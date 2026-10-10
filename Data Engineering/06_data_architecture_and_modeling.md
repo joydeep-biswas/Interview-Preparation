@@ -4,6 +4,37 @@ A comprehensive, production-grade guide to enterprise data architectures (Data L
 
 ---
 
+## Architectural Overview: Enterprise Data Architecture & Medallion Lakehouse Modeling
+
+```mermaid
+flowchart TD
+    subgraph IngestionRaw ["Bronze Layer (Raw Ingestion)"]
+        Raw["Raw Event Stream & CDC Data<br/>(Immutable, append-only, original format preserved)"]
+    end
+    subgraph EnrichedConformed ["Silver Layer (Cleansed & Enriched)"]
+        Cleanse["Deduplicated & Schema-Validated Data<br/>(Quarantine invalid records, standardized formats)"]
+        DataVault["Data Vault 2.0 / Core Integration<br/>(Hubs, Links, Satellites for auditability)"]
+    end
+    subgraph AnalyticalServing ["Gold Layer (Curated Dimensional Models)"]
+        KimballStar["Kimball Star Schema<br/>(Conformed Dimensions, Fact Tables, SCD 1/2)"]
+        SemanticLayer["Centralized Semantic Layer<br/>(Metric consistency, role-based business metrics)"]
+    end
+
+    Raw --> Cleanse --> DataVault
+    DataVault --> KimballStar --> SemanticLayer
+
+    style IngestionRaw fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style EnrichedConformed fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style AnalyticalServing fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Raw fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Cleanse fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style DataVault fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style KimballStar fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style SemanticLayer fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
 1. [Data Architecture Patterns](#1-data-architecture-patterns)
    - [1.1 Data Lake](#11-data-lake)
@@ -11,7 +42,7 @@ A comprehensive, production-grade guide to enterprise data architectures (Data L
    - [1.3 Data Lakehouse](#13-data-lakehouse)
    - [1.4 Lambda Architecture](#14-lambda-architecture)
    - [1.5 Kappa Architecture](#15-kappa-architecture)
-   - [1.6 Medallion Architecture (Bronze / Silver / Gold)](#16-medallion-architecture-bronze--silver--gold)
+   - [1.6 Medallion Architecture (Bronze / Silver / Gold)](#16-medallion-architecture-bronze-silver-gold)
    - [1.7 Data Mesh](#17-data-mesh)
    - [1.8 Data Fabric](#18-data-fabric)
    - [1.9 Modern Data Stack (MDS)](#19-modern-data-stack-mds)
@@ -33,22 +64,22 @@ A comprehensive, production-grade guide to enterprise data architectures (Data L
      - [2.7.4 Degenerate Dimensions](#274-degenerate-dimensions)
      - [2.7.5 Outrigger Dimensions](#275-outrigger-dimensions)
    - [2.8 Slowly Changing Dimensions (SCD Types 0-6)](#28-slowly-changing-dimensions-scd-types-0-6)
-     - [2.8.1 SCD Type 0 (Fixed / Retain Original)](#281-scd-type-0-fixed--retain-original)
+     - [2.8.1 SCD Type 0 (Fixed / Retain Original)](#281-scd-type-0-fixed-retain-original)
      - [2.8.2 SCD Type 1 (Overwrite)](#282-scd-type-1-overwrite)
-     - [2.8.3 SCD Type 2 (Historical Versioning with Effective Dates)](#283-scd-type-2-historical-versioning)
-     - [2.8.4 SCD Type 3 (Previous / Current Attribute Columns)](#284-scd-type-3-previous--current-attribute-columns)
+     - [2.8.3 SCD Type 2 (Historical Versioning with Effective Dates)](#283-scd-type-2-historical-versioning-with-effective-dates)
+     - [2.8.4 SCD Type 3 (Previous / Current Attribute Columns)](#284-scd-type-3-previous-current-attribute-columns)
      - [2.8.5 SCD Type 4 (Historical Min/Max Mini-Dimensions)](#285-scd-type-4-historical-mini-dimensions)
-     - [2.8.6 SCD Type 6 (Hybrid 1 + 2 + 3)](#286-scd-type-6-hybrid-1--2--3)
+     - [2.8.6 SCD Type 6 (Hybrid 1 + 2 + 3)](#286-scd-type-6-hybrid-1-2-3)
    - [2.9 Data Vault 2.0 (Hubs, Links, Satellites)](#29-data-vault-20-hubs-links-satellites)
    - [2.10 One Big Table (OBT)](#210-one-big-table-obt)
-   - [2.11 The Semantic Layer & Metric Standardization](#211-the-semantic-layer--metric-standardization)
-   - [2.12 Dimension Refresh Strategies & Reference Data Updates](#212-dimension-refresh-strategies--reference-data-updates)
-   - [2.13 Referential Integrity & Orphan Record Prevention](#213-referential-integrity--orphan-record-prevention)
-3. [Data Governance & Metadata Management](#3-data-governance--metadata-management)
+   - [2.11 The Semantic Layer & Metric Standardization](#211-the-semantic-layer-metric-standardization)
+   - [2.12 Dimension Refresh Strategies & Reference Data Updates](#212-dimension-refresh-strategies-reference-data-updates)
+   - [2.13 Referential Integrity & Orphan Record Prevention](#213-referential-integrity-orphan-record-prevention)
+3. [Data Governance & Metadata Management](#3-data-governance-metadata-management)
    - [3.1 Data Lineage](#31-data-lineage)
    - [3.2 Data Catalog](#32-data-catalog)
    - [3.3 Data Quality Frameworks](#33-data-quality-frameworks)
-   - [3.4 Data Classification & PII Protection](#34-data-classification--pii-protection)
+   - [3.4 Data Classification & PII Protection](#34-data-classification-pii-protection)
    - [3.5 Master Data Management (MDM)](#35-master-data-management-mdm)
 
 ---

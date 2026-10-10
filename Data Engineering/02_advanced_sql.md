@@ -4,39 +4,75 @@ A comprehensive, production-grade guide to advanced relational query design, dis
 
 ---
 
+## Architectural Overview: Advanced Query Optimization & Distributed Join Architecture
+
+```mermaid
+flowchart TD
+    subgraph Optimizer ["Cost-Based Optimizer (CBO)"]
+        SQL["Declarative Analytical SQL<br/>(Window functions, CTEs, complex joins)"]
+        AstCbo["Logical Plan -> Physical Tree<br/>(Histogram statistics & cost estimation)"]
+    end
+    subgraph JoinStrategies ["Distributed Physical Join Operators"]
+        BHJ["Broadcast Hash Join<br/>(Small dimension broadcast; zero fact shuffle)"]
+        SHJ["Shuffle Hash Join<br/>(Network key hash redistribution)"]
+        SMJ["Sort-Merge Join<br/>(External disk sort; resilient to skew & spill)"]
+    end
+    subgraph Materialization ["Persistence & Serving"]
+        MV["Materialized Views & CDC UPSERT<br/>(Precomputed query rewrite & Delta MERGE)"]
+    end
+
+    SQL --> AstCbo
+    AstCbo --> BHJ
+    AstCbo --> SHJ
+    AstCbo --> SMJ
+    JoinStrategies --> MV
+
+    style Optimizer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style JoinStrategies fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Materialization fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style SQL fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style AstCbo fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style BHJ fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style SHJ fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style SMJ fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style MV fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
-1. [Advanced Joins & Distributed Execution Mechanics](#1-advanced-joins--distributed-execution-mechanics)
-   - [1.1 SEMI JOIN & ANTI JOIN](#11-semi-join--anti-join)
-   - [1.2 SELF JOIN & Asymmetric Pairing](#12-self-join--asymmetric-pairing)
+1. [Advanced Joins & Distributed Execution Mechanics](#1-advanced-joins-distributed-execution-mechanics)
+   - [1.1 SEMI JOIN & ANTI JOIN](#11-semi-join-anti-join)
+   - [1.2 SELF JOIN & Asymmetric Pairing](#12-self-join-asymmetric-pairing)
    - [1.3 Distributed Join Strategies: Broadcast, Shuffle Hash, Sort-Merge](#13-distributed-join-strategies-broadcast-shuffle-hash-sort-merge)
-   - [1.4 Join Order & Cost-Based Optimizer (CBO) Execution Trees](#14-join-order--cost-based-optimizer-cbo-execution-trees)
-   - [1.5 Join Cardinality, Skew & Fan-Out Prevention (Pre-Aggregation & Salting)](#15-join-cardinality-skew--fan-out-prevention-pre-aggregation--salting)
-   - [1.6 Non-Equi Joins & Temporal / SCD2 Range Matching](#16-non-equi-joins--temporal--scd2-range-matching)
-2. [Advanced Subqueries, CTEs & Hierarchical Recursion](#2-advanced-subqueries-ctes--hierarchical-recursion)
-   - [2.1 Correlated Subqueries & Query Decorrelation (LATERAL / CROSS APPLY)](#21-correlated-subqueries--query-decorrelation-lateral--cross-apply)
-   - [2.2 Common Table Expressions (CTEs) & Materialization Semantics](#22-common-table-expressions-ctes--materialization-semantics)
-   - [2.3 Recursive CTEs & Graph / Hierarchy Traversal](#23-recursive-ctes--graph--hierarchy-traversal)
-   - [2.4 EXISTS vs. NOT EXISTS vs. IN / NOT IN Deep-Dive](#24-exists-vs-not-exists-vs-in--not-in-deep-dive)
-3. [Window Functions & Analytical SQL](#3-window-functions--analytical-sql)
-   - [3.1 Window Functions Architecture & Syntax](#31-window-functions-architecture--syntax)
+   - [1.4 Join Order & Cost-Based Optimizer (CBO) Execution Trees](#14-join-order-cost-based-optimizer-cbo-execution-trees)
+   - [1.5 Join Cardinality, Skew & Fan-Out Prevention (Pre-Aggregation & Salting)](#15-join-cardinality-skew-fan-out-prevention-pre-aggregation-salting)
+   - [1.6 Non-Equi Joins & Temporal / SCD2 Range Matching](#16-non-equi-joins-temporal-scd2-range-matching)
+2. [Advanced Subqueries, CTEs & Hierarchical Recursion](#2-advanced-subqueries-ctes-hierarchical-recursion)
+   - [2.1 Correlated Subqueries & Query Decorrelation (LATERAL / CROSS APPLY)](#21-correlated-subqueries-query-decorrelation-lateral-cross-apply)
+   - [2.2 Common Table Expressions (CTEs) & Materialization Semantics](#22-common-table-expressions-ctes-materialization-semantics)
+   - [2.3 Recursive CTEs & Graph / Hierarchy Traversal](#23-recursive-ctes-graph-hierarchy-traversal)
+   - [2.4 EXISTS vs. NOT EXISTS vs. IN / NOT IN Deep-Dive](#24-exists-vs-not-exists-vs-in-not-in-deep-dive)
+3. [Window Functions & Analytical SQL](#3-window-functions-analytical-sql)
+   - [3.1 Window Functions Architecture & Syntax](#31-window-functions-architecture-syntax)
    - [3.2 Window Framing Deep-Dive: ROWS vs. RANGE vs. GROUPS](#32-window-framing-deep-dive-rows-vs-range-vs-groups)
-   - [3.3 Ranking Functions: ROW_NUMBER, RANK, DENSE_RANK, NTILE](#33-ranking-functions-row_number-rank-dense_rank-ntile)
-   - [3.4 Value Navigation Functions: LEAD, LAG, FIRST_VALUE, LAST_VALUE, NTH_VALUE](#34-value-navigation-functions-lead-lag-first_value-last_value-nth_value)
-   - [3.5 Cumulative Patterns: Running Totals & Moving Averages](#35-cumulative-patterns-running-totals--moving-averages)
+   - [3.3 Ranking Functions: ROW_NUMBER, RANK, DENSE_RANK, NTILE](#33-ranking-functions-rownumber-rank-denserank-ntile)
+   - [3.4 Value Navigation Functions: LEAD, LAG, FIRST_VALUE, LAST_VALUE, NTH_VALUE](#34-value-navigation-functions-lead-lag-firstvalue-lastvalue-nthvalue)
+   - [3.5 Cumulative Patterns: Running Totals & Moving Averages](#35-cumulative-patterns-running-totals-moving-averages)
    - [3.6 Advanced Analytical Patterns: Top-N, Deduplication, Sessionization, Gaps and Islands](#36-advanced-analytical-patterns-top-n-deduplication-sessionization-gaps-and-islands)
    - [3.7 The QUALIFY Clause](#37-the-qualify-clause)
-4. [Advanced Grouping, Aggregation & Pivoting](#4-advanced-grouping-aggregation--pivoting)
+4. [Advanced Grouping, Aggregation & Pivoting](#4-advanced-grouping-aggregation-pivoting)
    - [4.1 Multi-Dimensional Grouping: GROUPING SETS, ROLLUP, CUBE](#41-multi-dimensional-grouping-grouping-sets-rollup-cube)
    - [4.2 PIVOT and UNPIVOT](#42-pivot-and-unpivot)
-5. [Advanced Data Modification, Concurrency & Transactions](#5-advanced-data-modification-concurrency--transactions)
-   - [5.1 MERGE / UPSERT & Change Data Capture (CDC) Patterns](#51-merge--upsert--change-data-capture-cdc-patterns)
-   - [5.2 Transaction Control & ACID Mechanics](#52-transaction-control--acid-mechanics)
-   - [5.3 ANSI SQL Isolation Levels & Concurrency Anomalies](#53-ansi-sql-isolation-levels--concurrency-anomalies)
-6. [Advanced Database Programmability & Objects](#6-advanced-database-programmability--objects)
-   - [6.1 Materialized Views & Query Rewrite Engines](#61-materialized-views--query-rewrite-engines)
-   - [6.2 Stored Procedures & Transactional Orchestration](#62-stored-procedures--transactional-orchestration)
+5. [Advanced Data Modification, Concurrency & Transactions](#5-advanced-data-modification-concurrency-transactions)
+   - [5.1 MERGE / UPSERT & Change Data Capture (CDC) Patterns](#51-merge-upsert-change-data-capture-cdc-patterns)
+   - [5.2 Transaction Control & ACID Mechanics](#52-transaction-control-acid-mechanics)
+   - [5.3 ANSI SQL Isolation Levels & Concurrency Anomalies](#53-ansi-sql-isolation-levels-concurrency-anomalies)
+6. [Advanced Database Programmability & Objects](#6-advanced-database-programmability-objects)
+   - [6.1 Materialized Views & Query Rewrite Engines](#61-materialized-views-query-rewrite-engines)
+   - [6.2 Stored Procedures & Transactional Orchestration](#62-stored-procedures-transactional-orchestration)
    - [6.3 User-Defined Functions (UDFs: Scalar, Table-Valued, Vectorized)](#63-user-defined-functions-udfs-scalar-table-valued-vectorized)
-   - [6.4 Temporary Views & Global Virtual Catalogs](#64-temporary-views--global-virtual-catalogs)
+   - [6.4 Temporary Views & Global Virtual Catalogs](#64-temporary-views-global-virtual-catalogs)
 
 ---
 

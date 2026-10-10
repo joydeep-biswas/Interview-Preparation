@@ -2,9 +2,55 @@
 
 A comprehensive production-grade guide to Microsoft Azure data platform services (ADLS Gen2, Data Factory, Synapse Analytics, Databricks, Event Hubs), enterprise cloud security and networking, and end-to-end DataOps engineering (Docker, Kubernetes, Terraform IaC, CI/CD automation, testing, and zero-downtime deployment strategies).
 
+---
+
+## Architectural Overview: Enterprise Azure Data Platform & DataOps Architecture
+
+```mermaid
+flowchart TD
+    subgraph IngestionLayer ["Ingestion & Movement"]
+        ADF["Azure Data Factory (ADF)<br/>(Metadata-driven Copy Pipelines & Self-Hosted IR)"]
+        EventHub["Azure Event Hubs / IoT Hub<br/>(Real-time telemetry ingestion)"]
+    end
+    subgraph StorageLayer ["Lakehouse Persistence"]
+        ADLS["Azure Data Lake Storage (ADLS Gen2)<br/>(Hierarchical Namespace: Bronze / Silver / Gold)"]
+        KeyVault["Azure Key Vault<br/>(Managed identities & encrypted secrets)"]
+    end
+    subgraph ComputeLayer ["Analytics & Processing Engines"]
+        Databricks["Azure Databricks Lakehouse<br/>(Autoscaling clusters, Delta Lake & Unity Catalog)"]
+        Synapse["Azure Synapse Analytics<br/>(Serverless SQL pools & Dedicated DW)"]
+    end
+    subgraph DataOpsPlatform ["DataOps & Release Engineering"]
+        CICD["Terraform IaC & Azure DevOps CI/CD<br/>(Automated unit testing, linting & blue-green deploys)"]
+    end
+
+    ADF --> ADLS
+    EventHub --> Databricks
+    KeyVault -.-> ADF
+    KeyVault -.-> Databricks
+    ADLS <--> Databricks
+    ADLS <--> Synapse
+    CICD --> ADF
+    CICD --> Databricks
+
+    style IngestionLayer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style StorageLayer fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style ComputeLayer fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style DataOpsPlatform fill:#0f172a,stroke:#ec4899,stroke-width:1.5px,color:#f472b6
+    style ADF fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style EventHub fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ADLS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style KeyVault fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Databricks fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Synapse fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style CICD fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
 1. [End-to-End Enterprise Data Architecture on Microsoft Azure](#1-end-to-end-enterprise-data-architecture-on-microsoft-azure)
-   - [1.1 Architecture Blueprint & Security Fundamentals](#11-architecture-blueprint--security-fundamentals)
+   - [1.1 Architecture Blueprint & Security Fundamentals](#11-architecture-blueprint-security-fundamentals)
    - [1.2 Infrastructure as Code: Complete Terraform Deployment](#12-infrastructure-as-code-complete-terraform-deployment)
    - [1.3 Production PySpark Medallion Pipeline on Azure Databricks](#13-production-pyspark-medallion-pipeline-on-azure-databricks)
 2. [Core Azure Data Platform Services](#2-core-azure-data-platform-services)
@@ -18,47 +64,47 @@ A comprehensive production-grade guide to Microsoft Azure data platform services
    - [2.8 Azure SQL Database](#28-azure-sql-database)
    - [2.9 Azure Cosmos DB](#29-azure-cosmos-db)
    - [2.10 Azure Key Vault](#210-azure-key-vault)
-   - [2.11 Azure Monitor & Log Analytics](#211-azure-monitor--log-analytics)
-3. [Identity, Security & Cloud Networking](#3-identity-security--cloud-networking)
+   - [2.11 Azure Monitor & Log Analytics](#211-azure-monitor-log-analytics)
+3. [Identity, Security & Cloud Networking](#3-identity-security-cloud-networking)
    - [3.1 Microsoft Entra ID (Azure AD)](#31-microsoft-entra-id-azure-ad)
-   - [3.2 Service Principals & App Registrations](#32-service-principals--app-registrations)
+   - [3.2 Service Principals & App Registrations](#32-service-principals-app-registrations)
    - [3.3 Managed Identities](#33-managed-identities)
    - [3.4 Role-Based Access Control (RBAC)](#34-role-based-access-control-rbac)
    - [3.5 Key Vault Secret Scopes Integration](#35-key-vault-secret-scopes-integration)
-   - [3.6 Virtual Networks (VNets) & Network Security Groups (NSGs)](#36-virtual-networks-vnets--network-security-groups-nsgs)
-   - [3.7 Private Endpoints & Azure Private Link](#37-private-endpoints--azure-private-link)
+   - [3.6 Virtual Networks (VNets) & Network Security Groups (NSGs)](#36-virtual-networks-vnets-network-security-groups-nsgs)
+   - [3.7 Private Endpoints & Azure Private Link](#37-private-endpoints-azure-private-link)
 4. [Azure Data Factory (ADF) Deep-Dive](#4-azure-data-factory-adf-deep-dive)
-   - [4.1 Pipelines, Activities & Control Flow](#41-pipelines-activities--control-flow)
+   - [4.1 Pipelines, Activities & Control Flow](#41-pipelines-activities-control-flow)
    - [4.2 Core Activities](#42-core-activities)
    - [4.3 Mapping Data Flows](#43-mapping-data-flows)
    - [4.4 Integration Runtimes (IR)](#44-integration-runtimes-ir)
    - [4.5 Linked Services vs Datasets](#45-linked-services-vs-datasets)
    - [4.6 Triggers](#46-triggers)
    - [4.7 Parameters vs Variables](#47-parameters-vs-variables)
-   - [4.8 Monitoring & Alerts](#48-monitoring--alerts)
+   - [4.8 Monitoring & Alerts](#48-monitoring-alerts)
 5. [Azure Synapse Analytics Deep-Dive](#5-azure-synapse-analytics-deep-dive)
    - [5.1 Synapse Dedicated SQL Pools (MPP Architecture)](#51-synapse-dedicated-sql-pools-mpp-architecture)
    - [5.2 Data Distribution Strategies](#52-data-distribution-strategies)
    - [5.3 Synapse Serverless SQL Pools (OPENROWSET)](#53-synapse-serverless-sql-pools-openrowset)
    - [5.4 Synapse Spark Pools](#54-synapse-spark-pools)
    - [5.5 Synapse Pipelines](#55-synapse-pipelines)
-6. [DataOps, CI/CD & Version Control](#6-dataops-cicd--version-control)
+6. [DataOps, CI/CD & Version Control](#6-dataops-cicd-version-control)
    - [6.1 The DataOps CI/CD Lifecycle](#61-the-dataops-cicd-lifecycle)
    - [6.2 Git Branching Strategies](#62-git-branching-strategies)
    - [6.3 Automated Pre-Commit Hooks](#63-automated-pre-commit-hooks)
-7. [Containers & Cloud Infrastructure as Code](#7-containers--cloud-infrastructure-as-code)
+7. [Containers & Cloud Infrastructure as Code](#7-containers-cloud-infrastructure-as-code)
    - [7.1 Docker for Data Engineering](#71-docker-for-data-engineering)
    - [7.2 Kubernetes for Data](#72-kubernetes-for-data)
    - [7.3 Infrastructure as Code (Terraform)](#73-infrastructure-as-code-terraform)
    - [7.4 Multi-Environment Promotion](#74-multi-environment-promotion)
-8. [Testing & Release Engineering for Data Pipelines](#8-testing--release-engineering-for-data-pipelines)
+8. [Testing & Release Engineering for Data Pipelines](#8-testing-release-engineering-for-data-pipelines)
    - [8.1 Unit Testing Transformation Logic with pytest](#81-unit-testing-transformation-logic-with-pytest)
    - [8.2 Integration Testing with Testcontainers](#82-integration-testing-with-testcontainers)
    - [8.3 End-to-End Pipeline Testing](#83-end-to-end-pipeline-testing)
    - [8.4 Synthetic Test Data Generation with Faker](#84-synthetic-test-data-generation-with-faker)
    - [8.5 Blue-Green Deployments for Data Pipelines](#85-blue-green-deployments-for-data-pipelines)
-   - [8.6 Canary Deployments & Shadow Pipelines](#86-canary-deployments--shadow-pipelines)
-9. [References & Further Reading](#9-references--further-reading)
+   - [8.6 Canary Deployments & Shadow Pipelines](#86-canary-deployments-shadow-pipelines)
+9. [References & Further Reading](#9-references-further-reading)
 
 ---
 
@@ -1091,3 +1137,11 @@ flowchart TD
 - [DataCamp: CI/CD for Machine Learning and Data](https://www.datacamp.com/tutorial/ci-cd-for-machine-learning)
 
 ---
+
+---
+
+# 9. References & Further Reading
+
+- [Official Documentation & Design Principles Guide](https://docs.microsoft.com/en-us/azure/architecture/)
+- [High Performance Distributed Data Architecture Patterns](https://martinfowler.com/articles/patterns-of-distributed-systems/)
+- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)

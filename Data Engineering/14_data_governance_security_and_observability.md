@@ -4,7 +4,7 @@ A unified, comprehensive, production-grade guide to enterprise data governance, 
 
 ---
 
-## Unified Governance & Observability Control Plane
+## Architectural Overview: Unified Governance & Observability Control Plane
 
 ```mermaid
 flowchart TD
@@ -58,38 +58,38 @@ flowchart TD
 ## Table of Contents
 1. [Access Control Paradigms](#1-access-control-paradigms)
    - [1.1 RBAC vs ABAC](#11-rbac-vs-abac)
-   - [1.2 Principle of Least Privilege (PoLP) & Zero Trust](#12-principle-of-least-privilege-polp--zero-trust)
-2. [Data Protection & Obfuscation Techniques](#2-data-protection--obfuscation-techniques)
+   - [1.2 Principle of Least Privilege (PoLP) & Zero Trust](#12-principle-of-least-privilege-polp-zero-trust)
+2. [Data Protection & Obfuscation Techniques](#2-data-protection-obfuscation-techniques)
    - [2.1 Static Data Masking vs Dynamic Data Masking](#21-static-data-masking-vs-dynamic-data-masking)
-   - [2.2 Tokenization, Anonymization & Cryptographic Pseudonymization](#22-tokenization-anonymization--cryptographic-pseudonymization)
-   - [2.3 Encryption at Rest & Envelope Encryption](#23-encryption-at-rest--envelope-encryption)
-   - [2.4 Encryption in Transit (mTLS & TLS 1.3)](#24-encryption-in-transit-mtls--tls-13)
-3. [Regulatory Compliance & Lakehouse Privacy](#3-regulatory-compliance--lakehouse-privacy)
+   - [2.2 Tokenization, Anonymization & Cryptographic Pseudonymization](#22-tokenization-anonymization-cryptographic-pseudonymization)
+   - [2.3 Encryption at Rest & Envelope Encryption](#23-encryption-at-rest-envelope-encryption)
+   - [2.4 Encryption in Transit (mTLS & TLS 1.3)](#24-encryption-in-transit-mtls-tls-13)
+3. [Regulatory Compliance & Lakehouse Privacy](#3-regulatory-compliance-lakehouse-privacy)
    - [3.1 Regulatory Frameworks (GDPR, CCPA, HIPAA, PCI-DSS)](#31-regulatory-frameworks-gdpr-ccpa-hipaa-pci-dss)
-   - [3.2 GDPR & CCPA Compliance: The "Right to be Forgotten" in Data Lakes](#32-gdpr--ccpa-compliance-the-right-to-be-forgotten-in-data-lakes)
-   - [3.3 Data Retention Policies & Cryptographic Erasure](#33-data-retention-policies--cryptographic-erasure)
-4. [Fine-Grained Security & Secure Collaboration](#4-fine-grained-security--secure-collaboration)
-   - [4.1 Row-Level Security (RLS) & Column-Level Security (CLS)](#41-row-level-security-rls--column-level-security-cls)
+   - [3.2 GDPR & CCPA Compliance: The "Right to be Forgotten" in Data Lakes](#32-gdpr-ccpa-compliance-the-right-to-be-forgotten-in-data-lakes)
+   - [3.3 Data Retention Policies & Cryptographic Erasure](#33-data-retention-policies-cryptographic-erasure)
+4. [Fine-Grained Security & Secure Collaboration](#4-fine-grained-security-secure-collaboration)
+   - [4.1 Row-Level Security (RLS) & Column-Level Security (CLS)](#41-row-level-security-rls-column-level-security-cls)
    - [4.2 Data Clean Rooms](#42-data-clean-rooms)
 5. [The 5 Pillars of Data Observability](#5-the-5-pillars-of-data-observability)
    - [5.1 Freshness](#51-freshness)
    - [5.2 Volume](#52-volume)
-   - [5.3 Quality & Automated Assertion Frameworks](#53-quality--automated-assertion-frameworks)
+   - [5.3 Quality & Automated Assertion Frameworks](#53-quality-automated-assertion-frameworks)
    - [5.4 Schema Drift Detection](#54-schema-drift-detection)
    - [5.5 End-to-End Lineage Tracking](#55-end-to-end-lineage-tracking)
-6. [Data Reliability Engineering & Downtime](#6-data-reliability-engineering--downtime)
-   - [6.1 Data Downtime Calculation & Impact](#61-data-downtime-calculation--impact)
+6. [Data Reliability Engineering & Downtime](#6-data-reliability-engineering-downtime)
+   - [6.1 Data Downtime Calculation & Impact](#61-data-downtime-calculation-impact)
    - [6.2 Data SLIs, SLOs, and SLAs](#62-data-slis-slos-and-slas)
    - [6.3 Error Budgets for Data Platforms](#63-error-budgets-for-data-platforms)
-7. [Automated Anomaly Detection & Circuit Breakers](#7-automated-anomaly-detection--circuit-breakers)
-   - [7.1 Statistical Anomaly Detection (Z-Score & IQR)](#71-statistical-anomaly-detection-z-score--iqr)
+7. [Automated Anomaly Detection & Circuit Breakers](#7-automated-anomaly-detection-circuit-breakers)
+   - [7.1 Statistical Anomaly Detection (Z-Score & IQR)](#71-statistical-anomaly-detection-z-score-iqr)
    - [7.2 Pipeline Circuit Breakers](#72-pipeline-circuit-breakers)
-8. [Observability Tooling & Operational RCA](#8-observability-tooling--operational-rca)
+8. [Observability Tooling & Operational RCA](#8-observability-tooling-operational-rca)
    - [8.1 Tooling Landscape (Elementary, Monte Carlo, OpenLineage)](#81-tooling-landscape-elementary-monte-carlo-openlineage)
    - [8.2 Metadata-Driven Monitoring via Warehouse System Tables](#82-metadata-driven-monitoring-via-warehouse-system-tables)
    - [8.3 Alert Fatigue Prevention Strategies](#83-alert-fatigue-prevention-strategies)
    - [8.4 Root Cause Analysis (RCA) Workflows](#84-root-cause-analysis-rca-workflows)
-9. [References & Further Reading](#9-references--further-reading)
+9. [References & Further Reading](#9-references-further-reading)
 
 ---
 
@@ -523,12 +523,29 @@ $$Z = \frac{x - \mu}{\sigma} \quad (\text{Flag if } |Z| > 3.0)$$
 A Circuit Breaker halts downstream DAG tasks whenever staging data fails volume or quality assertions, preventing corrupted records from polluting production Gold marts.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Closed: Pipeline Runs Normally
-    Closed --> Tripped: Quality / Volume Test Fails!
-    Tripped --> Open: Halt Downstream Tasks & Send Alert
-    Open --> Reset: Engineer Investigates, Fixes Source, & Resets
-    Reset --> Closed
+flowchart TD
+    subgraph OperationalState ["Normal Execution Flow"]
+        ClosedState["CLOSED State (Healthy)<br/>(Pipeline executes normally, assertions passing)"]
+    end
+
+    subgraph ProtectionState ["Fault Isolation & Alerting"]
+        TrippedState["TRIPPED State<br/>(Quality / Volume anomaly detected in staging batch)"]
+        OpenState["OPEN State (Circuit Breaker Active)<br/>(Downstream DAG tasks blocked, alert dispatched to on-call)"]
+        HalfOpenState["RESET / HALF-OPEN State<br/>(Remediation verified, dry-run batch validated)"]
+    end
+
+    ClosedState -->|"Assertion failure (nulls > threshold, row drop > 30%)"| TrippedState
+    TrippedState -->|"Automated DAG halt & pager trigger"| OpenState
+    OpenState -->|"Data engineer investigates, fixes bad source data"| HalfOpenState
+    HalfOpenState -->|"Validation tests pass"| ClosedState
+
+    style OperationalState fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style ProtectionState fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+
+    style ClosedState fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style TrippedState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style OpenState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style HalfOpenState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
 ```
 
 ```sql

@@ -4,7 +4,7 @@ A unified, comprehensive, production-grade guide to enterprise data pipeline des
 
 ---
 
-## End-to-End Pipeline & Ingestion Architecture
+## Architectural Overview: End-to-End Pipeline & Ingestion Architecture
 
 ```mermaid
 flowchart LR
@@ -62,31 +62,31 @@ flowchart LR
 
 
 ## Table of Contents
-1. [ETL vs. ELT & Processing Paradigms](#1-etl-vs-elt--processing-paradigms)
-   - [1.1 ETL vs ELT Architecture & Processing Paradigms](#11-etl-vs-elt-architecture--processing-paradigms)
+1. [ETL vs. ELT & Processing Paradigms](#1-etl-vs-elt-processing-paradigms)
+   - [1.1 ETL vs ELT Architecture & Processing Paradigms](#11-etl-vs-elt-architecture-processing-paradigms)
    - [1.2 Batch vs Streaming Processing](#12-batch-vs-streaming-processing)
    - [1.3 Push vs Pull Architecture](#13-push-vs-pull-architecture)
    - [1.4 Micro-Batching Mechanics](#14-micro-batching-mechanics)
 2. [Resilient Pipeline Design Patterns](#2-resilient-pipeline-design-patterns)
    - [2.1 Idempotency](#21-idempotency)
-   - [2.2 Fault Tolerance & Recovery](#22-fault-tolerance--recovery)
-   - [2.3 Checkpointing & State Stores](#23-checkpointing--state-stores)
+   - [2.2 Fault Tolerance & Recovery](#22-fault-tolerance-recovery)
+   - [2.3 Checkpointing & State Stores](#23-checkpointing-state-stores)
    - [2.4 Backpressure Management](#24-backpressure-management)
-   - [2.5 Replayability & Event Re-Sourcing](#25-replayability--event-re-sourcing)
+   - [2.5 Replayability & Event Re-Sourcing](#25-replayability-event-re-sourcing)
    - [2.6 Deduplication Patterns](#26-deduplication-patterns)
-   - [2.7 Late-Arriving & Out-of-Order Data](#27-late-arriving--out-of-order-data)
+   - [2.7 Late-Arriving & Out-of-Order Data](#27-late-arriving-out-of-order-data)
    - [2.8 Watermarking](#28-watermarking)
-   - [2.9 Dead Letter Queues (DLQ) & Quarantine Routing](#29-dead-letter-queues-dlq--quarantine-routing)
-   - [2.10 Bad Records Handling & Permissive Modes](#210-bad-records-handling--permissive-modes)
-   - [2.11 Schema Validation & Defensive Ingestion](#211-schema-validation--defensive-ingestion)
-   - [2.12 Pipeline Monitoring & Observability](#212-pipeline-monitoring--observability)
-   - [2.13 SLA Management & Alerting Thresholds](#213-sla-management--alerting-thresholds)
+   - [2.9 Dead Letter Queues (DLQ) & Quarantine Routing](#29-dead-letter-queues-dlq-quarantine-routing)
+   - [2.10 Bad Records Handling & Permissive Modes](#210-bad-records-handling-permissive-modes)
+   - [2.11 Schema Validation & Defensive Ingestion](#211-schema-validation-defensive-ingestion)
+   - [2.12 Pipeline Monitoring & Observability](#212-pipeline-monitoring-observability)
+   - [2.13 SLA Management & Alerting Thresholds](#213-sla-management-alerting-thresholds)
    - [2.14 Backfilling Historical Data](#214-backfilling-historical-data)
-   - [2.15 Metadata-Driven Pipelines & Control Table Framework](#215-metadata-driven-pipelines--control-table-framework)
-3. [Data Quality & Contracts](#3-data-quality--contracts)
+   - [2.15 Metadata-Driven Pipelines & Control Table Framework](#215-metadata-driven-pipelines-control-table-framework)
+3. [Data Quality & Contracts](#3-data-quality-contracts)
    - [3.1 Data Contracts](#31-data-contracts)
    - [3.2 Great Expectations Framework](#32-great-expectations-framework)
-   - [3.3 Soda Core & Soda Cloud](#33-soda-core--soda-cloud)
+   - [3.3 Soda Core & Soda Cloud](#33-soda-core-soda-cloud)
    - [3.4 Apache Spark Deequ](#34-apache-spark-deequ)
    - [3.5 dbt Tests](#35-dbt-tests)
    - [3.6 Schema Drift Detection](#36-schema-drift-detection)
@@ -94,28 +94,28 @@ flowchart LR
 4. [File-Based Cloud Ingestion](#4-file-based-cloud-ingestion)
    - [4.1 Batch File Ingestion vs Incremental Processing](#41-batch-file-ingestion-vs-incremental-processing)
    - [4.2 Databricks Auto Loader (`cloudFiles`)](#42-databricks-auto-loader-cloudfiles)
-   - [4.3 SQL `COPY INTO` (Databricks & Snowflake)](#43-sql-copy-into-databricks--snowflake)
+   - [4.3 SQL `COPY INTO` (Databricks & Snowflake)](#43-sql-copy-into-databricks-snowflake)
    - [4.4 Snowflake Snowpipe](#44-snowflake-snowpipe)
    - [4.5 BigQuery Load Jobs](#45-bigquery-load-jobs)
    - [4.6 Directory Listing vs Notification-Based Ingestion](#46-directory-listing-vs-notification-based-ingestion)
-   - [4.7 Checkpoint Management & State Tracking](#47-checkpoint-management--state-tracking)
-   - [4.8 Schema Inference & Automated Evolution](#48-schema-inference--automated-evolution)
+   - [4.7 Checkpoint Management & State Tracking](#47-checkpoint-management-state-tracking)
+   - [4.8 Schema Inference & Automated Evolution](#48-schema-inference-automated-evolution)
 5. [Change Data Capture (CDC) Patterns](#5-change-data-capture-cdc-patterns)
-   - [5.1 Log-Based CDC (Debezium & Kafka Connect)](#51-log-based-cdc-debezium--kafka-connect)
-   - [5.2 Query-Based CDC (Watermarks & updated_at)](#52-query-based-cdc-watermarks--updated_at)
+   - [5.1 Log-Based CDC (Debezium & Kafka Connect)](#51-log-based-cdc-debezium-kafka-connect)
+   - [5.2 Query-Based CDC (Watermarks & updated_at)](#52-query-based-cdc-watermarks-updatedat)
    - [5.3 Trigger-Based CDC](#53-trigger-based-cdc)
 6. [Relational Database Ingestion (RDBMS to Lake)](#6-relational-database-ingestion-rdbms-to-lake)
-   - [6.1 JDBC & ODBC Extraction Fundamentals](#61-jdbc--odbc-extraction-fundamentals)
+   - [6.1 JDBC & ODBC Extraction Fundamentals](#61-jdbc-odbc-extraction-fundamentals)
    - [6.2 Partitioned Database Reads (Parallel JDBC via Spark)](#62-partitioned-database-reads-parallel-jdbc-via-spark)
 7. [API Ingestion Patterns](#7-api-ingestion-patterns)
    - [7.1 API Pagination Strategies](#71-api-pagination-strategies)
-   - [7.2 Rate Limiting Handling (Exponential Backoff & Jitter)](#72-rate-limiting-handling-exponential-backoff--jitter)
+   - [7.2 Rate Limiting Handling (Exponential Backoff & Jitter)](#72-rate-limiting-handling-exponential-backoff-jitter)
    - [7.3 API Authentication](#73-api-authentication)
 8. [Streaming Message Ingestion](#8-streaming-message-ingestion)
    - [8.1 Kafka to Lakehouse Ingestion](#81-kafka-to-lakehouse-ingestion)
    - [8.2 Azure Event Hubs to Lakehouse Ingestion](#82-azure-event-hubs-to-lakehouse-ingestion)
 9. [Production Data Engineering Problem-Solution Master Playbook](#9-production-data-engineering-problem-solution-master-playbook)
-10. [References & Further Reading](#10-references--further-reading)
+10. [References & Further Reading](#10-references-further-reading)
 
 ---
 
@@ -1144,3 +1144,11 @@ flowchart TD
 | **48** | **Compliance & Governance** | Data Governance Framework | Regulatory liabilities under GDPR, CCPA, and HIPAA privacy mandates. | "Right to be Forgotten" cryptographic erasure, automated tagging, and audit trail logs. See [14. Governance](14_data_governance_security_and_observability.md#3-regulatory-compliance--privacy-engineering). |
 | **49** | **Disaster Recovery** | Backup & Restore Strategy | Regional cloud datacenter outages, ransomware, or accidental table drop. | Multi-region storage geo-redundancy (GRS/RA-GRS) and incremental Delta `DEEP CLONE` replication. See [09. Databricks](09_databricks_and_delta_lake.md#102-shallow-clone-vs-deep-clone), [09. Databricks](09_databricks_and_delta_lake.md#88-restore-table-disaster-recovery), [13. Azure](13_azure_data_engineering_and_devops.md#22-adls-gen2). |
 | **50** | **End-to-End Visibility** | End-to-End Monitoring | Fragmented pipeline stages operating as black boxes without unified health telemetry. | 5 Pillars of Data Observability (Freshness, Volume, Schema, Distribution, Lineage) with centralized alerting. See [10. Pipelines](10_data_pipeline_design_and_ingestion.md#212-pipeline-monitoring--observability), [14. Governance](14_data_governance_security_and_observability.md#7-data-observability--reliability-engineering). |
+
+---
+
+# 10. References & Further Reading
+
+- [Official Documentation & Design Principles Guide](https://docs.microsoft.com/en-us/azure/architecture/)
+- [High Performance Distributed Data Architecture Patterns](https://martinfowler.com/articles/patterns-of-distributed-systems/)
+- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)

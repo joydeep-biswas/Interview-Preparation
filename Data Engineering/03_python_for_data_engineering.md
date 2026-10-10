@@ -4,32 +4,69 @@ A comprehensive, production-grade guide to Python for high-performance data engi
 
 ---
 
+## Architectural Overview: Python Data Engineering & Memory Systems Architecture
+
+```mermaid
+flowchart TD
+    subgraph MemoryManagement ["CPython Memory & Runtime Internals"]
+        GIL["Global Interpreter Lock (GIL)<br/>(Single native thread execution lock)"]
+        ArenaPool["PyMalloc Allocator<br/>(Arenas -> Pools -> Blocks: <= 512B objects)"]
+        GC["Generational Garbage Collector<br/>(Gen 0 / 1 / 2 reference counting & cycles)"]
+    end
+    subgraph StreamingEngines ["Streaming & High-Throughput Compute"]
+        Generators["Generator Lazy Streaming<br/>(O(1) memory chunked iterators for 10GB+ CSV/JSON)"]
+        Polars["Polars / Arrow Vectorized Engine<br/>(Rust multi-threaded columnar SIMD execution)"]
+    end
+    subgraph ConcurrencySubsystem ["Concurrency Paradigms"]
+        AsyncIO["Asyncio Coroutines<br/>(Single-threaded event loop for high-latency APIs)"]
+        Multiprocessing["Multiprocessing Pool<br/>(Independent OS processes bypassing GIL)"]
+    end
+
+    ArenaPool --> GIL
+    GC --> GIL
+    GIL --> ConcurrencySubsystem
+    Generators --> Polars
+
+    style MemoryManagement fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style StreamingEngines fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style ConcurrencySubsystem fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style GIL fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ArenaPool fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style GC fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Generators fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Polars fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style AsyncIO fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Multiprocessing fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
 1. [Advanced Python Fundamentals](#1-advanced-python-fundamentals)
-   - [1.1 Built-in Data Structures & Time Complexity](#11-built-in-data-structures--time-complexity)
+   - [1.1 Built-in Data Structures & Time Complexity](#11-built-in-data-structures-time-complexity)
    - [1.2 Comprehensions (List, Dict, Set)](#12-comprehensions-list-dict-set)
    - [1.3 Generators, Iterators, and Memory-Safe Streaming](#13-generators-iterators-and-memory-safe-streaming)
-   - [1.4 Custom Decorators & Practical Engineering Use Cases](#14-custom-decorators--practical-engineering-use-cases)
-   - [1.5 Context Managers & Deterministic Resource Cleanup](#15-context-managers--deterministic-resource-cleanup)
+   - [1.4 Custom Decorators & Practical Engineering Use Cases](#14-custom-decorators-practical-engineering-use-cases)
+   - [1.5 Context Managers & Deterministic Resource Cleanup](#15-context-managers-deterministic-resource-cleanup)
    - [1.6 Lambda Functions, `*args`, and `**kwargs`](#16-lambda-functions-args-and-kwargs)
-   - [1.7 Robust Error Handling & Custom Domain Exceptions](#17-robust-error-handling--custom-domain-exceptions)
-   - [1.8 Type Hinting & Pydantic Data Validation](#18-type-hinting--pydantic-data-validation)
-2. [Data Processing Libraries & Modern Tooling](#2-data-processing-libraries--modern-tooling)
-   - [2.1 Pandas vs Polars (Architecture & Benchmarks)](#21-pandas-vs-polars-architecture--benchmarks)
+   - [1.7 Robust Error Handling & Custom Domain Exceptions](#17-robust-error-handling-custom-domain-exceptions)
+   - [1.8 Type Hinting & Pydantic Data Validation](#18-type-hinting-pydantic-data-validation)
+2. [Data Processing Libraries & Modern Tooling](#2-data-processing-libraries-modern-tooling)
+   - [2.1 Pandas vs Polars (Architecture & Benchmarks)](#21-pandas-vs-polars-architecture-benchmarks)
    - [2.2 Polars Deep-Dive (Rust-Based Multithreaded Lazy Execution)](#22-polars-deep-dive)
    - [2.3 DuckDB: The In-Process Analytical OLAP Engine](#23-duckdb-the-in-process-analytical-olap-engine)
-   - [2.4 PyArrow & Parquet In-Memory Processing](#24-pyarrow--parquet-in-memory-processing)
-   - [2.5 JSON & Nested Payload Manipulation](#25-json--nested-payload-manipulation)
-   - [2.6 Date, Time & Timezone Management (`zoneinfo`)](#26-date-time--timezone-management-zoneinfo)
+   - [2.4 PyArrow & Parquet In-Memory Processing](#24-pyarrow-parquet-in-memory-processing)
+   - [2.5 JSON & Nested Payload Manipulation](#25-json-nested-payload-manipulation)
+   - [2.6 Date, Time & Timezone Management (`zoneinfo`)](#26-date-time-timezone-management-zoneinfo)
    - [2.7 Streaming Large Files Line-by-Line (Memory-Safe I/O)](#27-streaming-large-files-line-by-line-memory-safe-io)
-   - [2.8 File Validation & Checksums (`hashlib`)](#28-file-validation--checksums-hashlib)
-   - [2.9 Missing Data Imputation & Default Value Fallbacks](#29-missing-data-imputation--default-value-fallbacks)
+   - [2.8 File Validation & Checksums (`hashlib`)](#28-file-validation-checksums-hashlib)
+   - [2.9 Missing Data Imputation & Default Value Fallbacks](#29-missing-data-imputation-default-value-fallbacks)
 3. [Production Python Systems Engineering](#3-production-python-systems-engineering)
-   - [3.1 Environment & Package Management (`venv`, `poetry`)](#31-environment--package-management-venv-poetry)
-   - [3.2 Structured Logging (`structlog` & JSON Formats)](#32-structured-logging-structlog--json-formats)
+   - [3.1 Environment & Package Management (`venv`, `poetry`)](#31-environment-package-management-venv-poetry)
+   - [3.2 Structured Logging (`structlog` & JSON Formats)](#32-structured-logging-structlog)
    - [3.3 Configuration Management (`pydantic-settings`)](#33-configuration-management-pydantic-settings)
    - [3.4 Concurrency: Multiprocessing vs Multithreading vs Asyncio](#34-concurrency-multiprocessing-vs-multithreading-vs-asyncio)
-   - [3.5 Modern Static Analysis & Tooling (`ruff`, `mypy`, `black`)](#35-modern-static-analysis--tooling-ruff-mypy-black)
+   - [3.5 Modern Static Analysis & Tooling (`ruff`, `mypy`, `black`)](#35-modern-static-analysis-tooling)
 
 ---
 

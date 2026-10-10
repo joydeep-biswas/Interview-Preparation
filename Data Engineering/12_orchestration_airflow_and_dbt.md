@@ -1,34 +1,74 @@
 # 12. Orchestration (Apache Airflow & dbt)
 
+A comprehensive, production-grade guide to workflow orchestration and analytics engineering with Apache Airflow and dbt, covering DAG scheduling internals, deferrable operators, Celery and Kubernetes executors, dbt incremental modeling, Jinja templating, testing, and CI/CD DataOps pipelines.
+
+---
+
+## Architectural Overview: Modern Data Stack Orchestration (Airflow & dbt) Architecture
+
+```mermaid
+flowchart TD
+    subgraph AirflowControlPlane ["Airflow Workflow Control Plane (Orchestration Layer)"]
+        Scheduler["Airflow Scheduler<br/>(Evaluates DAG cron/datasets & dependencies)"]
+        Executor["Celery / Kubernetes Executor<br/>(Spawns isolated task worker containers)"]
+        Sensors["Deferrable Operators & Sensors<br/>(Async event trigger polling without slot holding)"]
+    end
+    subgraph ComputeEngine ["dbt Transformation Layer (Pushdown Compute)"]
+        dbtModels["dbt Models & Jinja Macros<br/>(Compiles modular SQL DAGs into warehouse targets)"]
+        Incremental["Incremental Models & Quality Gates<br/>(MERGE logic, schema tests & singular assertions)"]
+    end
+    subgraph WarehouseSink ["Cloud Data Lakehouse / Warehouse"]
+        Lakehouse["Delta Lake / Snowflake / BigQuery<br/>(In-engine distributed SQL physical execution)"]
+    end
+
+    Scheduler --> Executor
+    Executor --> dbtModels
+    Sensors --> Scheduler
+    dbtModels --> Incremental
+    Incremental --> Lakehouse
+
+    style AirflowControlPlane fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ComputeEngine fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style WarehouseSink fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Scheduler fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Executor fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Sensors fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style dbtModels fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Incremental fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Lakehouse fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
 1. [Apache Airflow Core Architecture](#1-apache-airflow-core-architecture)
    - [1.1 DAGs, Tasks, and Operators](#11-dags-tasks-and-operators)
-   - [1.2 Sensors & Deferrable Operators (Triggerer)](#12-sensors--deferrable-operators-triggerer)
-   - [1.3 Hooks & Connections Management](#13-hooks--connections-management)
-   - [1.4 XComs & Custom XCom Backends](#14-xcoms--custom-xcom-backends)
-   - [1.5 Modern TaskFlow API & Dynamic Task Mapping](#15-modern-taskflow-api--dynamic-task-mapping)
-   - [1.6 Airflow 5-Component Architecture & Lifecycle State Machine](#16-airflow-5-component-architecture--lifecycle-state-machine)
-   - [1.7 Airflow Executors & Operational Cluster Management](#17-airflow-executors--operational-cluster-management)
+   - [1.2 Sensors & Deferrable Operators (Triggerer)](#12-sensors-deferrable-operators-triggerer)
+   - [1.3 Hooks & Connections Management](#13-hooks-connections-management)
+   - [1.4 XComs & Custom XCom Backends](#14-xcoms-custom-xcom-backends)
+   - [1.5 Modern TaskFlow API & Dynamic Task Mapping](#15-modern-taskflow-api-dynamic-task-mapping)
+   - [1.6 Airflow 5-Component Architecture & Lifecycle State Machine](#16-airflow-5-component-architecture-lifecycle-state-machine)
+   - [1.7 Airflow Executors & Operational Cluster Management](#17-airflow-executors-operational-cluster-management)
    - [1.8 Dynamic DAG Generation](#18-dynamic-dag-generation)
    - [1.9 Backfilling, Scheduling Timetables, and Data Intervals](#19-backfilling-scheduling-timetables-and-data-intervals)
-   - [1.10 Pools, Slots & Concurrency Throttling](#110-pools-slots--concurrency-throttling)
+   - [1.10 Pools, Slots & Concurrency Throttling](#110-pools-slots-concurrency-throttling)
    - [1.11 Trigger Rules and Advanced DAG Control Flow](#111-trigger-rules-and-advanced-dag-control-flow)
-   - [1.12 SLAs, Callbacks & Enterprise Alerting](#112-slas-callbacks--enterprise-alerting)
+   - [1.12 SLAs, Callbacks & Enterprise Alerting](#112-slas-callbacks-enterprise-alerting)
    - [1.13 Orchestrator Comparison: Airflow vs Prefect vs Dagster](#113-orchestrator-comparison-airflow-vs-prefect-vs-dagster)
-   - [1.14 Ecosystem Integration: dbt + Airflow (Cosmos)](#114-ecosystem-integration-dbt--airflow-cosmos)
-2. [dbt (Data Build Tool) Modeling & Transformation](#2-dbt-data-build-tool-modeling--transformation)
+   - [1.14 Ecosystem Integration: dbt + Airflow (Cosmos)](#114-ecosystem-integration-dbt-airflow-cosmos)
+2. [dbt (Data Build Tool) Modeling & Transformation](#2-dbt-data-build-tool-modeling-transformation)
    - [2.1 dbt Core vs dbt Cloud](#21-dbt-core-vs-dbt-cloud)
-   - [2.2 dbt Models & SQL-First Transformation](#22-dbt-models--sql-first-transformation)
+   - [2.2 dbt Models & SQL-First Transformation](#22-dbt-models-sql-first-transformation)
    - [2.3 Materialization Strategies](#23-materialization-strategies)
    - [2.4 Incremental Models Deep-Dive (`merge` vs `delete+insert`)](#24-incremental-models-deep-dive-merge-vs-deleteinsert)
    - [2.5 Seeds, Sources, and Automated SCD2 Snapshots](#25-seeds-sources-and-automated-scd2-snapshots)
-   - [2.6 dbt Testing & Assertions](#26-dbt-testing--assertions)
-   - [2.7 Documentation & Interactive Lineage Graphs](#27-documentation--interactive-lineage-graphs)
-   - [2.8 Jinja Templating & Custom Macros](#28-jinja-templating--custom-macros)
+   - [2.6 dbt Testing & Assertions](#26-dbt-testing-assertions)
+   - [2.7 Documentation & Interactive Lineage Graphs](#27-documentation-interactive-lineage-graphs)
+   - [2.8 Jinja Templating & Custom Macros](#28-jinja-templating-custom-macros)
    - [2.9 dbt Packages](#29-dbt-packages)
-   - [2.10 Exposures & the dbt Semantic Layer](#210-exposures--the-dbt-semantic-layer)
-   - [2.11 `dbt build` vs `dbt run` & CLI Operations Cheatsheet](#211-dbt-build-vs-dbt-run--cli-operations-cheatsheet)
-3. [References & Further Reading](#3-references--further-reading)
+   - [2.10 Exposures & the dbt Semantic Layer](#210-exposures-the-dbt-semantic-layer-metric-standardization)
+   - [2.11 `dbt build` vs `dbt run` & CLI Operations Cheatsheet](#211-dbt-build-vs-dbt-run-cli-operations-cheatsheet)
+3. [References & Further Reading](#3-references-further-reading)
 
 ---
 
@@ -634,19 +674,46 @@ flowchart TD
 A task instance transitions through a deterministic series of states during execution:
 
 ```mermaid
-stateDiagram-v2
-    [*] --> None
-    None --> Scheduled: Scheduler identifies interval start
-    Scheduled --> Queued: Placed onto Executor queue
-    Queued --> Running: Worker picks up task execution
-    Running --> Success: Execution succeeds without error
-    Running --> UpForRetry: Task fails, retries remaining
-    UpForRetry --> Queued: Backoff timer expires
-    Running --> Failed: Task fails, retries exhausted
-    Running --> Deferred: Deferrable operator yields Trigger
-    Deferred --> Scheduled: Triggerer fires completion event
-    Success --> [*]
-    Failed --> [*]
+flowchart TD
+    subgraph SchedulerQueue ["Scheduler & Queue Management"]
+        NoneState["NONE State<br/>(Task instance created in metadata DB, dependencies unmet)"]
+        ScheduledState["SCHEDULED State<br/>(Dependencies satisfied, data interval arrived)"]
+        QueuedState["QUEUED State<br/>(Placed in Executor queue, e.g. Celery / Kubernetes)"]
+    end
+
+    subgraph WorkerExecution ["Worker Runtime Execution"]
+        RunningState["RUNNING State<br/>(Picked up by worker, executing operator execute method)"]
+        DeferredState["DEFERRED State<br/>(Yielded to Triggerer process, releasing worker slot)"]
+        RetryState["UP_FOR_RETRY<br/>(Execution failed, waiting for retry exponential backoff)"]
+    end
+
+    subgraph TerminalOutcomes ["Terminal Task Execution States"]
+        SuccessState["SUCCESS State<br/>(Completed cleanly, unblocks downstream dependencies)"]
+        FailedState["FAILED State<br/>(Retries exhausted, triggers on_failure_callback & alerts)"]
+    end
+
+    NoneState -->|"Dependencies clear"| ScheduledState
+    ScheduledState -->|"Executor slot allocated"| QueuedState
+    QueuedState -->|"Worker starts execution"| RunningState
+    RunningState -->|"Task completes successfully"| SuccessState
+    RunningState -->|"Exception thrown, retries > 0"| RetryState
+    RetryState -->|"Retry delay expires"| QueuedState
+    RunningState -->|"Exception thrown, retries = 0"| FailedState
+    RunningState -->|"Deferrable operator yields Trigger"| DeferredState
+    DeferredState -->|"Triggerer event fires"| ScheduledState
+
+    style SchedulerQueue fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style WorkerExecution fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style TerminalOutcomes fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
+    style NoneState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ScheduledState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style QueuedState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style RunningState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style DeferredState fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style RetryState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style SuccessState fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style FailedState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
 ```
 
 ---

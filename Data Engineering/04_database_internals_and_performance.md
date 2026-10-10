@@ -4,46 +4,82 @@ A comprehensive, production-grade guide to database architectures, internal stor
 
 ---
 
+## Architectural Overview: Database Storage Engine & Memory Hierarchy Architecture
+
+```mermaid
+flowchart TD
+    subgraph ClientAndParser ["Client Query & Parser"]
+        Client["SQL Query Execution<br/>(Transaction begin, commit, rollback)"]
+    end
+    subgraph MemoryBufferPool ["In-Memory Buffer Pool"]
+        BufferPool["Buffer Pool Manager<br/>(LRU / Clock eviction, slotted page cache)"]
+        WALBuffer["WAL Ring Buffer<br/>(Sequential redo log records)"]
+    end
+    subgraph StorageEngines ["Physical Storage Engine Architecture"]
+        BTree["B+ Tree Storage (OLTP)<br/>(Read-optimized, balanced fan-out disk pages)"]
+        LSM["LSM-Tree Storage (Write-Heavy)<br/>(MemTable -> WAL -> Immutable SSTables)"]
+        WALDisk["Write-Ahead Log (WAL) on Disk<br/>(Fsync sequential append for durability)"]
+    end
+
+    Client --> BufferPool
+    BufferPool --> WALBuffer
+    WALBuffer -->|"fsync before commit"| WALDisk
+    BufferPool -->|"Dirty page flush"| BTree
+    BufferPool -->|"Compaction"| LSM
+
+    style ClientAndParser fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style MemoryBufferPool fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    style StorageEngines fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Client fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style BufferPool fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style WALBuffer fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style BTree fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style LSM fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style WALDisk fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
 1. [Database Architecture](#1-database-architecture)
    - [1.1 OLTP vs OLAP](#11-oltp-vs-olap)
    - [1.2 Row-Oriented vs Column-Oriented Databases](#12-row-oriented-vs-column-oriented-databases)
    - [1.3 Relational vs NoSQL Databases](#13-relational-vs-nosql-databases)
    - [1.4 Database Normalization (1NF, 2NF, 3NF, BCNF)](#14-database-normalization)
-   - [1.5 Denormalization & Analytical Modeling](#15-denormalization--analytical-modeling)
+   - [1.5 Denormalization & Analytical Modeling](#15-denormalization-analytical-modeling)
    - [1.6 Primary Keys](#16-primary-keys)
-   - [1.7 Foreign Keys & Referential Integrity](#17-foreign-keys--referential-integrity)
+   - [1.7 Foreign Keys & Referential Integrity](#17-foreign-keys-referential-integrity)
    - [1.8 Unique Constraints](#18-unique-constraints)
    - [1.9 Check Constraints](#19-check-constraints)
-   - [1.10 Table Constraints & Composite Constraints](#110-table-constraints--composite-constraints)
+   - [1.10 Table Constraints & Composite Constraints](#110-table-constraints-composite-constraints)
 2. [Indexing Mechanisms](#2-indexing-mechanisms)
    - [2.1 Indexing Fundamentals](#21-indexing-fundamentals)
    - [2.2 B-Tree Indexes](#22-b-tree-indexes)
    - [2.3 Hash Indexes](#23-hash-indexes)
-   - [2.4 Composite Indexes & Leading-Edge Rules](#24-composite-indexes--leading-edge-rules)
-   - [2.5 Covering Indexes & Index-Only Scans](#25-covering-indexes--index-only-scans)
+   - [2.4 Composite Indexes & Leading-Edge Rules](#24-composite-indexes-leading-edge-rules)
+   - [2.5 Covering Indexes & Index-Only Scans](#25-covering-indexes-index-only-scans)
    - [2.6 Clustered vs Non-Clustered Indexes](#26-clustered-vs-non-clustered-indexes)
-   - [2.7 Index Selectivity & Cardinality](#27-index-selectivity--cardinality)
+   - [2.7 Index Selectivity & Cardinality](#27-index-selectivity-cardinality)
    - [2.8 When Indexes Hurt Performance](#28-when-indexes-hurt-performance)
-3. [Query Performance & Optimization](#3-query-performance--optimization)
+3. [Query Performance & Optimization](#3-query-performance-optimization)
    - [3.1 Execution Plans](#31-execution-plans)
    - [3.2 Query Optimization Engine](#32-query-optimization-engine)
    - [3.3 Cost-Based Optimization (CBO)](#33-cost-based-optimization-cbo)
-   - [3.4 Database Statistics & Histograms](#34-database-statistics--histograms)
+   - [3.4 Database Statistics & Histograms](#34-database-statistics-histograms)
    - [3.5 Cardinality Estimation](#35-cardinality-estimation)
    - [3.6 Predicate Pushdown](#36-predicate-pushdown)
    - [3.7 Projection Pushdown](#37-projection-pushdown)
    - [3.8 Partition Pruning](#38-partition-pruning)
    - [3.9 Join Optimization (Hash, Merge Sort, Nested Loop)](#39-join-optimization)
-   - [3.10 Query Profiling & Bottleneck Analysis](#310-query-profiling--bottleneck-analysis)
-   - [3.11 Explain Plans & EXPLAIN ANALYZE Deep-Dive](#311-explain-plans--explain-analyze-deep-dive)
-4. [Transactions & Concurrency Control](#4-transactions--concurrency-control)
+   - [3.10 Query Profiling & Bottleneck Analysis](#310-query-profiling-bottleneck-analysis)
+   - [3.11 Explain Plans & EXPLAIN ANALYZE Deep-Dive](#311-explain-plans-explain-analyze-deep-dive)
+4. [Transactions & Concurrency Control](#4-transactions-concurrency-control)
    - [4.1 ACID Properties](#41-acid-properties)
-   - [4.2 Transaction Lifecycle & Write-Ahead Logging (WAL)](#42-transaction-lifecycle--write-ahead-logging-wal)
+   - [4.2 Transaction Lifecycle & Write-Ahead Logging (WAL)](#42-transaction-lifecycle-write-ahead-logging-wal)
    - [4.3 ANSI SQL Isolation Levels](#43-ansi-sql-isolation-levels)
    - [4.4 Multi-Version Concurrency Control (MVCC)](#44-multi-version-concurrency-control-mvcc)
    - [4.5 Read Anomalies (Dirty, Non-Repeatable, Phantom Reads)](#45-read-anomalies)
-   - [4.6 Deadlocks & Concurrency Contention](#46-deadlocks--concurrency-contention)
+   - [4.6 Deadlocks & Concurrency Contention](#46-deadlocks-concurrency-contention)
 
 ---
 

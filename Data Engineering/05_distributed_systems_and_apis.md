@@ -4,7 +4,7 @@ A unified, comprehensive, production-grade guide to distributed computing theory
 
 ---
 
-## Distributed Network & Integration Architecture
+## Architectural Overview: Distributed Network & Integration Architecture
 
 ```mermaid
 flowchart TD
@@ -53,26 +53,26 @@ flowchart TD
    - [1.1 MapReduce Paradigm](#11-mapreduce-paradigm)
    - [1.2 CAP Theorem](#12-cap-theorem)
    - [1.3 PACELC Theorem](#13-pacelc-theorem)
-   - [1.4 Consensus Algorithms (Raft & Paxos)](#14-consensus-algorithms-raft--paxos)
+   - [1.4 Consensus Algorithms (Raft & Paxos)](#14-consensus-algorithms-raft-paxos)
    - [1.5 Distributed Locks](#15-distributed-locks)
-   - [1.6 Leader Election & Split-Brain Mitigation](#16-leader-election--split-brain-mitigation)
-   - [1.7 Heartbeats & Failure Detection](#17-heartbeats--failure-detection)
+   - [1.6 Leader Election & Split-Brain Mitigation](#16-leader-election-split-brain-mitigation)
+   - [1.7 Heartbeats & Failure Detection](#17-heartbeats-failure-detection)
 2. [Distributed Data Architecture](#2-distributed-data-architecture)
    - [2.1 Horizontal vs Vertical Scaling](#21-horizontal-vs-vertical-scaling)
    - [2.2 Sharding vs Partitioning](#22-sharding-vs-partitioning)
-   - [2.3 Consistent Hashing & Virtual Nodes](#23-consistent-hashing--virtual-nodes)
+   - [2.3 Consistent Hashing & Virtual Nodes](#23-consistent-hashing-virtual-nodes)
    - [2.4 Database Replication Topologies](#24-database-replication-topologies)
-   - [2.5 Replication Lag & Read-After-Write Consistency](#25-replication-lag--read-after-write-consistency)
-   - [2.6 Quorum Reads & Writes (W + R > N)](#26-quorum-reads--writes-w--r--n)
+   - [2.5 Replication Lag & Read-After-Write Consistency](#25-replication-lag-read-after-write-consistency)
+   - [2.6 Quorum Reads & Writes (W + R > N)](#26-quorum-reads-writes-w-r-n)
    - [2.7 Consistency Spectrum: Strong vs. Eventual Consistency](#27-consistency-spectrum-strong-vs-eventual-consistency)
-3. [API Protocols & Communication Architectures](#3-api-protocols--communication-architectures)
+3. [API Protocols & Communication Architectures](#3-api-protocols-communication-architectures)
    - [3.1 REST vs GraphQL vs gRPC](#31-rest-vs-graphql-vs-grpc)
    - [3.2 HTTP Methods, Status Codes, and Headers](#32-http-methods-status-codes-and-headers)
-4. [API Authentication & Security](#4-api-authentication--security)
-   - [4.1 API Keys & Bearer Tokens (JWT Structure)](#41-api-keys--bearer-tokens-jwt-structure)
+4. [API Authentication & Security](#4-api-authentication-security)
+   - [4.1 API Keys & Bearer Tokens (JWT Structure)](#41-api-keys-bearer-tokens-jwt-structure)
    - [4.2 OAuth 2.0 Flows](#42-oauth-20-flows)
    - [4.3 Mutual TLS (mTLS)](#43-mutual-tls-mtls)
-5. [Rate Limiting, Throttling & Pipeline Resilience](#5-rate-limiting-throttling--pipeline-resilience)
+5. [Rate Limiting, Throttling & Pipeline Resilience](#5-rate-limiting-throttling-pipeline-resilience)
    - [5.1 Token Bucket Algorithm](#51-token-bucket-algorithm)
    - [5.2 Leaky Bucket Algorithm](#52-leaky-bucket-algorithm)
    - [5.3 Exponential Backoff with Jitter](#53-exponential-backoff-with-jitter)
@@ -81,7 +81,7 @@ flowchart TD
    - [6.2 Webhook Signature Verification](#62-webhook-signature-verification)
    - [6.3 Reverse ETL (Operational Analytics)](#63-reverse-etl-operational-analytics)
    - [6.4 Managed Data Integration Platforms (Fivetran vs Airbyte)](#64-managed-data-integration-platforms-fivetran-vs-airbyte)
-7. [References & Further Reading](#7-references--further-reading)
+7. [References & Further Reading](#7-references-further-reading)
 
 ---
 
@@ -272,12 +272,22 @@ record_strict = spanner_client.read_record("user:101", consistency_level="QUORUM
 Consensus algorithms ensure that a distributed cluster of nodes agree on a shared state or log of events, even when some nodes crash or experience network delays.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Follower: Node Boots Up
-    Follower --> Candidate: Election Timeout Fires (No Heartbeat)
-    Candidate --> Leader: Receives Votes from Majority (Quorum)
-    Candidate --> Follower: Discovers Existing Valid Leader
-    Leader --> Follower: Higher Term Discovered
+flowchart TD
+    subgraph ClusterMembership ["Raft Consensus Node Roles"]
+        FollowerNode["FOLLOWER Node<br/>(Passively responds to Leader heartbeats & Candidate votes)"]
+        CandidateNode["CANDIDATE Node<br/>(Increments term, votes for self, solicits quorum votes)"]
+        LeaderNode["LEADER Node<br/>(Handles all client writes, coordinates log replication)"]
+    end
+
+    FollowerNode -->|"Election timeout fires without heartbeat (150-300ms)"| CandidateNode
+    CandidateNode -->|"Receives votes from majority quorum (> N/2)"| LeaderNode
+    CandidateNode -->|"Discovers legitimate leader or higher term"| FollowerNode
+    LeaderNode -->|"Discovers higher term in cluster network"| FollowerNode
+
+    style ClusterMembership fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style FollowerNode fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style CandidateNode fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style LeaderNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### Key Elements of Raft Consensus
@@ -1165,3 +1175,11 @@ flowchart LR
 - [DataCamp: Reverse ETL and Modern Data Integration](https://www.datacamp.com/tutorial/reverse-etl)
 
 ---
+
+---
+
+# 7. References & Further Reading
+
+- [Official Documentation & Design Principles Guide](https://docs.microsoft.com/en-us/azure/architecture/)
+- [High Performance Distributed Data Architecture Patterns](https://martinfowler.com/articles/patterns-of-distributed-systems/)
+- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)

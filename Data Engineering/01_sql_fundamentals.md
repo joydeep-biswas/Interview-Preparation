@@ -4,30 +4,69 @@ A comprehensive, production-grade guide to SQL fundamentals, relational query ar
 
 ---
 
+## Architectural Overview: Logical SQL Execution & Query Processing Pipeline
+
+```mermaid
+flowchart TD
+    subgraph Ingestion ["1. Data Source Resolution"]
+        S1["FROM & JOINs<br/>(Evaluate Cartesian products, table scans & ON predicates)"]
+    end
+    subgraph PreGrouping ["2. Pre-Aggregation Filtering"]
+        S2["WHERE Clause<br/>(Prune scanned tuples before grouping)"]
+    end
+    subgraph Aggregation ["3. Grouping & Aggregate Evaluation"]
+        S3["GROUP BY<br/>(Bucket rows by grouping keys)"] --> S4["HAVING<br/>(Filter aggregate metrics post-grouping)"]
+    end
+    subgraph Projection ["4. Projection & Result Formatting"]
+        S5["SELECT<br/>(Compute expressions, scalar math & aliases)"]
+        S6["DISTINCT<br/>(Hash/Sort deduplication across output columns)"]
+        S7["ORDER BY<br/>(Sort materialized result set)"]
+        S8["LIMIT / OFFSET<br/>(Restrict total returned record volume)"]
+    end
+
+    S1 --> S2 --> S3
+    S4 --> S5 --> S6 --> S7 --> S8
+
+    style Ingestion fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style PreGrouping fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Aggregation fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Projection fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style S2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style S3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style S4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style S5 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style S6 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style S7 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style S8 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
-1. [SQL Query Architecture & Logical Processing Order](#1-sql-query-architecture--logical-processing-order)
-   - [1.1 Declarative Paradigm & Execution Order](#11-declarative-paradigm--execution-order)
+1. [SQL Query Architecture & Logical Processing Order](#1-sql-query-architecture-logical-processing-order)
+   - [1.1 Declarative Paradigm & Execution Order](#11-declarative-paradigm-execution-order)
    - [1.2 Core Clauses: SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT](#12-core-clauses-select-from-where-group-by-having-order-by-limit)
-2. [Data Types, Casting & Defensive Conversions](#2-data-types-casting--defensive-conversions)
+2. [Data Types, Casting & Defensive Conversions](#2-data-types-casting-defensive-conversions)
    - [2.1 Core SQL Data Types](#21-core-sql-data-types)
-   - [2.2 Type Casting & Safe Conversions (CAST, TRY_CAST)](#22-type-casting--safe-conversions-cast-try_cast)
-3. [Three-Valued Logic & NULL Handling](#3-three-valued-logic--null-handling)
+   - [2.2 Type Casting & Safe Conversions (CAST, TRY_CAST)](#22-type-casting-safe-conversions-cast-trycast)
+3. [Three-Valued Logic & NULL Handling](#3-three-valued-logic-null-handling)
    - [3.1 Three-Valued Logic (3VL) Truth Semantics](#31-three-valued-logic-3vl-truth-semantics)
-   - [3.2 IS NULL, IS NOT NULL & The NOT IN NULL Trap](#32-is-null-is-not-null--the-not-in-null-trap)
+   - [3.2 IS NULL, IS NOT NULL & The NOT IN NULL Trap](#32-is-null-is-not-null-the-not-in-null-trap)
    - [3.3 Conditional Fallbacks (COALESCE, NULLIF)](#33-conditional-fallbacks-coalesce-nullif)
-4. [Filtering, Sorting & Conditional Expressions](#4-filtering-sorting--conditional-expressions)
-   - [4.1 Comparison, Range & Pattern Matching (LIKE, ILIKE, BETWEEN)](#41-comparison-range--pattern-matching-like-ilike-between)
+4. [Filtering, Sorting & Conditional Expressions](#4-filtering-sorting-conditional-expressions)
+   - [4.1 Comparison, Range & Pattern Matching (LIKE, ILIKE, BETWEEN)](#41-comparison-range-pattern-matching-like-ilike-between)
    - [4.2 DISTINCT Deduplication](#42-distinct-deduplication)
    - [4.3 CASE WHEN Conditional Branching](#43-case-when-conditional-branching)
    - [4.4 Row-Level Comparisons (GREATEST, LEAST)](#44-row-level-comparisons-greatest-least)
-5. [Scalar Functions: String & Temporal Manipulation](#5-scalar-functions-string--temporal-manipulation)
+5. [Scalar Functions: String & Temporal Manipulation](#5-scalar-functions-string-temporal-manipulation)
    - [5.1 String Manipulation Functions](#51-string-manipulation-functions)
-   - [5.2 Date & Time Functions](#52-date--time-functions)
-6. [Aggregations & Grouping](#6-aggregations--grouping)
+   - [5.2 Date & Time Functions](#52-date-time-functions)
+6. [Aggregations & Grouping](#6-aggregations-grouping)
    - [6.1 Standard Aggregation Functions (COUNT, SUM, AVG, MIN, MAX)](#61-standard-aggregation-functions-count-sum-avg-min-max)
-   - [6.2 Set & Array Aggregations (COUNT DISTINCT, STRING_AGG, ARRAY_AGG)](#62-set--array-aggregations-count-distinct-string_agg-array_agg)
+   - [6.2 Set & Array Aggregations (COUNT DISTINCT, STRING_AGG, ARRAY_AGG)](#62-set-array-aggregations-count-distinct-stringagg-arrayagg)
    - [6.3 Statistical Aggregates (STDDEV, VARIANCE)](#63-statistical-aggregates-stddev-variance)
-7. [Relational Joins & Multi-Table Querying](#7-relational-joins--multi-table-querying)
+7. [Relational Joins & Multi-Table Querying](#7-relational-joins-multi-table-querying)
    - [7.1 Relational Join Foundations](#71-relational-join-foundations)
    - [7.2 INNER JOIN](#72-inner-join)
    - [7.3 LEFT (OUTER) JOIN](#73-left-outer-join)
@@ -35,16 +74,16 @@ A comprehensive, production-grade guide to SQL fundamentals, relational query ar
    - [7.5 FULL OUTER JOIN](#75-full-outer-join)
    - [7.6 CROSS JOIN](#76-cross-join)
    - [7.7 Equi-Joins vs. Non-Equi Joins](#77-equi-joins-vs-non-equi-joins)
-   - [7.8 Multiple-Table Joins & Star Schema Patterns](#78-multiple-table-joins--star-schema-patterns)
+   - [7.8 Multiple-Table Joins & Star Schema Patterns](#78-multiple-table-joins-star-schema-patterns)
 8. [Set Operators](#8-set-operators)
    - [8.1 UNION vs. UNION ALL](#81-union-vs-union-all)
    - [8.2 INTERSECT](#82-intersect)
-   - [8.3 EXCEPT / MINUS](#83-except--minus)
+   - [8.3 EXCEPT / MINUS](#83-except-minus)
 9. [Subqueries Fundamentals](#9-subqueries-fundamentals)
    - [9.1 Scalar Subqueries](#91-scalar-subqueries)
    - [9.2 Multi-Row Subqueries (IN, ANY, ALL)](#92-multi-row-subqueries-in-any-all)
-   - [9.3 Table Subqueries & Derived Tables](#93-table-subqueries--derived-tables)
-10. [Foundational Data Modification (DML) & Database Objects](#10-foundational-data-modification-dml--database-objects)
+   - [9.3 Table Subqueries & Derived Tables](#93-table-subqueries-derived-tables)
+10. [Foundational Data Modification (DML) & Database Objects](#10-foundational-data-modification-dml-database-objects)
     - [10.1 INSERT Operations](#101-insert-operations)
     - [10.2 UPDATE Operations](#102-update-operations)
     - [10.3 DELETE vs. TRUNCATE](#103-delete-vs-truncate)

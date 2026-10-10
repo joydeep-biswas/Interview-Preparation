@@ -4,17 +4,48 @@ A comprehensive, production-grade guide to Apache Spark distributed computing ar
 
 ---
 
+## Architectural Overview: Apache Spark Cluster & Query Lifecycle Architecture
+
+```mermaid
+flowchart TD
+    subgraph DriverNode ["Spark Driver (Cluster Master)"]
+        SparkSession["SparkSession & DataFrame API<br/>(User Python / SQL code)"]
+        Catalyst["Catalyst Optimizer<br/>(Analysis -> Logical Plan -> Optimized Physical Plan)"]
+        DAGScheduler["DAG Scheduler<br/>(Divides query into Stages by shuffle boundaries)"]
+        TaskScheduler["Task Scheduler<br/>(Launches individual tasks onto executors)"]
+    end
+    subgraph WorkerNodes ["Distributed Spark Executors"]
+        E1["Executor 1 (Tasks + Tungsten Memory)<br/>(Off-heap memory management & byte-code generation)"]
+        E2["Executor 2 (Tasks + Tungsten Memory)<br/>(Block Manager, Shuffle Service, Local Disks)"]
+    end
+
+    SparkSession --> Catalyst --> DAGScheduler --> TaskScheduler
+    TaskScheduler -->|"Launches tasks"| E1
+    TaskScheduler -->|"Launches tasks"| E2
+
+    style DriverNode fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style WorkerNodes fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style SparkSession fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Catalyst fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DAGScheduler fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style TaskScheduler fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style E1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style E2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
-1. [Spark Fundamentals & Engine Internals](#1-spark-fundamentals--engine-internals)
+1. [Spark Fundamentals & Engine Internals](#1-spark-fundamentals-engine-internals)
    - [1.1 Spark Architecture (Driver, Workers, Cluster Manager, Executors, Slots)](#11-spark-architecture)
    - [1.2 RDD vs DataFrame vs Dataset](#12-rdd-vs-dataframe-vs-dataset)
-   - [1.3 Lazy Evaluation & Execution Plan Generation](#13-lazy-evaluation--execution-plan-generation)
+   - [1.3 Lazy Evaluation & Execution Plan Generation](#13-lazy-evaluation-execution-plan-generation)
    - [1.4 DAG (Directed Acyclic Graph) Execution Flow](#14-dag-directed-acyclic-graph-execution-flow)
    - [1.5 Catalyst Optimizer Internals](#15-catalyst-optimizer-internals)
    - [1.6 Project Tungsten Execution Engine](#16-project-tungsten-execution-engine)
    - [1.7 Narrow vs Wide Dependencies](#17-narrow-vs-wide-dependencies)
    - [1.8 Transformations vs Actions](#18-transformations-vs-actions)
-   - [1.9 Shuffling Mechanics & Network Spill](#19-shuffling-mechanics--network-spill)
+   - [1.9 Shuffling Mechanics & Network Spill](#19-shuffling-mechanics-network-spill)
 2. [Spark Execution Model](#2-spark-execution-model)
    - [2.1 Jobs, Stages, and Tasks Hierarchy](#21-jobs-stages-and-tasks-hierarchy)
    - [2.2 Adaptive Query Execution (AQE)](#22-adaptive-query-execution-aqe)
@@ -23,36 +54,36 @@ A comprehensive, production-grade guide to Apache Spark distributed computing ar
    - [2.5 Shuffle Partition Configuration (`spark.sql.shuffle.partitions`)](#25-shuffle-partition-configuration)
    - [2.6 Spark UI Architecture](#26-spark-ui-architecture)
 3. [PySpark Data Processing](#3-pyspark-data-processing)
-   - [3.1 PySpark DataFrames & SQL Expressions](#31-pyspark-dataframes--sql-expressions)
-   - [3.2 PySpark SQL Functions & Transformations](#32-pyspark-sql-functions--transformations)
+   - [3.1 PySpark DataFrames & SQL Expressions](#31-pyspark-dataframes-sql-expressions)
+   - [3.2 PySpark SQL Functions & Transformations](#32-pyspark-sql-functions-transformations)
    - [3.3 PySpark Window Functions](#33-pyspark-window-functions)
-   - [3.4 PySpark Joins & Cartesian Logic](#34-pyspark-joins--cartesian-logic)
-   - [3.5 PySpark Aggregations & Pivot](#35-pyspark-aggregations--pivot)
+   - [3.4 PySpark Joins & Cartesian Logic](#34-pyspark-joins-cartesian-logic)
+   - [3.5 PySpark Aggregations & Pivot](#35-pyspark-aggregations-pivot)
    - [3.6 PySpark UDFs: Python Standard vs Vectorized Pandas UDFs](#36-pyspark-udfs-python-standard-vs-vectorized-pandas-udfs)
    - [3.7 Pandas API on Spark (Koalas)](#37-pandas-api-on-spark-koalas)
-   - [3.8 Handling NULLs & Missing Data in PySpark (Imputation & Default Values)](#38-handling-nulls--missing-data-in-pyspark)
-   - [3.9 Complex Data Types (Array, Map, Struct) & Shredding](#39-complex-data-types-array-map-struct--shredding)
-   - [3.10 Inconsistent Timestamps & Time Zone Normalization in PySpark](#310-inconsistent-timestamps--time-zone-normalization-in-pyspark)
-   - [3.11 File Corruption & Malformed Record Handling](#311-file-corruption--malformed-record-handling)
+   - [3.8 Handling NULLs & Missing Data in PySpark (Imputation & Default Values)](#38-handling-nulls-missing-data-in-pyspark-imputation-default-values)
+   - [3.9 Complex Data Types (Array, Map, Struct) & Shredding](#39-complex-data-types-array-map-struct-shredding)
+   - [3.10 Inconsistent Timestamps & Time Zone Normalization in PySpark](#310-inconsistent-timestamps-time-zone-normalization-in-pyspark)
+   - [3.11 File Corruption & Malformed Record Handling](#311-file-corruption-malformed-record-handling)
 4. [Distributed Spark Join Strategies](#4-distributed-spark-join-strategies)
    - [4.1 Broadcast Hash Join (BHJ)](#41-broadcast-hash-join-bhj)
    - [4.2 Shuffle Hash Join (SHJ)](#42-shuffle-hash-join-shj)
    - [4.3 Sort-Merge Join (SMJ)](#43-sort-merge-join-smj)
-   - [4.4 Cartesian / Broadcast Nested Loop Join](#44-cartesian--broadcast-nested-loop-join)
+   - [4.4 Cartesian / Broadcast Nested Loop Join](#44-cartesian-broadcast-nested-loop-join)
    - [4.5 Skew Join Optimization](#45-skew-join-optimization)
-   - [4.6 Bucketing for Large Joins (Eliminating Shuffle Exchange)](#46-bucketing-for-large-joins)
+   - [4.6 Bucketing for Large Joins (Eliminating Shuffle Exchange)](#46-bucketing-for-large-joins-eliminating-shuffle-exchange)
 5. [Spark Performance Optimization](#5-spark-performance-optimization)
    - [5.1 Key Salting for Extreme Data Skew](#51-key-salting-for-extreme-data-skew)
    - [5.2 Broadcast Threshold Tuning](#52-broadcast-threshold-tuning)
-   - [5.3 Caching & Persistence Strategies (`cache()` vs `persist()`)](#53-caching--persistence-strategies)
+   - [5.3 Caching & Persistence Strategies (`cache()` vs `persist()`)](#53-caching-persistence-strategies)
    - [5.4 Spark Storage Levels](#54-spark-storage-levels)
-   - [5.5 Memory Architecture & Spill to Disk](#55-memory-architecture--spill-to-disk)
+   - [5.5 Memory Architecture & Spill to Disk](#55-memory-architecture-spill-to-disk)
    - [5.6 Java Garbage Collection (G1GC) Tuning](#56-java-garbage-collection-g1gc-tuning)
-6. [Spark Debugging & Troubleshooting](#6-spark-debugging--troubleshooting)
-   - [6.1 Reading Spark UI: DAG & Event Timeline](#61-reading-spark-ui-dag--event-timeline)
-   - [6.2 Executor Metrics & Peak Memory Diagnostics](#62-executor-metrics--peak-memory-diagnostics)
+6. [Spark Debugging & Troubleshooting](#6-spark-debugging-troubleshooting)
+   - [6.1 Reading Spark UI: DAG & Event Timeline](#61-reading-spark-ui-dag-event-timeline)
+   - [6.2 Executor Metrics & Peak Memory Diagnostics](#62-executor-metrics-peak-memory-diagnostics)
    - [6.3 Diagnosing Out-Of-Memory (OOM) Errors (Driver vs Executor)](#63-diagnosing-out-of-memory-oom-errors)
-   - [6.4 Stragglers Detection & Speculative Execution](#64-stragglers-detection--speculative-execution)
+   - [6.4 Stragglers Detection & Speculative Execution](#64-stragglers-detection-speculative-execution)
    - [6.5 Task Failure Root Causes (FetchFailedException, Heartbeat Timeout)](#65-task-failure-root-causes)
    - [6.6 End-to-End Spark ETL Optimization Playbook (Troubleshooting Slow ETL Pipelines)](#66-end-to-end-spark-etl-optimization-playbook)
 

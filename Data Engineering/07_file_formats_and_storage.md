@@ -4,6 +4,38 @@ A comprehensive, production-grade guide to big data file serialization formats (
 
 ---
 
+## Architectural Overview: Columnar Storage & Lakehouse File Format Architecture
+
+```mermaid
+flowchart TD
+    subgraph FileFormats ["Big Data Storage Formats"]
+        Parquet["Apache Parquet (Columnar OLAP)<br/>(Row Groups -> Column Chunks -> Pages + Footer Metadata)"]
+        Avro["Apache Avro (Row-based Streaming)<br/>(Schema embedded in file header, efficient serialization)"]
+        ORC["Apache ORC (Optimized Columnar)<br/>(Stripe architecture, lightweight indexes, ACID support)"]
+    end
+    subgraph CompressionAndLayout ["Storage Encoding & Partition Layout"]
+        Codecs["Compression Codecs<br/>(Snappy: low CPU / fast; ZSTD: optimal compression ratio)"]
+        HivePartition["Hive-Style Directory Partitioning<br/>(year=YYYY/month=MM/ - avoids full bucket scans)"]
+    end
+    subgraph CompactionMgmt ["Small File Mitigation"]
+        BinPacking["Bin-Packing & Compaction<br/>(Merge small 1MB files into optimal 128MB-512MB chunks)"]
+    end
+
+    FileFormats --> CompressionAndLayout --> CompactionMgmt
+
+    style FileFormats fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style CompressionAndLayout fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style CompactionMgmt fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Parquet fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Avro fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ORC fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Codecs fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style HivePartition fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style BinPacking fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
+
+---
+
 ## Table of Contents
 1. [Big Data File Formats](#1-big-data-file-formats)
    - [1.1 CSV (Comma-Separated Values)](#11-csv-comma-separated-values)
@@ -13,23 +45,23 @@ A comprehensive, production-grade guide to big data file serialization formats (
    - [1.5 Apache Avro](#15-apache-avro)
    - [1.6 Row-Oriented vs Columnar File Formats Deep-Dive](#16-row-oriented-vs-columnar-file-formats-deep-dive)
    - [1.7 Compression Codecs (Snappy, GZIP, Zstandard, BZIP2)](#17-compression-codecs)
-2. [Storage Concepts & Lake Optimization](#2-storage-concepts--lake-optimization)
+2. [Storage Concepts & Lake Optimization](#2-storage-concepts-lake-optimization)
    - [2.1 Object Storage vs Block Storage vs File Storage](#21-object-storage-vs-block-storage-vs-file-storage)
    - [2.2 Cloud Storage Tiers (Hot, Cool, Cold, Archive)](#22-cloud-storage-tiers)
    - [2.3 Storage Lifecycle Management Policies](#23-storage-lifecycle-management-policies)
-   - [2.4 Immutability & Write-Once-Read-Many (WORM)](#24-immutability--write-once-read-many-worm)
-   - [2.5 Partitioning Strategies & Hive Directory Layout](#25-partitioning-strategies--hive-directory-layout)
-   - [2.6 Bucketing & Clustering](#26-bucketing--clustering)
+   - [2.4 Immutability & Write-Once-Read-Many (WORM)](#24-immutability-write-once-read-many-worm)
+   - [2.5 Partitioning Strategies & Hive Directory Layout](#25-partitioning-strategies-hive-directory-layout)
+   - [2.6 Bucketing & Clustering](#26-bucketing-clustering)
    - [2.7 The Small File Problem](#27-the-small-file-problem)
-   - [2.8 File Compaction & Bin-Packing Techniques](#28-file-compaction--bin-packing-techniques)
-3. [Azure Storage & ADLS Gen2 Architecture](#3-azure-storage--adls-gen2-architecture)
+   - [2.8 File Compaction & Bin-Packing Techniques](#28-file-compaction-bin-packing-techniques)
+3. [Azure Storage & ADLS Gen2 Architecture](#3-azure-storage-adls-gen2-architecture)
    - [3.1 ADLS Gen2 (Azure Data Lake Storage Gen2)](#31-adls-gen2-azure-data-lake-storage-gen2)
    - [3.2 Hierarchical Namespace (HNS) vs Flat Blob Storage](#32-hierarchical-namespace-hns-vs-flat-blob-storage)
    - [3.3 Azure Blob Storage](#33-azure-blob-storage)
    - [3.4 Azure Access Tiers](#34-azure-access-tiers)
    - [3.5 Shared Access Signatures (SAS Tokens)](#35-shared-access-signatures-sas-tokens)
    - [3.6 Azure Managed Identity](#36-azure-managed-identity)
-   - [3.7 Private Endpoints & Virtual Network Isolation](#37-private-endpoints--virtual-network-isolation)
+   - [3.7 Private Endpoints & Virtual Network Isolation](#37-private-endpoints-virtual-network-isolation)
 
 ---
 

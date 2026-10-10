@@ -4,7 +4,7 @@ A unified, comprehensive, production-grade guide to real-time event streaming ar
 
 ---
 
-## End-to-End Real-Time Event Streaming Architecture
+## Architectural Overview: End-to-End Real-Time Event Streaming Architecture
 
 ```mermaid
 flowchart LR
@@ -78,45 +78,45 @@ flowchart LR
 1. [Kafka Core Fundamentals](#1-kafka-core-fundamentals)
    - [1.1 Topics, Partitions, and Monotonic Offsets](#11-topics-partitions-and-monotonic-offsets)
    - [1.2 Producers, Consumers, and Consumer Groups](#12-producers-consumers-and-consumer-groups)
-   - [1.3 Brokers & Cluster Topology](#13-brokers--cluster-topology)
+   - [1.3 Brokers & Cluster Topology](#13-brokers-cluster-topology)
    - [1.4 Message Anatomy](#14-message-anatomy)
    - [1.5 Retention Policies](#15-retention-policies)
-   - [1.6 Log Compaction & Tombstones](#16-log-compaction--tombstones)
-2. [Kafka Architecture & Storage Internals](#2-kafka-architecture--storage-internals)
+   - [1.6 Log Compaction & Tombstones](#16-log-compaction-tombstones)
+2. [Kafka Architecture & Storage Internals](#2-kafka-architecture-storage-internals)
    - [2.1 ZooKeeper vs KRaft (Kafka Raft Metadata Mode)](#21-zookeeper-vs-kraft-kafka-raft-metadata-mode)
-   - [2.2 Partition Leaders, Followers & High Watermarks](#22-partition-leaders-followers--high-watermarks)
+   - [2.2 Partition Leaders, Followers & High Watermarks](#22-partition-leaders-followers-high-watermarks)
    - [2.3 In-Sync Replicas (ISR)](#23-in-sync-replicas-isr)
-   - [2.4 Producer ACKs & min.insync.replicas](#24-producer-acks--mininsyncreplicas)
-   - [2.5 Replication Factor & Disaster Recovery](#25-replication-factor--disaster-recovery)
+   - [2.4 Producer ACKs & min.insync.replicas](#24-producer-acks-mininsyncreplicas)
+   - [2.5 Replication Factor & Disaster Recovery](#25-replication-factor-disaster-recovery)
    - [2.6 Physical Segment Files](#26-physical-segment-files)
-3. [Kafka Consumers & Rebalancing Mechanics](#3-kafka-consumers--rebalancing-mechanics)
-   - [3.1 Consumer Groups & Partition Assignment](#31-consumer-groups--partition-assignment)
+3. [Kafka Consumers & Rebalancing Mechanics](#3-kafka-consumers-rebalancing-mechanics)
+   - [3.1 Consumer Groups & Partition Assignment](#31-consumer-groups-partition-assignment)
    - [3.2 Rebalance Protocols: Eager vs Cooperative Sticky](#32-rebalance-protocols-eager-vs-cooperative-sticky)
    - [3.3 Offset Commit Strategies](#33-offset-commit-strategies)
-   - [3.4 Consumer Lag Monitoring & Burrow](#34-consumer-lag-monitoring--burrow)
+   - [3.4 Consumer Lag Monitoring & Burrow](#34-consumer-lag-monitoring-burrow)
 4. [Kafka in Enterprise Data Engineering](#4-kafka-in-enterprise-data-engineering)
    - [4.1 Kafka Connect Framework](#41-kafka-connect-framework)
    - [4.2 Confluent Schema Registry](#42-confluent-schema-registry)
    - [4.3 Schema Evolution Compatibility Modes](#43-schema-evolution-compatibility-modes)
-   - [4.4 Kafka to Delta Lake Streaming Ingestion & DLQ Isolation](#44-kafka-to-delta-lake-streaming-ingestion--dead-letter-queue-dlq-isolation)
+   - [4.4 Kafka to Delta Lake Streaming Ingestion & DLQ Isolation](#44-kafka-to-delta-lake-streaming-ingestion-dead-letter-queue-dlq-isolation)
    - [4.5 Event-Driven Architecture (EDA) Patterns](#45-event-driven-architecture-eda-patterns)
 5. [Spark Structured Streaming Core Engine](#5-spark-structured-streaming-core-engine)
-   - [5.1 The Unbounded Table Model & Streaming DataFrames](#51-the-unbounded-table-model--streaming-dataframes)
+   - [5.1 The Unbounded Table Model & Streaming DataFrames](#51-the-unbounded-table-model-streaming-dataframes)
    - [5.2 Sources, Sinks, and Triggers](#52-sources-sinks-and-triggers)
    - [5.3 Output Modes (Append, Complete, Update)](#53-output-modes-append-complete-update)
-   - [5.4 Checkpointing & Offset Commit Management](#54-checkpointing--offset-commit-management)
+   - [5.4 Checkpointing & Offset Commit Management](#54-checkpointing-offset-commit-management)
    - [5.5 Event-Time vs. Processing-Time Semantics](#55-event-time-vs-processing-time-semantics)
-   - [5.6 Watermarking & State Expiration](#56-watermarking--state-expiration)
+   - [5.6 Watermarking & State Expiration](#56-watermarking-state-expiration)
    - [5.7 Streaming Window Operations](#57-streaming-window-operations)
    - [5.8 Streaming Joins](#58-streaming-joins)
    - [5.9 Stateful vs. Stateless Streaming Operations](#59-stateful-vs-stateless-streaming-operations)
    - [5.10 Streaming Deduplication](#510-streaming-deduplication)
-6. [Advanced Streaming Infrastructure & Real-Time OLAP](#6-advanced-streaming-infrastructure--real-time-olap)
+6. [Advanced Streaming Infrastructure & Real-Time OLAP](#6-advanced-streaming-infrastructure-real-time-olap)
    - [6.1 End-to-End Delivery Semantics](#61-end-to-end-delivery-semantics)
    - [6.2 Stream Processing Engine Comparison](#62-stream-processing-engine-comparison)
    - [6.3 Cloud Message Brokers Comparison Matrix (Kafka vs. Event Hubs vs. Kinesis)](#63-cloud-message-brokers-comparison-matrix-kafka-vs-event-hubs-vs-kinesis)
    - [6.4 Real-Time OLAP Databases](#64-real-time-olap-databases)
-7. [References & Further Reading](#7-references--further-reading)
+7. [References & Further Reading](#7-references-further-reading)
 
 ---
 
@@ -1073,3 +1073,11 @@ flowchart LR
 - [GeeksforGeeks: Real-Time OLAP Systems](https://www.geeksforgeeks.org/real-time-olap-databases/)
 
 ---
+
+---
+
+# 7. References & Further Reading
+
+- [Official Documentation & Design Principles Guide](https://docs.microsoft.com/en-us/azure/architecture/)
+- [High Performance Distributed Data Architecture Patterns](https://martinfowler.com/articles/patterns-of-distributed-systems/)
+- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)
