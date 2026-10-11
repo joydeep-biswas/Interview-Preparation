@@ -89,27 +89,51 @@ flowchart TD
 
 Every object allocated on the HotSpot JVM heap contains an internal header preceding its instance fields:
 
+```mermaid
+flowchart TD
+    subgraph HeapObject ["HotSpot 64-bit JVM Object Heap Layout"]
+        direction TB
+
+        subgraph Header ["Part 1: Object Header (12 or 16 Bytes)"]
+            direction LR
+            MarkWord["Mark Word (8 Bytes / 64 bits)<br/>• Identity HashCode (31 bits)<br/>• 4-bit GC Age (0–15 survival cycles)<br/>• Synchronization Lock State & Biased Bits"]
+            KlassWord["Klass Pointer (4 or 8 Bytes)<br/>• Compressed OOP (-XX:+UseCompressedClassPointers)<br/>• Pointer to Class Metadata in Metaspace"]
+            MarkWord --- KlassWord
+        end
+
+        subgraph Body ["Part 2: Instance Payload & Memory Alignment"]
+            direction LR
+            InstanceFields["Instance Fields Data (Variable Size)<br/>• Primitives ordered by width: 8B, 4B, 2B, 1B<br/>• 4-byte Compressed Reference Pointers (OOPs)"]
+            Padding["Alignment Padding (0–7 Bytes)<br/>• Zero-fill bytes to reach 8-byte word boundary<br/>• Optimizes 64-bit CPU L1/L2 cache line fetch"]
+            InstanceFields --- Padding
+        end
+
+        Header -->|"Contiguous Memory Offset"| Body
+    end
+
+    style HeapObject fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Header fill:#1e293b,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    style Body fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
+    style MarkWord fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style KlassWord fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style InstanceFields fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Padding fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
 ```
-+-------------------------------------------------------------------------+
-|                          64-bit Object Header                           |
-+------------------------------------+------------------------------------+
-|         Mark Word (8 bytes)        |    Klass Pointer (4 or 8 bytes)    |
-| (Identity Hash, GC Age, Locks)     | (Compressed OOP pointing to Klass) |
-+------------------------------------+------------------------------------+
-|                        Instance Fields Data                             |
-| (Primitives & 4-byte Compressed Object Pointers)                        |
-+-------------------------------------------------------------------------+
-|                     Alignment Padding (0-7 bytes)                       |
-| (Pads object to multiple of 8 bytes for 64-bit CPU cache alignment)     |
-+-------------------------------------------------------------------------+
-```
+
+| Memory Segment | Typical Size | Internal Bit Fields & Purpose |
+| :--- | :--- | :--- |
+| **Mark Word** | 8 bytes (64 bits) | Dynamic runtime metadata: identity hash code, 4-bit GC age (0–15), lock status flags (lightweight/heavyweight/biased/GC-marked). |
+| **Klass Pointer** | 4 bytes (compressed) or 8 bytes (uncompressed) | Pointer referencing the instance's class definition structure in **Metaspace** (`-XX:+UseCompressedClassPointers`). |
+| **Instance Fields** | Variable | Primitive variables packed by byte-width (`long`/`double` $\to$ `int`/`float` $\to$ `short`/`char` $\to$ `byte`/`boolean`) followed by reference addresses. |
+| **Alignment Padding** | 0 to 7 bytes | Zero-fill padding ensuring the total byte size of every object on the heap is evenly divisible by 8. |
 
 1. **Mark Word (64 bits / 8 bytes)**: Stores runtime metadata dynamically updated by the JVM:
    * **Hash Code**: Identity hash code generated when `System.identityHashCode(obj)` is called.
    * **GC Age**: 4 bits (values 0–15) tracking object survival cycles in Young Generation (survivor spaces) before promotion to Tenured/Old generation (Tenuring Threshold defaults to 15).
    * **Biased Locking / Lock Flags**: Tracks synchronization state: Normal, Biased, Lightweight (thin lock using basic object monitor), Heavyweight (OS mutex monitor), or Marked for GC.
 2. **Klass Word (Compressed OOP - 32 bits / 4 bytes)**:
-   * By default, on heaps $<32	ext{ GB}$, HotSpot enables `-XX:+UseCompressedClassPointers`, compressing 64-bit pointers down to 32 bits using 8-byte aligned shifts.
+   * By default, on heaps $<32\text{ GB}$, HotSpot enables `-XX:+UseCompressedClassPointers`, compressing 64-bit pointers down to 32 bits using 8-byte aligned shifts.
    * Points directly to the class metadata representation residing in **Metaspace**.
 3. **Instance Data**: Fields defined in the class hierarchy ordered by the JVM for memory alignment (primitives grouped by size: `long`/`double` (8B), `int`/`float` (4B), `short`/`char` (2B), `byte`/`boolean` (1B), then references).
 4. **Padding**: Every object size in HotSpot is aligned to a multiple of 8 bytes. If an object takes 28 bytes, 4 bytes of padding are appended to make it 32 bytes.
@@ -187,18 +211,26 @@ public final class BankAccount {
 When a subclass is instantiated, class initialization (`<clinit>`) and instance initialization (`<init>`) execute in strict hierarchical order:
 
 ```mermaid
-flowchart TD
-    Step1["1. Superclass Static Initializers & static fields (&lt;clinit&gt;)"] --> Step2["2. Subclass Static Initializers & static fields (&lt;clinit&gt;)"]
-    Step2 --> Step3["3. Superclass Instance Initializers & field assignments"]
-    Step3 --> Step4["4. Superclass Constructor body (&lt;init&gt;)"]
-    Step4 --> Step5["5. Subclass Instance Initializers & field assignments"]
-    Step5 --> Step6["6. Subclass Constructor body (&lt;init&gt;)"]
+flowchart LR
+    subgraph Phase1 ["Phase 1: Static Class Initialization (<clinit>)"]
+        direction LR
+        Step1["1. Superclass Static Initializers<br/>(static fields & static blocks)"] --> Step2["2. Subclass Static Initializers<br/>(static fields & static blocks)"]
+    end
 
+    subgraph Phase2 ["Phase 2: Instance Hierarchical Initialization (<init>)"]
+        direction LR
+        Step3["3. Superclass Fields & Init Blocks"] --> Step4["4. Superclass Constructor Body"] --> Step5["5. Subclass Fields & Init Blocks"] --> Step6["6. Subclass Constructor Body"]
+    end
+
+    Step2 --> Step3
+
+    style Phase1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Phase2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Step1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Step2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Step3 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Step2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Step3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style Step4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Step5 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style Step5 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style Step6 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 

@@ -103,41 +103,65 @@ The Java Collections Framework (JCF) is a unified architecture located in `java.
 
 #### Visual Hierarchy
 ```mermaid
-flowchart TD
-    subgraph RootInterface ["Root Iteration Interface"]
-        IterableNode["Iterable&lt;E&gt;<br/>(Defines iterator, forEach, spliterator)"]
-    end
+classDiagram
+    direction TB
+    class Iterable~E~ {
+        <<interface>>
+        +iterator() Iterator~E~
+        +forEach(Consumer action)
+        +spliterator() Spliterator~E~
+    }
+    class Collection~E~ {
+        <<interface>>
+        +size() int
+        +add(E e) boolean
+        +contains(Object o) boolean
+        +stream() Stream~E~
+    }
+    class List~E~ {
+        <<interface>>
+        +get(int index) E
+        +set(int index, E element) E
+    }
+    class Set~E~ {
+        <<interface>>
+        +contains(Object o) boolean
+    }
+    class Queue~E~ {
+        <<interface>>
+        +offer(E e) boolean
+        +poll() E
+        +peek() E
+    }
+    class Deque~E~ {
+        <<interface>>
+        +addFirst(E e) void
+        +addLast(E e) void
+        +pollFirst() E
+        +pollLast() E
+    }
+    class Map~K_V~ {
+        <<interface>>
+        +put(K key, V value) V
+        +get(Object key) V
+        +values() Collection~V~
+        +keySet() Set~K~
+    }
 
-    subgraph CoreCollection ["Unified Collection Hierarchy"]
-        CollectionNode["Collection&lt;E&gt;<br/>(add, remove, contains, size, stream)"]
-        ListNode["List&lt;E&gt;<br/>(Ordered sequence, zero-based indexed access)"]
-        SetNode["Set&lt;E&gt;<br/>(Mathematical set: distinct unique elements)"]
-        QueueNode["Queue&lt;E&gt;<br/>(FIFO buffer: offer, poll, peek)"]
-        DequeNode["Deque&lt;E&gt;<br/>(Double-ended queue: stack and queue operations)"]
-    end
+    Iterable <|-- Collection : extends
+    Collection <|-- List : extends
+    Collection <|-- Set : extends
+    Collection <|-- Queue : extends
+    Queue <|-- Deque : extends
+    Map ..> Collection : values() view
 
-    subgraph KeyValueHierarchy ["Key-Value Mapping (Separate Root)"]
-        MapNode["Map&lt;K, V&gt;<br/>(Key-to-value associations: put, get, entrySet, keySet)"]
-    end
-
-    IterableNode --> CollectionNode
-    CollectionNode --> ListNode
-    CollectionNode --> SetNode
-    CollectionNode --> QueueNode
-    QueueNode --> DequeNode
-    MapNode -.->|"Values view as Collection"| CollectionNode
-
-    style RootInterface fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style CoreCollection fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style KeyValueHierarchy fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-
-    style IterableNode fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style CollectionNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style ListNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style SetNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style QueueNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style DequeNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style MapNode fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Iterable fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style Collection fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style List fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style Set fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#ffffff
+    style Queue fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    style Deque fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    style Map fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
 ```
 
 #### Quick Selection Rules for Backend Engineers:
@@ -236,7 +260,7 @@ A doubly-linked list implementation of `List` and `Deque`. Each element is wrapp
 
 #### Visual Structure
 ```mermaid
-flowchart LR
+flowchart TD
     Head["Head"] --> N1
     subgraph N1["Node 1"]
         direction LR
@@ -819,6 +843,7 @@ Acts as a direct thread-to-thread handoff mechanism. It is the default queue use
 
 #### Visual Direct Handoff
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant Producer as Producer Thread
     participant SQ as SynchronousQueue (0 Capacity)
@@ -1381,7 +1406,7 @@ public class NumericStats<T extends Number> {
 
 #### Visual PECS Flow
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph ProducerExtends["Producer: ? extends Number (Read Only)"]
         direction LR
         PCollection["List<? extends Number>"] -->|Reading is Safe: returns Number| ReadTarget["Number num = list.get(0)"]
@@ -1450,14 +1475,16 @@ Java implements generics via **Type Erasure**. The compiler enforces type constr
 
 #### Visual Bytecode Transformation
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph SourceCode["Source Code (Compile Time)"]
+        direction TD
         C1["List&lt;String&gt; list = new ArrayList<>();"]
         C2["list.add('Hello');"]
         C3["String s = list.get(0);"]
     end
 
     subgraph Bytecode["Compiled Bytecode (Runtime Erasure)"]
+        direction TD
         B1["List list = new ArrayList();"]
         B2["list.add('Hello');"]
         B3["String s = (String) list.get(0); // Synthetic Cast"]

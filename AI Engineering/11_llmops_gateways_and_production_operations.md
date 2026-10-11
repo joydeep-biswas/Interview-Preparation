@@ -143,14 +143,35 @@ An **AI Gateway** sits as a reverse proxy between internal enterprise microservi
 
 Commercial LLM APIs enforce strict limits on both **Requests Per Minute (RPM)** and **Tokens Per Minute (TPM)**. Exceeding either immediately yields `HTTP 429 Too Many Requests`.
 
-```text
-TOKEN-BUCKET ALGORITHM MECHANICS:
-Capacity: C = 500,000 tokens.
-Refill Rate: r = 8,333 tokens per second (500k TPM / 60s).
-Each incoming request estimates required tokens (prompt_tokens + max_tokens).
-If bucket has sufficient tokens: Subtract tokens and dispatch request immediately.
-If bucket is empty: Enqueue request or return HTTP 429 with Retry-After header.
+```mermaid
+flowchart TD
+    Req["Incoming Inference Request<br/>(Estimates: prompt_tokens + max_tokens)"] --> Check{"Token Bucket >= Required Tokens?"}
+    Check -- "Yes (Tokens Available)" --> Allow["Deduct Tokens from Bucket & Dispatch Request"]
+    Check -- "No (Insufficient Tokens)" --> Action{"Traffic Shaping Policy"}
+    Action -- "Buffer Enabled" --> Wait["Enqueue in Priority Queue until Refill"]
+    Action -- "Fail Fast" --> Reject["Return HTTP 429 with Retry-After"]
+
+    Refill["Continuous Refill Engine:<br/>r = 8,333 tokens/sec (Capacity C = 500,000)"] -.-> Check
+
+    classDef req fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef check fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef allow fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef reject fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
+    classDef refill fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#f8fafc;
+
+    class Req req;
+    class Check,Action check;
+    class Allow allow;
+    class Wait,Reject reject;
+    class Refill refill;
 ```
+
+| Parameter | Production Value | Operational Definition |
+| :--- | :--- | :--- |
+| **Burst Capacity ($C$)** | `500,000 tokens` | Maximum burst volume allowed to accumulate in the bucket. |
+| **Refill Rate ($r$)** | `8,333 tokens / sec` | Sustained consumption velocity based on quota ($500\text{k TPM} / 60\text{s}$). |
+| **Cost Estimation** | `prompt_tokens + max_tokens` | Pre-allocated token estimate deducted before dispatching request. |
+| **Throttling Behavior** | `HTTP 429 Retry-After: <sec>` | Emits backpressure signal or enqueues in Redis sorted set until bucket refills. |
 
 ---
 
@@ -167,15 +188,35 @@ In multi-tenant SaaS platforms, a single misconfigured customer script must neve
 ### 4.1 Circuit Breaker Finite State Machine
 
 ```mermaid
-flowchart TD
-    Closed["Closed State (Normal Operation)<br/>Requests route to Primary Provider"] -->|"Error Rate > 15% across 20 calls"| Open["Open State (Tripped / Broken)<br/>All requests fail over to Fallback instantly"]
-    Open -->|"Cooldown Window Expires (30s)"| HalfOpen["Half-Open State (Canary Probe)<br/>Send 10% of traffic to Primary"]
-    HalfOpen -->|"Canary succeeds (Error Rate < 2%)"| Closed
-    HalfOpen -->|"Canary fails (Error persists)"| Open
+stateDiagram-v2
+    classDef operational fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef tripped fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef trial fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
 
-    style Closed fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Open fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style HalfOpen fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    [*] --> Closed
+    
+    Closed --> Open: Error rate > 15% across 20 calls
+    note right of Closed
+        Normal operational state.
+        Traffic routed to Primary Provider.
+    end note
+
+    Open --> HalfOpen: Cooldown window expires (30s)
+    note right of Open
+        Tripped failover state.
+        All requests rerouted to Fallback Provider.
+    end note
+
+    HalfOpen --> Closed: Canary succeeds (Error rate < 2%)
+    HalfOpen --> Open: Canary fails (Upstream outage persists)
+    note right of HalfOpen
+        Canary probing state.
+        Sends 10% trial traffic to Primary.
+    end note
+
+    class Closed operational
+    class Open tripped
+    class HalfOpen trial
 ```
 
 ---
@@ -296,20 +337,12 @@ When a user closes their browser tab 2 seconds into a 20-second streaming comple
 
 # 7. Observability & The Four Golden Signals of LLMs
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| GOLDEN SIGNAL         | PRODUCTION DEFINITION       | TARGET PRODUCTION SLA         |
-+-----------------------+-----------------------------+-------------------------------+
-| Time to First Token   | Latency between HTTP request| p50 < 400ms,                  |
-| (TTFT)                | arrival and 1st token chunk.| p95 < 1200ms.                 |
-| Inter-Token Latency   | Time elapsed between        | p50 < 25ms,                   |
-| (ITL)                 | emission of successive tokens| p95 < 50ms (40+ tokens/sec).  |
-| Output Generation     | Total tokens emitted per    | > 40 tokens/sec               |
-| Speed (Throughput)    | second per active request.  | per streaming client.         |
-| Error Rate (HTTP 429  | Percentage of requests      | < 0.1% across rolling         |
-| / 500 / 503)          | terminating in error.       | 5-minute window.              |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Golden Signal | Production Definition | Target Production SLA |
+| :--- | :--- | :--- |
+| **Time to First Token (TTFT)** | Latency between HTTP request arrival and emission of the 1st token chunk. | $p50 < 400\text{ms}$, $p95 < 1200\text{ms}$. |
+| **Inter-Token Latency (ITL)** | Time elapsed between emission of successive tokens. | $p50 < 25\text{ms}$, $p95 < 50\text{ms}$ ($>40$ tokens/sec). |
+| **Output Generation Speed (Throughput)** | Total tokens emitted per second per active request stream. | $> 40\text{ tokens/sec}$ per streaming client. |
+| **Error Rate (HTTP 429 / 500 / 503)** | Percentage of requests terminating in error or throttling. | $< 0.1\%$ across rolling 5-minute window. |
 
 ---
 
@@ -317,13 +350,12 @@ When a user closes their browser tab 2 seconds into a 20-second streaming comple
 
 ### 8.1 Defining Rigorous AI SLOs and Error Budgets
 
-```text
-ENTERPRISE AI PRODUCTION SLO MATRIX:
-1. Availability: 99.9% of API requests return HTTP 200 within timeout budget.
-2. Latency: 95% of interactive chat queries achieve TTFT < 800ms.
-3. Groundedness: 99.5% of production RAG responses score Faithfulness = 1.0 on automated sample audit.
-4. Error Budget: A 0.1% allowable failure rate over 30 days = 43 minutes of total downtime.
-```
+| Objective / Metric | Target Production SLA | Measurement Window & Criteria |
+| :--- | :--- | :--- |
+| **Availability** | $\ge 99.9\%$ | Percentage of API requests returning HTTP 200 within timeout budget. |
+| **Latency** | $p95 < 800\text{ms}$ | Interactive chat query Time to First Token (TTFT). |
+| **Groundedness** | $\ge 99.5\%$ | Production RAG responses scoring Faithfulness $= 1.0$ on automated sample audit. |
+| **Error Budget** | $\le 0.1\%$ | Allowable failure rate over 30 rolling days ($\approx 43$ minutes of downtime). |
 
 ---
 

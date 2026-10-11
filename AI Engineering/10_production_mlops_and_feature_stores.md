@@ -106,14 +106,35 @@ A model trained on yesterday's dataset may produce completely different predicti
 > [!IMPORTANT]
 > **Eliminating Feature Leakage:** Point-in-time correct joins are mandatory when constructing training data from historical feature logs. Using current feature values with past labels introduces lookahead data leakage, creating models that perform flawlessly offline but fail catastrophically in live production.
 
-Full auditability requires tracking the complete supply chain:
-```text
-AUDITABLE ML LINEAGE CHAIN:
-Raw S3 Data (SHA-256) ---> DVC Data Version ---> Training Script (Git SHA)
-                      ---> Hyperparameters (MLflow Run ID)
-                      ---> Serialized Model Artifact (ONNX SHA)
-                      ---> Docker Container Image Digest
-                      ---> KServe Kubernetes Pod Deployment
+```mermaid
+flowchart TD
+    subgraph Stage1 ["Stage 1: Data & Code Provenance"]
+        direction LR
+        S3["Raw S3 Data<br/>(Immutable SHA-256)"] --> DVC["DVC Data Version<br/>(Content hash pointer)"] --> Train["Training Script<br/>(Git commit SHA)"]
+    end
+
+    subgraph Stage2 ["Stage 2: Model Artifacts & Registration"]
+        direction LR
+        Params["Hyperparameters<br/>(MLflow Run ID)"] --> Model["Serialized Model<br/>(ONNX artifact hash)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Containerization & Production Serving"]
+        direction LR
+        Docker["Docker Image<br/>(Immutable digest)"] --> Deploy["KServe Pod<br/>(Kubernetes deployment)"]
+    end
+
+    Stage1 --> Stage2 --> Stage3
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style S3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DVC fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Train fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Params fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Model fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Docker fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Deploy fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -194,15 +215,12 @@ A **Feature Store** solves the dual requirement of machine learning:
 
 When training a model on historical events, feature values must reflect the state of the world **at the exact timestamp of the event**, not the current timestamp:
 
-```text
-POINT-IN-TIME (AS-OF) JOIN MECHANICS:
-Customer Transaction Event: Timestamp: 2024-03-15 14:32:00
-Current Database Feature:   customer_total_spend = $15,400 (as of today)
-Point-in-Time Feature:      customer_total_spend = $4,200  (as of 2024-03-15)
+> **Customer Transaction Event Timestamp:** `2024-03-15 14:32:00`
 
-HAZARD: Joining against current data causes catastrophic future leakage.
-Feast As-Of Joins ensure: Feature_Timestamp <= Event_Timestamp.
-```
+| Feature Horizon Mode | Evaluated Feature Value | Data Leakage Risk & Production Consequence |
+| :--- | :--- | :--- |
+| **Current Database Snapshot** | `customer_total_spend = \$15,400` (today) | **Catastrophic Target Leakage:** Leaks future customer transaction activity into historical training rows. |
+| **Point-in-Time (As-Of) Correct** | `customer_total_spend = \$4,200` (as of event timestamp) | **Zero Leakage:** Strictly enforces $\text{Feature\_Timestamp} \le \text{Event\_Timestamp}$. |
 
 ---
 

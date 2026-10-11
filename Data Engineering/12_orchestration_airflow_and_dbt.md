@@ -79,7 +79,7 @@ In modern production data platforms, enterprise workloads separate the **orchest
 ```mermaid
 flowchart LR
     subgraph AirflowControlPlane["Apache Airflow: Workflow Orchestration & Control Plane"]
-        direction TB
+        direction TD
         A[Trigger: Event / Cron] --> B[Sensor: S3/Kafka Arrival]
         B --> C[Operator: Spin Up Compute / Ingest]
         C --> D[dbt Cloud / Core Run Operator]
@@ -87,7 +87,7 @@ flowchart LR
     end
 
     subgraph DbtTransformationLayer["dbt: Pushdown Transformation Layer"]
-        direction TB
+        direction TD
         T1["Raw Ingestion: bronze_orders"] --> T2["Staging: stg_orders (View)"]
         T2 --> T3["Intermediate: int_order_items (Ephemeral)"]
         T3 --> T4["Marts: fct_orders (Incremental Merge)"]
@@ -335,14 +335,16 @@ In Airflow, tasks run in isolated processes or completely separate containers. *
 For conceptual overviews, see GeeksforGeeks' [What is Apache Airflow?](https://www.geeksforgeeks.org/what-is-apache-airflow/) and DataCamp's [Create a Customer Insights Pipeline with Airflow and dbt](https://www.datacamp.com/tutorial/airflow-tutorial).
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Anti_Pattern["Anti-Pattern: Raw Data in XCom"]
+        direction TD
         T1["Task 1 (Extract)"] -->|100MB DataFrame| DB[("Airflow Metadata DB<br/>(PostgreSQL BLOB Table)")]
         DB -->|Heavy Memory Deserialization| T2["Task 2 (Transform)"]
         DB -.->|Performance Degradation & Scheduler Crashes| Crash["System Failure"]
     end
 
     subgraph Best_Practice["Best Practice: Pointer-Based XCom"]
+        direction TD
         P1["Task 1 (Extract)"] -->|Writes 100MB Parquet| S3[("Object Storage: S3 / GCS / ADLS")]
         P1 -->|"Pushes s3://bucket/key.parquet (128 bytes)"| MetaDB[("Airflow Metadata DB")]
         MetaDB -->|Pulls URI Pointer| P2["Task 2 (Transform)"]
@@ -674,46 +676,42 @@ flowchart TD
 A task instance transitions through a deterministic series of states during execution:
 
 ```mermaid
-flowchart TD
-    subgraph SchedulerQueue ["Scheduler & Queue Management"]
-        NoneState["NONE State<br/>(Task instance created in metadata DB, dependencies unmet)"]
-        ScheduledState["SCHEDULED State<br/>(Dependencies satisfied, data interval arrived)"]
-        QueuedState["QUEUED State<br/>(Placed in Executor queue, e.g. Celery / Kubernetes)"]
-    end
+stateDiagram-v2
+    classDef scheduled fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    classDef running fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#ffffff
+    classDef deferred fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    classDef retry fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    classDef success fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef failed fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
 
-    subgraph WorkerExecution ["Worker Runtime Execution"]
-        RunningState["RUNNING State<br/>(Picked up by worker, executing operator execute method)"]
-        DeferredState["DEFERRED State<br/>(Yielded to Triggerer process, releasing worker slot)"]
-        RetryState["UP_FOR_RETRY<br/>(Execution failed, waiting for retry exponential backoff)"]
-    end
+    [*] --> NONE: Created in metadata DB (dependencies unmet)
+    
+    NONE --> SCHEDULED: Dependencies satisfied & data interval arrived
+    SCHEDULED --> QUEUED: Executor slot allocated (Celery / Kubernetes queue)
+    QUEUED --> RUNNING: Worker picks up task instance
+    
+    state RUNNING {
+        [*] --> Executing: Operator execute() running
+    }
 
-    subgraph TerminalOutcomes ["Terminal Task Execution States"]
-        SuccessState["SUCCESS State<br/>(Completed cleanly, unblocks downstream dependencies)"]
-        FailedState["FAILED State<br/>(Retries exhausted, triggers on_failure_callback & alerts)"]
-    end
+    RUNNING --> DEFERRED: Yields trigger (Deferrable Operator releases worker slot)
+    DEFERRED --> SCHEDULED: Triggerer fires resume event
 
-    NoneState -->|"Dependencies clear"| ScheduledState
-    ScheduledState -->|"Executor slot allocated"| QueuedState
-    QueuedState -->|"Worker starts execution"| RunningState
-    RunningState -->|"Task completes successfully"| SuccessState
-    RunningState -->|"Exception thrown, retries > 0"| RetryState
-    RetryState -->|"Retry delay expires"| QueuedState
-    RunningState -->|"Exception thrown, retries = 0"| FailedState
-    RunningState -->|"Deferrable operator yields Trigger"| DeferredState
-    DeferredState -->|"Triggerer event fires"| ScheduledState
+    RUNNING --> UP_FOR_RETRY: Exception thrown (retries > 0)
+    UP_FOR_RETRY --> QUEUED: Exponential backoff delay expires
 
-    style SchedulerQueue fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style WorkerExecution fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style TerminalOutcomes fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    RUNNING --> SUCCESS: Completed cleanly
+    RUNNING --> FAILED: Retries exhausted (retries = 0)
 
-    style NoneState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ScheduledState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style QueuedState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style RunningState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style DeferredState fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style RetryState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style SuccessState fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style FailedState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    SUCCESS --> [*]: Unblocks downstream DAG tasks
+    FAILED --> [*]: Triggers on_failure_callback & PagerDuty alerts
+
+    class NONE,SCHEDULED,QUEUED scheduled
+    class RUNNING running
+    class DEFERRED deferred
+    class UP_FOR_RETRY retry
+    class SUCCESS success
+    class FAILED failed
 ```
 
 ---

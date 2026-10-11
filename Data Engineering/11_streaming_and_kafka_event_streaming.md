@@ -132,15 +132,18 @@ flowchart LR
 - **Offset:** A sequential, monotonically increasing 64-bit integer assigned to each record within a partition that uniquely identifies the message.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph TopicOrders ["Topic: 'customer_orders' (3 Partitions)"]
         subgraph Part0 ["Partition 0"]
+            direction TD
             P0_0["Offset 0"] --> P0_1["Offset 1"] --> P0_2["Offset 2"] --> P0_3["Offset 3 (Tail)"]
         end
         subgraph Part1 ["Partition 1"]
+            direction TD
             P1_0["Offset 0"] --> P1_1["Offset 1"] --> P1_2["Offset 2 (Tail)"]
         end
         subgraph Part2 ["Partition 2"]
+            direction TD
             P2_0["Offset 0"] --> P2_1["Offset 1"] --> P2_2["Offset 2"] --> P2_3["Offset 3 (Tail)"]
         end
     end
@@ -236,7 +239,7 @@ A Kafka record is an immutable binary tuple appended to a topic partition commit
 5. **Partition & Offset:** Monotonically assigned by the broker upon commit.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph KafkaRecord ["Physical Kafka Record Anatomy"]
         Offset["Offset: 5042"]
         Timestamp["Timestamp: 1727913600000"]
@@ -324,7 +327,7 @@ Kafka retains messages independently of whether they have been consumed:
 Log Compaction retains at least the **most recent record for every message key** within a partition log, discarding older updates. It treats the topic as a changelog (K-V store snapshot).
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph UncompactedLog ["Uncompacted Partition Log"]
         K1_v1["Key A: $10"] --> K2_v1["Key B: $20"] --> K1_v2["Key A: $15"] --> K1_v3["Key A: $25"]
     end
@@ -526,16 +529,17 @@ When a consumer joins or leaves, **ALL consumers in the group revoke all partiti
 Consumers continue reading unaffected partitions without pausing. Only the specific partitions that need to be migrated to the new consumer are reassigned incrementally (**Zero pipeline downtime**).
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant C1 as Consumer 1 (Part 0, 1)
     participant C2 as Consumer 2 (Part 2)
     participant C3 as New Consumer 3 Joins
 
-    Note over C1,C2: Cooperative Sticky Rebalancing (Zero Stop-the-World Pause!)
-    C3->>Coordinator: JoinGroup
-    Coordinator->>C1: Revoke ONLY Part 1 (C1 keeps reading Part 0 continuously!)
-    Coordinator->>C3: Assign Part 1
-    Note over C1,C3: Continuous ingestion without global stall!
+    Note over C1, C2: Cooperative Sticky Rebalancing (Zero Stop-the-World Pause!)
+    Coordinator ->> C1: Revoke ONLY Part 1 (C1 keeps reading Part 0 continuously!)
+    Coordinator ->> C3: Assign Part 1
+    C3 ->> Coordinator: JoinGroup
+    Note over C1, C3: Continuous ingestion without global stall!
 ```
 
 ---
@@ -586,7 +590,7 @@ Consumers read the 4-byte ID, fetch the schema from the registry once (cached), 
 flowchart LR
     P[Producer] -->|1. Register Schema| SR[(Schema Registry)]
     SR -- 2. Return Schema ID: 42 --> P
-    P -->|3. Publish: [ID: 42][Avro Bytes]| K[Kafka Topic]
+    P -->|"3. Publish: [ID: 42][Avro Bytes]"| K[Kafka Topic]
     K --> C[Consumer]
     C -->|4. Lookup Schema ID: 42| SR
     SR -- 5. Return Avro Schema --> C
@@ -708,7 +712,7 @@ In modern enterprise architectures, services communicate via asynchronous event 
 Structured Streaming abstracts a live data stream as an **unbounded, continuously growing table**. Every newly arriving event is treated as a new row appended to the input table. Developers write queries using standard DataFrame and SQL APIs; Spark automatically executes the query incrementally across streaming micro-batches or continuous processing.
 
 ```mermaid
-flowchart TD
+flowchart LR
     Stream["Continuous Incoming Event Stream"] --> InTable[("Input Table (Unbounded Append-Only)")]
     InTable --> Engine["Structured Streaming Incremental Engine"]
     Engine --> ResultTable[("Result Table (Updated State)")]
@@ -812,7 +816,7 @@ The Output Mode specifies how updated rows in the Result Table are written to th
 | **`Update`** | Only the **specific rows that changed or were updated** since the last trigger are emitted. | Supported across both aggregations and point updates. |
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph OutputModesComparison ["Output Modes Breakdown"]
         Batch1["Batch 1 Aggregates: [NY: 10, CA: 20]"]
         Batch2New["Batch 2 Incoming: [NY + 5, TX: 15]"]
@@ -901,12 +905,14 @@ Fixed-size, **overlapping** time intervals defined by window duration and slide 
 Dynamic-size windows bounded by an **inactivity gap**. If no events arrive from a user for 30 minutes, the session window closes.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Tumbling ["1. Tumbling Windows (Fixed, No Overlap)"]
+        direction LR
         T1["[00:00 - 00:10]"] --> T2["[00:10 - 00:20]"] --> T3["[00:20 - 00:30]"]
     end
 
     subgraph Sliding ["2. Sliding Windows (Overlapping Intervals)"]
+        direction LR
         S1["[00:00 - 00:10]"]
         S2["   [00:05 - 00:15]"]
         S3["      [00:10 - 00:20]"]
@@ -914,6 +920,7 @@ flowchart TD
     end
 
     subgraph Session ["3. Session Windows (Inactivity Gap Bounded)"]
+        direction LR
         U1["User Clicks (Events 2 mins apart) -> Single 18-Min Session Window"]
         Gap["[30 Min Inactivity Gap]"]
         U2["New User Click -> New Session Window Opened"]
@@ -1059,7 +1066,7 @@ Real-Time OLAP databases are specialized columnar storage engines engineered to 
 flowchart LR
     Kafka[Kafka Event Stream] -->|Direct Real-Time Ingest| RT_OLAP[(ClickHouse / Apache Pinot / Druid)]
     RT_OLAP --> API[User-Facing Analytics API]
-    RT_OLAP --> LiveDash[Real-Time Security Dashboard (<50ms Latency)]
+    RT_OLAP --> LiveDash["Real-Time Security Dashboard (<50ms Latency>)"]
 
     style Kafka fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style RT_OLAP fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff

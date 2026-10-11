@@ -152,17 +152,20 @@ Virtual Machines (VMs) virtualize physical hardware through a **Hypervisor** (Ty
 Containers virtualize the operating system. All containers running on a host share the **single underlying Linux Host Kernel**. Isolation is achieved through native Linux kernel primitives (`namespaces` and `control groups`). Containers bundle only the application bytecode, runtime binaries, and dependencies, yielding megabyte footprints and sub-second startup times.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph VMArchitecture["Virtual Machine Architecture (Hardware Virtualization)"]
+		direction LR
         Hardware1["Physical Server (Bare Metal)"]
         HostOS1["Host OS (Optional in Type 1)"]
         Hypervisor["Hypervisor (Type 1 KVM/ESXi or Type 2)"]
         subgraph VM1["Guest VM 1 (Order Service)"]
+			direction LR
             GOS1["Guest OS Kernel (2-10 GB)"]
             Bins1["System Libs & JRE"]
             App1["Spring Boot App 1"]
         end
         subgraph VM2["Guest VM 2 (Payment Service)"]
+			direction LR
             GOS2["Guest OS Kernel (2-10 GB)"]
             Bins2["System Libs & JRE"]
             App2["Spring Boot App 2"]
@@ -172,6 +175,7 @@ flowchart TD
     end
 
     subgraph ContainerArchitecture["Container Architecture (OS-Level Virtualization)"]
+		direction LR
         Hardware2["Physical Server (Bare Metal)"]
         HostOS2["Host Linux Kernel (Shared Kernel)"]
         ContainerEngine["Container Runtime (containerd / runc)"]
@@ -246,6 +250,7 @@ flowchart LR
         end
 
         subgraph OverlayFS["3. OverlayFS (Layered Union Filesystem)"]
+			direction LR
             Merged["Merged View: Unified Container Filesystem"]
             Upper["UpperDir: Read-Write Container Layer"]
             Lower["LowerDir: Read-Only Base Image Layers"]
@@ -306,7 +311,7 @@ flowchart LR
 Understanding container states is essential for diagnosing operational production failures:
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Instantiation ["Container Initialization"]
         Created["CREATED State<br/>(Filesystem & namespaces allocated, no active PID)"]
     end
@@ -1148,9 +1153,9 @@ The generated Kubernetes Secret holds two Base64-encoded keys required by standa
 ### 3.1 CI vs CD (Continuous Integration, Delivery, and Deployment)
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph CI["Continuous Integration (CI)"]
-        direction TB
+        direction LR
         Code["Code Commit"] --> Build["Maven Compile"]
         Build --> Unit["Unit Tests"]
         Unit --> Int["Integration Tests (Testcontainers)"]
@@ -1214,7 +1219,7 @@ flowchart LR
 ### 3.3 Zero-Downtime Deployment Strategies: Rolling vs Blue-Green vs Canary vs Shadow
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph RollingDeploy["1. Rolling Deployment (Default Kubernetes)"]
         direction LR
         R_v1["v1 (Active)"] --- R_v2["v2 (New)"] --- R_v3["v2 (New)"]
@@ -1701,40 +1706,50 @@ flowchart TD
 ### 5.2 Cloud Computing Service Models: IaaS vs PaaS vs CaaS vs FaaS
 
 ```mermaid
-flowchart LR
-    subgraph IaaS["IaaS (Azure VMs)"]
-        I1["Vendor: Hardware, Hypervisor"]
-        I2["You: OS, Patching, Runtime, App, Data"]
+flowchart TD
+    subgraph Row1 ["Infrastructure & Container Hosting"]
+        direction LR
+        subgraph IaaS ["IaaS (Azure VMs)"]
+            direction TB
+            I1["Vendor: Hardware, Hypervisor"]
+            I2["You: OS, Patching, Runtime, App, Data"]
+        end
+        subgraph CaaS ["CaaS (Azure AKS)"]
+            direction TB
+            C1["Vendor: Hardware, K8s Control Plane, Node OS"]
+            C2["You: Container Images, K8s Manifests, App"]
+        end
     end
 
-    subgraph CaaS["CaaS (Azure AKS)"]
-        C1["Vendor: Hardware, K8s Control Plane, Node OS Patching"]
-        C2["You: Container Images, K8s Manifests, App, Data"]
+    subgraph Row2 ["Managed Application & Serverless Platforms"]
+        direction LR
+        subgraph PaaS ["PaaS (App Service)"]
+            direction TB
+            P1["Vendor: Hardware, OS, Java Runtime, Framework"]
+            P2["You: Spring Boot JAR code, Data"]
+        end
+        subgraph FaaS ["FaaS (Azure Functions)"]
+            direction TB
+            F1["Vendor: Everything, Event Triggers, Scale-to-Zero"]
+            F2["You: Single Function Method"]
+        end
     end
 
-    subgraph PaaS["PaaS (App Service)"]
-        P1["Vendor: Hardware, OS, Java Runtime, Framework Scaling"]
-        P2["You: Spring Boot JAR code, Data"]
-    end
+    style Row1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Row2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style IaaS fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style CaaS fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style PaaS fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style FaaS fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
 
-    subgraph FaaS["FaaS (Azure Functions)"]
-        F1["Vendor: Everything, Event Triggers, Scale-to-Zero"]
-        F2["You: Single Function Method"]
-    end
-
-    style IaaS fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style CaaS fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style PaaS fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style FaaS fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-
-    style I1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style I2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style C1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style C2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style P1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style P2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style F1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style F2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style I1 fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style I2 fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style C1 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style C2 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style P1 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style P2 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style F1 fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style F2 fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -1766,9 +1781,9 @@ flowchart LR
 ### 5.5 Azure Service Bus vs Azure Event Hubs: Deep Architectural Comparison
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph ServiceBusModel["Azure Service Bus: Individual Message Broker (Smart Broker, Dumb Consumer)"]
-        direction TB
+        direction LR
         App1["Producer App"] --> Queue["Service Bus Queue"]
         Queue -->|Destructive Read / Ack| C1["Consumer 1"]
         Queue -->|Destructive Read / Ack| C2["Consumer 2"]
@@ -1776,7 +1791,7 @@ flowchart TD
     end
 
     subgraph EventHubsModel["Azure Event Hubs: Partitioned Append-Only Log (Dumb Broker, Smart Consumer)"]
-        direction TB
+        direction LR
         App2["Telemetry Producers"] --> Log["Event Hub (Partitions 0, 1, 2)"]
         Log -->|Read Offset 104| CG1["Consumer Group: Analytics"]
         Log -->|Read Offset 104| CG2["Consumer Group: Long-term Archival"]
@@ -1815,6 +1830,7 @@ flowchart TD
 Hardcoding database passwords or API keys in configuration files is a critical vulnerability. Azure **Workload Identity** federates Kubernetes ServiceAccounts with **Microsoft Entra ID (Azure AD)** using OpenID Connect (OIDC):
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant Pod as Java Pod on AKS

@@ -9,6 +9,7 @@ A comprehensive, production-grade engineering guide covering the Testing Pyramid
 ```mermaid
 flowchart TD
     subgraph Testing_Pyramid_CI["1. Automated Testing Pipeline (CI Gate)"]
+        direction TB
         UnitTests["Unit Tests (JUnit 5 + Mockito)<br/>(Fast, In-Memory, Plentiful)"]
         TestcontainersFlow["Integration Tests (Testcontainers)<br/>(Real Ephemeral PostgreSQL & Kafka Containers)"]
         ContractTests["Contract Tests (Pact & WireMock)<br/>(API Consumer Verification)"]
@@ -116,7 +117,7 @@ flowchart TD
 The Testing Pyramid enforces an efficient distribution of automated tests across a software project:
 
 ```mermaid
-flowchart TD
+flowchart LR
     E2E["End-to-End (E2E) Tests (5-10%)<br/>Slowest, brittle, expensive, tests full deployed environment"]
     Integration["Integration Tests (20-30%)<br/>Verifies component boundaries using Testcontainers & real databases"]
     Unit["Unit Tests (60-70%)<br/>Fastest (<5ms), isolated, in-memory, deterministic, extensive test matrix"]
@@ -268,16 +269,16 @@ assertThat(userList)
 
 ```mermaid
 flowchart TD
-    subgraph FullContext["@SpringBootTest (Full Integration Context)"]
-        FullSpring["Spins up entire ApplicationContext (All Beans, DB, Services, Security, Filters)"]
+    subgraph FullContext ["@SpringBootTest (Full Integration Context)"]
+        FullSpring["Spins up entire ApplicationContext<br/>(All Beans, DB, Services, Security, Filters)"]
     end
 
-    subgraph WebSlice["@WebMvcTest (Web Tier Slice)"]
-        WebSpring["Loads only Controllers, ControllerAdvice, Filters.<br/>Services & Repositories must be mocked via @MockBean!"]
+    subgraph WebSlice ["@WebMvcTest (Web Tier Slice)"]
+        WebSpring["Loads Controllers, Advice, Filters<br/>(Services & Repositories mocked via @MockBean)"]
     end
 
-    subgraph DataSlice["@DataJpaTest (Persistence Slice)"]
-        DataSpring["Loads only Entities, JPA Repositories, EntityManager, DataSource.<br/>Zero Web or Service beans loaded!"]
+    subgraph DataSlice ["@DataJpaTest (Persistence Slice)"]
+        DataSpring["Loads Entities, Repositories, DataSource<br/>(Zero Web or Service beans loaded)"]
     end
 
     style FullContext fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc

@@ -382,17 +382,22 @@ ALTER TABLE dim_customers ADD COLUMNS (
 
 #### End-to-End Architectural Blueprint
 ```mermaid
-flowchart LR
-    subgraph UnstructuredPipeline ["Unstructured Documents Ingestion & Multimodal Querying Pipeline"]
-        A["Raw PDFs / Invoices / Images"] --> B[("ADLS Gen2 Landing Zone<br/>(Raw Binary Storage)")]
-        B --> C["Azure AI Document Intelligence<br/>(OCR / Layout / Table Extraction)"]
-        C --> D["Extract Structured JSON & Text"]
-        D --> E["Embedding Model (text-embedding-3)"]
-        E --> F[("Vector Search Index<br/>(Azure AI Search / Databricks)")]
+flowchart TD
+    subgraph Stage1 ["Stage 1: Landing & Document Intelligence"]
+        direction LR
+        A["Raw Documents<br/>(PDFs, Invoices, Images)"] --> B[("ADLS Gen2 Landing<br/>(Raw Binary Storage)")] --> C["Azure AI Document Intelligence<br/>(Layout, OCR & Table Extraction)"]
+    end
+
+    subgraph Stage2 ["Stage 2: Extraction & Multimodal Storage"]
+        direction LR
+        D["Parsed JSON & Structured Text"] --> E["Embedding Model<br/>(text-embedding-3)"] --> F[("Vector Search Index<br/>(Azure AI Search / Databricks)")]
         D --> G[("Relational Delta Tables<br/>(gold.fact_invoices)")]
     end
 
-    style UnstructuredPipeline fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    C --> D
+
+    style Stage1 fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style A fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style B fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style C fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff

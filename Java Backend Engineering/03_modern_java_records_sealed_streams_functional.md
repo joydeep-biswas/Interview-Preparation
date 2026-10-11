@@ -7,7 +7,7 @@ A comprehensive guide covering Java functional programming paradigms, Stream API
 ## Architectural Overview: Modern Java Language & Functional Pipeline Architecture
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph DataModeling ["Modern Type System (Java 16 - 21+)"]
         Records["Records<br/>(Immutable data carriers, compact constructors)"]
         Sealed["Sealed Hierarchies<br/>(Exhaustive domain modeling: permits)"]
@@ -15,6 +15,7 @@ flowchart TD
     end
 
     subgraph FunctionalPipeline ["Functional Processing & Stream Pipeline Engine"]
+        direction LR
         Source["Stream Source<br/>(Collection, Supplier, Generator)"]
         Intermediate["Intermediate Operations (Lazy)<br/>(filter, map, flatMap, peek -> Sink Chaining)"]
         Terminal["Terminal Operation (Eager Evaluation)<br/>(collect, reduce, forEach, findFirst)"]
@@ -301,7 +302,7 @@ A Functional Interface is an interface that contains **exactly one abstract meth
 
 #### Visual Diagram
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph FunctionalInterfaceContract ["@FunctionalInterface Structural Contract"]
         SamNode["Single Abstract Method (SAM)<br/>R transform(T input) -> Exactly one abstract method required"]
         DefaultNode["Default Method<br/>default void logTransformation() -> Unlimited implementations allowed"]
@@ -406,21 +407,21 @@ A `Stream` represents a sequence of elements supporting sequential and parallel 
 
 #### Visual Pipeline Architecture
 ```mermaid
-flowchart LR
-    Source["Data Source: List&lt;Order&gt;"] --> F1["filter(o -> o.isPaid())"]
-    F1 --> M1["map(Order::getTotal)"]
-    M1 --> S1["sorted()"]
-    S1 --> T1["Terminal: collect(toList())"]
-    T1 --> Result["Result: List&lt;Double&gt;"]
-
-    subgraph IntermediateOperations["Intermediate Operations (Lazy)"]
-        F1
-        M1
-        S1
+flowchart TD
+    subgraph Stage1 ["Stage 1: Stream Source & Intermediate Operations (Lazy)"]
+        direction LR
+        Source["Data Source<br/>(List&lt;Order&gt;)"] --> F1["filter()<br/>(o -> o.isPaid())"] --> M1["map()<br/>(Order::getTotal)"] --> S1["sorted()<br/>(Natural order)"]
     end
 
-    style IntermediateOperations fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    subgraph Stage2 ["Stage 2: Terminal Operation & Materialization"]
+        direction LR
+        T1["Terminal: collect()<br/>(Collectors.toList())"] --> Result["Materialized Result<br/>(List&lt;Double&gt;)"]
+    end
 
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Source fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style F1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style M1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -1091,22 +1092,38 @@ Traditional Java error handling relies on throwing exceptions. However, throwing
 **Railway-Oriented Programming (ROP)** treats execution as a two-track railway: a **Success Track** and a **Failure Track**. Operations transform the success value or automatically bypass subsequent steps if a failure occurs.
 
 ```mermaid
-flowchart LR
-    Input["Input Request"] --> Step1{"Step 1: Validate Payload"}
-    Step1 -- Success --> Step2{"Step 2: Charge Payment"}
-    Step1 -- Failure --> FailTrack["Failure Track: Return Domain Error (e.g., 400 / 422)"]
-    
-    Step2 -- Success --> Step3["Step 3: Emit Order Placed Event"]
-    Step2 -- Failure --> FailTrack
-    
-    Step3 --> Output["Final Success Output"]
+flowchart TD
+    subgraph SuccessTrack ["Success Track (Happy Path Pipeline)"]
+        direction LR
+        Input["Input Request<br/>(Order Command)"] --> Step1["Step 1: Validate Payload<br/>(Check Schema & Rules)"]
+        Step1 --> Step2["Step 2: Charge Payment<br/>(Execute Payment Gateway)"]
+        Step2 --> Step3["Step 3: Emit Order Event<br/>(Publish to Kafka)"]
+        Step3 --> Output["Final Success Output<br/>(201 Created Response)"]
+    end
+
+    subgraph FailureTrack ["Failure Track (Short-Circuit Domain Egress)"]
+        direction LR
+        Fail1["Payload Validation Error<br/>(HTTP 400 Bad Request)"]
+        Fail2["Payment Charge Error<br/>(HTTP 422 Unprocessable)"]
+        FailTerminal["Short-Circuit Error Delivered<br/>(Bypasses All Downstream Steps)"]
+        Fail1 --> FailTerminal
+        Fail2 --> FailTerminal
+    end
+
+    Step1 -.->|"On Validation Failure"| Fail1
+    Step2 -.->|"On Gateway Decline"| Fail2
+
+    style SuccessTrack fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style FailureTrack fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
 
     style Input fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Step3 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Output fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style FailTrack fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Step3 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Output fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Fail1 fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
+    style Fail2 fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
+    style FailTerminal fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
 ```
 
 #### Production Code: The `Result<T, E>` Monad via Sealed Interfaces

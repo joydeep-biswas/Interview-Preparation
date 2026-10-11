@@ -10,22 +10,28 @@ All questions have been systematically grouped by conceptual similarity, mapped 
 
 ```mermaid
 flowchart TD
-    subgraph ChronologicalRoadmap ["Chronological Java Backend Engineering Interview Study Roadmap"]
-        Step1["01. Core Java, OOP & Basic Algorithms<br/>(Memory layout, string pool, two-pointers, sieve, tree path sum, classloaders, virtual threads)"]
-        --> Step2["02. Collections Framework & Data Structures<br/>(ArrayList vs LinkedList, HashMap internals, treeification, ConcurrentHashMap CAS, LRU cache)"]
-        --> Step3["03. Java 8+ Functional & Modern Features<br/>(Functional interfaces, SAM, method references, Optional monad, Stream pipelines, parallel pools)"]
-        --> Step4["04. Multithreading, Concurrency & Async<br/>(JMM visibility, volatile, Atomic CAS, synchronized, thread pools, CompletableFuture, deadlocks)"]
-        --> Step5["05. Spring Framework & Spring Boot Core<br/>(IoC container, DI reflection, Bean lifecycle, scopes, auto-configuration engine, actuator)"]
-        --> Step6["06. REST APIs & Web Services<br/>(Statelessness, PUT vs PATCH, idempotency keys, ProblemDetail, WebClient, gRPC, GraphQL)"]
-        --> Step7["07. Spring Security, OAuth2 & JWT<br/>(SecurityFilterChain, BCrypt, @PreAuthorize, JWT RS256, refresh token rotation, PKCE)"]
-        --> Step8["08. Databases, JPA & Hibernate<br/>(ACID, isolation levels, B-Trees, N+1 query problem, @Transactional, locking & double-booking)"]
-        --> Step9["09. Messaging Systems: Kafka & RabbitMQ<br/>(AMQP exchanges, commit logs, partitions, consumer groups, @KafkaListener, DLQ, slow consumers)"]
-        --> Step10["10. Microservices & System Design<br/>(DDD bounded contexts, Eureka/Consul, Circuit Breakers, Saga, Outbox, CAP, URL shortener, Chat)"]
-        --> Step11["11. Cloud, Containers & DevOps (Azure & AWS)<br/>(Multi-stage Docker, K8s probes, HPA, blue-green, Azure Managed Identities, Key Vault, VPC)"]
-        --> Step12["12. Troubleshooting & Production Engineering<br/>(JDWP debugging, low vs high CPU triage, thread dumps, off-heap leaks, GC tuning, retry storms)"]
+    subgraph Tier1 ["Tier 1: Core Java Language, Data Structures & Concurrency"]
+        direction LR
+        Step1["01. Core Java & Algorithms<br/>(Memory, two-pointers, virtual threads)"] --> Step2["02. Collections Framework<br/>(HashMap, ConcurrentHashMap CAS)"] --> Step3["03. Java 8+ Modern Features<br/>(Lambdas, Streams, Optional)"] --> Step4["04. Concurrency & Async<br/>(JMM, volatile, ThreadPools, deadlocks)"]
     end
 
-    style ChronologicalRoadmap fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    subgraph Tier2 ["Tier 2: Spring Framework, REST, Security & Databases"]
+        direction LR
+        Step5["05. Spring Framework Core<br/>(IoC container, Bean lifecycle, auto-config)"] --> Step6["06. REST APIs & Web<br/>(Idempotency, ProblemDetail, gRPC)"] --> Step7["07. Security, OAuth2 & JWT<br/>(SecurityFilterChain, BCrypt, PKCE)"] --> Step8["08. Databases, JPA & Hibernate<br/>(ACID, N+1 query, @Transactional)"]
+    end
+
+    subgraph Tier3 ["Tier 3: Distributed Systems, Cloud Containers & Reliability"]
+        direction LR
+        Step9["09. Messaging: Kafka & RMQ<br/>(Partitions, consumer groups, DLQ)"] --> Step10["10. Microservices Design<br/>(Circuit Breakers, Saga, Outbox, CAP)"] --> Step11["11. Cloud & Containers<br/>(Docker, K8s probes, Azure Key Vault)"] --> Step12["12. Production Troubleshooting<br/>(Thread dumps, GC tuning, leak triage)"]
+    end
+
+    Step4 --> Step5
+    Step8 --> Step9
+
+    style Tier1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Tier2 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
+    style Tier3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
     style Step1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff

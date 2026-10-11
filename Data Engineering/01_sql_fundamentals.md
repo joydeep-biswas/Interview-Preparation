@@ -7,38 +7,29 @@ A comprehensive, production-grade guide to SQL fundamentals, relational query ar
 ## Architectural Overview: Logical SQL Execution & Query Processing Pipeline
 
 ```mermaid
-flowchart TD
-    subgraph Ingestion ["1. Data Source Resolution"]
-        S1["FROM & JOINs<br/>(Evaluate Cartesian products, table scans & ON predicates)"]
-    end
-    subgraph PreGrouping ["2. Pre-Aggregation Filtering"]
-        S2["WHERE Clause<br/>(Prune scanned tuples before grouping)"]
-    end
-    subgraph Aggregation ["3. Grouping & Aggregate Evaluation"]
-        S3["GROUP BY<br/>(Bucket rows by grouping keys)"] --> S4["HAVING<br/>(Filter aggregate metrics post-grouping)"]
-    end
-    subgraph Projection ["4. Projection & Result Formatting"]
-        S5["SELECT<br/>(Compute expressions, scalar math & aliases)"]
-        S6["DISTINCT<br/>(Hash/Sort deduplication across output columns)"]
-        S7["ORDER BY<br/>(Sort materialized result set)"]
-        S8["LIMIT / OFFSET<br/>(Restrict total returned record volume)"]
+flowchart LR
+    subgraph Stage1 ["Stage 1: Row Ingestion, Filtering & Grouping"]
+        direction LR
+        S1["1. FROM & JOINs<br/>(Evaluate Cartesian products, table scans & ON predicates)"] --> S2["2. WHERE Clause<br/>(Prune scanned tuples before grouping)"] --> S3["3. GROUP BY<br/>(Bucket rows by grouping keys)"] --> S4["4. HAVING<br/>(Filter aggregate metrics post-grouping)"]
     end
 
-    S1 --> S2 --> S3
-    S4 --> S5 --> S6 --> S7 --> S8
+    subgraph Stage2 ["Stage 2: Projection, Deduplication & Ordering"]
+        direction LR
+        S5["5. SELECT<br/>(Compute expressions, scalar math & aliases)"] --> S6["6. DISTINCT<br/>(Hash/Sort deduplication across columns)"] --> S7["7. ORDER BY<br/>(Sort materialized result set)"] --> S8["8. LIMIT / OFFSET<br/>(Restrict total returned volume)"]
+    end
 
-    style Ingestion fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style PreGrouping fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style Aggregation fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style Projection fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    S4 -->|"Passes Filtered Groups"| S5
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style S2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style S3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style S4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style S5 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style S6 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style S7 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style S8 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style S7 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style S8 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -103,21 +94,25 @@ SQL (Structured Query Language) is a declarative domain-specific language design
 Although a standard query begins syntactically with the `SELECT` clause, the SQL engine executes query components in a strictly defined logical pipeline. Understanding this logical order is vital for writing performant queries, resolving column alias scoping issues, and avoiding subtle runtime bugs.
 
 ```mermaid
-flowchart TD
-    S1["1. FROM & JOINs<br/>Identify source tables, evaluate Cartesian combinations, apply ON filters"]
-    S1 --> S2["2. WHERE<br/>Filter raw rows prior to grouping (prune scan volume)"]
-    S2 --> S3["3. GROUP BY<br/>Bucket rows into discrete aggregate groups by key expressions"]
-    S3 --> S4["4. HAVING<br/>Filter aggregated group metrics (post-grouping prune)"]
-    S4 --> S5["5. SELECT<br/>Evaluate projected expressions, scalar math, functions, and column aliases"]
-    S5 --> S6["6. DISTINCT<br/>Perform hash/sort deduplication across all projected output columns"]
-    S6 --> S7["7. SET OPERATORS<br/>Apply UNION, INTERSECT, or EXCEPT across independent queries"]
-    S7 --> S8["8. ORDER BY<br/>Sort the final unified result set by specified sort expressions"]
-    S8 --> S9["9. LIMIT / OFFSET / FETCH<br/>Restrict the total number of materialized output rows"]
+flowchart LR
+    subgraph Phase1 ["Phase 1: Ingestion, Pre-Filtering & Aggregation"]
+        direction LR
+        S1["1. FROM & JOINs<br/>Cartesian scan & ON predicates"] --> S2["2. WHERE<br/>Prune tuples pre-grouping"] --> S3["3. GROUP BY<br/>Bucket rows into groups"] --> S4["4. HAVING<br/>Filter aggregate metrics"]
+    end
 
+    subgraph Phase2 ["Phase 2: Projection, Set Logic, Sorting & Materialization"]
+        direction LR
+        S5["5. SELECT<br/>Compute expressions & aliases"] --> S6["6. DISTINCT<br/>Deduplicate rows"] --> S7["7. SET OPERATORS<br/>UNION / INTERSECT / EXCEPT"] --> S8["8. ORDER BY<br/>Sort final result"] --> S9["9. LIMIT / OFFSET<br/>Restrict returned rows"]
+    end
+
+    S4 -->|"Passes Filtered Groups"| S5
+
+    style Phase1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Phase2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style S2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S4 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style S3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style S4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style S5 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style S6 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style S7 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
@@ -145,10 +140,10 @@ These core clauses form the foundational syntax of data extraction, filtering, s
 
 SELECT 
     o.category_id,                                           -- Grouping key: Category identifier
-    COUNT(o.order_id)                  AS total_orders,       -- Aggregate: Total count of completed orders
-    COUNT(DISTINCT o.customer_id)       AS unique_buyers,      -- Aggregate: Cardinality of unique customers
-    SUM(o.order_amount)                AS total_revenue,      -- Aggregate: Gross sum of revenue
-    ROUND(AVG(o.order_amount), 2)      AS avg_order_value     -- Aggregate: Mean ticket size rounded to cents
+    COUNT(o.order_id)                  AS total_orders,      -- Aggregate: Total count of completed orders
+    COUNT(DISTINCT o.customer_id)      AS unique_buyers,     -- Aggregate: Cardinality of unique customers
+    SUM(o.order_amount)                AS total_revenue,     -- Aggregate: Gross sum of revenue
+    ROUND(AVG(o.order_amount), 2)      AS avg_order_value    -- Aggregate: Mean ticket size rounded to cents
 FROM sales.orders AS o                                       -- Step 1: Scan base fact table
 WHERE o.order_status = 'COMPLETED'                           -- Step 2: Filter out cancelled/pending rows early
   AND o.order_date >= '2024-01-01'                           -- Step 2: Date boundary lower bound
@@ -251,17 +246,26 @@ In SQL, `NULL` represents missing, unrecorded, or unknown data. It is not equiva
 
 Because `NULL` signifies unknown information, direct equality evaluations like `column = NULL` or `NULL = NULL` do not evaluate to `TRUE` or `FALSE`. Instead, they evaluate to `UNKNOWN`. SQL evaluates logical expressions under **Three-Valued Logic (3VL)**.
 
-#### Truth Tables for 3VL
-```
-AND Logic:                         OR Logic:                          NOT Logic:
-+---------+---------+---------+    +---------+---------+---------+    +---------+---------+
-| A       | B       | A AND B |    | A       | B       | A OR B  |    | A       | NOT A   |
-+---------+---------+---------+    +---------+---------+---------+    +---------+---------+
-| TRUE    | UNKNOWN | UNKNOWN |    | TRUE    | UNKNOWN | TRUE    |    | TRUE    | FALSE   |
-| FALSE   | UNKNOWN | FALSE   |    | FALSE   | UNKNOWN | UNKNOWN |    | FALSE   | TRUE    |
-| UNKNOWN | UNKNOWN | UNKNOWN |    | UNKNOWN | UNKNOWN | UNKNOWN |    | UNKNOWN | UNKNOWN |
-+---------+---------+---------+    +---------+---------+---------+    +---------+---------+
-```
+##### AND Logic
+| A | B | `A AND B` |
+| :--- | :--- | :--- |
+| `TRUE` | `UNKNOWN` | `UNKNOWN` |
+| `FALSE` | `UNKNOWN` | `FALSE` |
+| `UNKNOWN` | `UNKNOWN` | `UNKNOWN` |
+
+##### OR Logic
+| A | B | `A OR B` |
+| :--- | :--- | :--- |
+| `TRUE` | `UNKNOWN` | `TRUE` |
+| `FALSE` | `UNKNOWN` | `UNKNOWN` |
+| `UNKNOWN` | `UNKNOWN` | `UNKNOWN` |
+
+##### NOT Logic
+| A | `NOT A` |
+| :--- | :--- |
+| `TRUE` | `FALSE` |
+| `FALSE` | `TRUE` |
+| `UNKNOWN` | `UNKNOWN` |
 
 > [!IMPORTANT]
 > The `WHERE` clause retains rows **only if the predicate evaluates strictly to `TRUE`**. Rows where the predicate evaluates to `FALSE` or `UNKNOWN` are discarded!
@@ -285,13 +289,21 @@ When using `IN` or `NOT IN` against a subquery or value set containing a `NULL`,
 Because the result is `UNKNOWN`, the `WHERE` clause discards the row. As a consequence, **the query returns zero rows**, silently dropping all data!
 
 ```mermaid
-flowchart TD
-    Sub["Subquery Output: [10, 20, NULL]"] --> Eval{"Evaluate: id NOT IN (10, 20, NULL)"}
-    Eval --> Exp["Expands to: NOT (id=10 OR id=20 OR id=NULL)"]
-    Exp --> Comp{"Is id = NULL evaluated?"}
-    Comp --> Unk["Yields UNKNOWN!"]
-    Unk --> Res["Final Predicate: UNKNOWN<br/>(Query returns 0 records silently!)"]
+flowchart LR
+    subgraph Row1 ["Step 1-3: Subquery Evaluation & Predicate Expansion"]
+        direction LR
+        Sub["Subquery Output:<br/>[10, 20, NULL]"] --> Eval{"Evaluate Predicate:<br/>id NOT IN (10, 20, NULL)"} --> Exp["Logical Expansion:<br/>NOT (id=10 OR id=20 OR id=NULL)"]
+    end
 
+    subgraph Row2 ["Step 4-6: 3VL Equality Collapse & Row Loss"]
+        direction LR
+        Comp{"Is id = NULL evaluated?"} --> Unk["Yields UNKNOWN!"] --> Res["Final Predicate: UNKNOWN<br/>(Query returns 0 records silently!)"]
+    end
+
+    Exp -->|"Triggers NULL comparison"| Comp
+
+    style Row1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Row2 fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
     style Sub fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Eval fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style Exp fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
@@ -530,29 +542,34 @@ Aggregation functions summarize multiple records to compute summary statistics p
 ### 6.1 Standard Aggregation Functions (COUNT, SUM, AVG, MIN, MAX)
 
 ```mermaid
-flowchart LR
-    subgraph RawRows ["Input Rows (Department: Sales)"]
-        R1["Salary: $5,000"]
-        R2["Salary: $7,000"]
-        R3["Salary: NULL (Ignored by Aggregates!)"]
+flowchart TD
+    subgraph RawRows ["Input Tuples (Department: Sales)"]
+        direction LR
+        R1["Salary: $5,000"] --- R2["Salary: $7,000"] --- R3["Salary: NULL (Ignored by Math Aggregates)"]
     end
     
-    subgraph AggEngine ["Aggregation Computation"]
-        RawRows --> C1["COUNT(*) = 3 rows"]
-        RawRows --> C2["COUNT(Salary) = 2 (Ignores NULL)"]
-        RawRows --> S1["SUM(Salary) = $12,000"]
-        RawRows --> A1["AVG(Salary) = $12,000 / 2 = $6,000"]
+    subgraph AggEngine ["Evaluated Aggregate Metrics"]
+        direction LR
+        C1["COUNT(*)<br/>3 Total Rows (Includes NULL)"]
+        C2["COUNT(Salary)<br/>2 Non-NULL Rows"]
+        S1["SUM(Salary)<br/>$12,000"]
+        A1["AVG(Salary)<br/>$12,000 / 2 = $6,000"]
     end
 
-    style RawRows fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style AggEngine fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    R1 & R2 & R3 --> C1
+    R1 & R2 --> C2
+    R1 & R2 --> S1
+    R1 & R2 --> A1
+
+    style RawRows fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style AggEngine fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style R1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style R2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style R3 fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fff
-    style C1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style C2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style S1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style A1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style R3 fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style C1 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style C2 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style S1 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style A1 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 #### Code Example
@@ -620,49 +637,25 @@ Relational joins combine columns from two or more tables based on common logical
 
 ### 7.1 Relational Join Foundations
 
+---
+
+### 7.2 INNER JOIN
+
+Returns records only when an exact match satisfies the join predicate in both datasets.
+
 ```mermaid
 flowchart TD
     subgraph InnerJoin ["INNER JOIN (A ∩ B)"]
         direction LR
         IA["Table A: [1, 2]"] --- IB["Table B: [2, 3]"] ==> IRes["[2]"]
     end
-    subgraph LeftJoin ["LEFT JOIN (All A + Matched B)"]
-        direction LR
-        LA["Table A: [1, 2]"] --- LB["Table B: [2, 3]"] ==> LRes["[1 (NULL), 2 (Matched)]"]
-    end
-    subgraph FullJoin ["FULL OUTER JOIN (A ∪ B)"]
-        direction LR
-        FA["Table A: [1, 2]"] --- FB["Table B: [2, 3]"] ==> FRes["[1 (NULL), 2 (Both), 3 (NULL)]"]
-    end
-    subgraph CrossJoin ["CROSS JOIN (A × B)"]
-        direction LR
-        CA["Table A: [1, 2]"] --- CB["Table B: ['X', 'Y']"] ==> CRes["[(1,'X'), (1,'Y'), (2,'X'), (2,'Y')]"]
-    end
 
     style InnerJoin fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style LeftJoin fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
-    style FullJoin fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-    style CrossJoin fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
 
     style IA fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style IB fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style IRes fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style LA fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style LB fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style LRes fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style FA fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style FB fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style FRes fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style CA fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style CB fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style CRes fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
 ```
-
----
-
-### 7.2 INNER JOIN
-
-Returns records only when an exact match satisfies the join predicate in both datasets.
 
 ```sql
 -- Inner join matching orders to registered customer records
@@ -683,6 +676,20 @@ INNER JOIN crm.customers AS c
 ### 7.3 LEFT (OUTER) JOIN
 
 Returns **all records from the left table** and matching rows from the right table. Unmatched right-side columns are filled with `NULL`.
+
+```mermaid
+flowchart TD
+    subgraph LeftJoin ["LEFT JOIN (All A + Matched B)"]
+        direction LR
+        LA["Table A: [1, 2]"] --- LB["Table B: [2, 3]"] ==> LRes["[1 (NULL), 2 (Matched)]"]
+    end
+
+    style LeftJoin fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+
+    style LA fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style LB fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style LRes fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+```
 
 ```sql
 -- Left join identifying all registered customers and their historical purchase summary
@@ -727,6 +734,20 @@ RIGHT JOIN catalog.products AS p
 
 Returns all records when a match exists in either table. Non-matching columns from either side are padded with `NULL`.
 
+```mermaid
+flowchart TD
+    subgraph FullJoin ["FULL OUTER JOIN (A ∪ B)"]
+        direction LR
+        FA["Table A: [1, 2]"] --- FB["Table B: [2, 3]"] ==> FRes["[1 (NULL), 2 (Both), 3 (NULL)]"]
+    end
+
+    style FullJoin fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+
+    style FA fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style FB fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style FRes fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+```
+
 ```sql
 -- Ledger reconciliation: Identify matching and unmatched records between Internal Accounts and Bank Statements
 SELECT 
@@ -749,6 +770,20 @@ FULL OUTER JOIN finance.bank_statements AS b
 ### 7.6 CROSS JOIN
 
 Computes the Cartesian product ($N \times M$ rows), pairing every row from Table A with every row from Table B.
+
+```mermaid
+flowchart TD
+    subgraph CrossJoin ["CROSS JOIN (A × B)"]
+        direction LR
+        CA["Table A: [1, 2]"] --- CB["Table B: ['X', 'Y']"] ==> CRes["[(1,'X'), (1,'Y'), (2,'X'), (2,'Y')]"]
+    end
+
+    style CrossJoin fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+
+    style CA fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style CB fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style CRes fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+```
 
 ```sql
 -- Generate a reporting skeleton for all stores across all product categories

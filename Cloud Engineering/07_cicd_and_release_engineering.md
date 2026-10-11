@@ -93,14 +93,22 @@ flowchart TD
 
 ### 1.1 Continuous Integration vs. Continuous Delivery vs. Deployment
 
-```text
-[Code Commit] ──> [CI: Automated Build & Test] ──> [Artifact Published]
-                                                          │
-          ┌───────────────────────────────────────────────┴───────────────────────────────┐
-          ▼                                                                               ▼
-[Continuous Delivery]                                                          [Continuous Deployment]
-Artifact automatically deployed to Staging;                                    Every change passing tests
-Manual approval gate blocks Production release.                                deploys to Production automatically.
+```mermaid
+flowchart TD
+    subgraph CICD ["CI/CD Pipeline Spectrum"]
+        Commit["Code Commit"] --> CI["Continuous Integration (CI)<br/>Automated Build & Test Suite"]
+        CI --> Artifact["Artifact Published<br/>(Container Image / Package)"]
+        
+        Artifact --> CDeliver["Continuous Delivery<br/>Artifact auto-deployed to Staging;<br/>Manual approval gate blocks Prod."]
+        Artifact --> CDeploy["Continuous Deployment<br/>Every commit passing automated tests<br/>deploys to Production automatically."]
+    end
+
+    style CICD fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Commit fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style CI fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style Artifact fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style CDeliver fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style CDeploy fill:#1f2937,stroke:#ec4899,stroke-width:1.5px,color:#fff
 ```
 
 - **Continuous Integration (CI):** Developers merge code frequently to the mainline branch. Automated test suites execute, providing feedback in $<10$ minutes.
@@ -183,6 +191,7 @@ Storing long-lived cloud credentials (such as AWS Access Keys or Azure Service P
 **Workload Identity Federation (OIDC)** eliminates stored passwords:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant Runner as GitHub Actions Runner
@@ -225,17 +234,40 @@ sequenceDiagram
 
 ### 4.1 Rolling Updates vs. Blue-Green Deployments
 
-```text
-ROLLING UPDATE (In-Place Transition):
-[v1] [v1] [v1]  ──>  [v2] [v1] [v1]  ──>  [v2] [v2] [v1]  ──>  [v2] [v2] [v2]
-(Gradually replaces instances. Lower infrastructure cost, but mixed versions run concurrently)
+```mermaid
+flowchart LR
+    subgraph Rolling ["Rolling Update (In-Place Incremental Replacement)"]
+        direction LR
+        R1["[v1] [v1] [v1]"] -->|"Replace 1"| R2["[v2] [v1] [v1]"] -->|"Replace 2"| R3["[v2] [v2] [v1]"] -->|"Complete"| R4["[v2] [v2] [v2]"]
+    end
 
-BLUE-GREEN DEPLOYMENT (Instant Cutover):
-[Blue Cluster: v1 (Active 100% Traffic)]       [Green Cluster: v2 (Idle / Staging 0%)]
-                                     │
-                 (Router flips target after testing)
-                                     ▼
-[Blue Cluster: v1 (Idle / Instant Rollback)]   [Green Cluster: v2 (Active 100% Traffic)]
+    subgraph BlueGreen ["Blue-Green Deployment (Instant Cutover)"]
+        direction LR
+        subgraph Stage1 ["Stage 1: Testing on Idle Environment"]
+            direction LR
+            B1["Blue: v1 (Active 100% Traffic)"]
+            G1["Green: v2 (Idle / Staging 0% Traffic)"]
+        end
+        subgraph Stage2 ["Stage 2: Router Flip (Instant Cutover)"]
+            direction LR
+            B2["Blue: v1 (Idle / Instant Rollback)"]
+            G2["Green: v2 (Active 100% Traffic)"]
+        end
+        Stage1 -->|"Router Flips Target"| Stage2
+    end
+
+    style Rolling fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style BlueGreen fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Stage1 fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
+    style Stage2 fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#fff
+    style R1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style R2 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style R3 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style R4 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style B1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style G1 fill:#1f2937,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style B2 fill:#1f2937,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style G2 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 ---
@@ -307,19 +339,29 @@ Enterprise pipelines configure GitHub Environments or Azure DevOps Release Gates
 
 To deploy database schema updates without downtime, engineers use the **Expand-and-Contract** pattern:
 
-```text
-PHASE 1: EXPAND (Additive Only)
-Add new column `full_name`. Keep old `first_name`, `last_name`. App writes to BOTH; reads from OLD.
+```mermaid
+flowchart LR
+    P1["Phase 1: EXPAND<br/>(Additive Change)<br/>Add `full_name`<br/>App writes BOTH, reads OLD"] --> P2["Phase 2: BACKFILL<br/>(Async Worker)<br/>Copy historical data:<br/>`first + last` -> `full_name`"]
+    P2 --> P3["Phase 3: SWITCH READS<br/>(Code Release)<br/>App reads & writes strictly `full_name`"]
+    P3 --> P4["Phase 4: CONTRACT<br/>(Cleanup)<br/>Drop obsolete columns<br/>`first_name`, `last_name`"]
 
-PHASE 2: DATA BACKFILL
-Run asynchronous background job copying old data into `full_name`.
+    classDef expand fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef backfill fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef reads fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef contract fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
 
-PHASE 3: SWITCH READS
-Deploy updated application code: reads and writes strictly from `full_name`.
-
-PHASE 4: CONTRACT (Destructive Cleanup)
-Drop obsolete columns `first_name` and `last_name` in a subsequent release.
+    class P1 expand;
+    class P2 backfill;
+    class P3 reads;
+    class P4 contract;
 ```
+
+| Phase | Phase Name | Database Schema Operation | Application R/W Semantics | Rollback Safety |
+| :---: | :--- | :--- | :--- | :--- |
+| **1** | **Expand** | Add new column `full_name` (nullable). | Writes to **BOTH** old and new columns; reads strictly from old. | Completely safe; old code is unaffected. |
+| **2** | **Backfill** | None (background data replication). | Batched async jobs populate `full_name` for historical rows. | Safe; non-blocking incremental batches. |
+| **3** | **Switch Reads** | Mark new column NOT NULL if applicable. | Application reads and writes **strictly from `full_name`**. | Safe; old columns remain available as backup. |
+| **4** | **Contract** | Destructive DDL: `DROP COLUMN first_name, last_name`. | Application has zero references to dropped columns. | Irreversible; executed only after stabilization. |
 
 ---
 

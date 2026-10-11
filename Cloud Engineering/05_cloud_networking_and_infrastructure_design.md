@@ -66,14 +66,14 @@ flowchart TD
    - [2.1 User-Defined Routes (UDRs) vs. System Route Precedence](#21-user-defined-routes-udrs-vs-system-route-precedence)
    - [2.2 Managed NAT Gateways and SNAT Port Exhaustion](#22-managed-nat-gateways-and-snat-port-exhaustion)
 3. [Network Firewalls and Security Group Topologies](#3-network-firewalls-and-security-group-topologies)
-   - [3.1 Cloud Firewalls: Azure Firewall vs. AWS Network Firewall](#31-cloud-firewalls-azure-firewall-vs-aws-network-firewall)
+   - [3.1 Cloud Next-Generation Firewalls (Azure Firewall Primary & AWS Network Firewall Counterpart)](#31-cloud-next-generation-firewalls-azure-firewall-primary--aws-network-firewall-counterpart)
    - [3.2 NSG / Security Group Defense-in-Depth Rules](#32-nsg-security-group-defense-in-depth-rules)
 4. [Private Link and Private Endpoints](#4-private-link-and-private-endpoints)
-   - [4.1 Architecture: Azure Private Link vs. AWS PrivateLink](#41-architecture-azure-private-link-vs-aws-privatelink)
+   - [4.1 Private Endpoints & Backbone Integration (Azure Private Link Primary & AWS PrivateLink Counterpart)](#41-private-endpoints--backbone-integration-azure-private-link-primary--aws-privatelink-counterpart)
    - [4.2 Private DNS Zone Integration and DNS Forwarding](#42-private-dns-zone-integration-and-dns-forwarding)
 5. [Hub-and-Spoke Topology and Transit Networking](#5-hub-and-spoke-topology-and-transit-networking)
    - [5.1 VNet Peering Non-Transitive Routing Constraints](#51-vnet-peering-non-transitive-routing-constraints)
-   - [5.2 Scaled Transit Fabrics: Azure Virtual WAN vs. AWS Transit Gateway](#52-scaled-transit-fabrics-azure-virtual-wan-vs-aws-transit-gateway)
+   - [5.2 Scaled Transit Networking Fabrics (Azure Virtual WAN Primary & AWS Transit Gateway Counterpart)](#52-scaled-transit-networking-fabrics-azure-virtual-wan-primary--aws-transit-gateway-counterpart)
 6. [Hybrid Connectivity: ExpressRoute and Direct Connect](#6-hybrid-connectivity-expressroute-and-direct-connect)
    - [6.1 Dedicated Layer 3 Circuits & BGP Peering Routing](#61-dedicated-layer-3-circuits-bgp-peering-routing)
    - [6.2 IPsec VPN Failover Over Direct Peering](#62-ipsec-vpn-failover-over-direct-peering)
@@ -94,15 +94,41 @@ flowchart TD
 
 Designing cloud networks for an enterprise requires allocating non-overlapping RFC 1918 IPv4 address space across all on-premises data centers, branch offices, and multi-region cloud subscriptions.
 
-```text
-Enterprise RFC 1918 Allocation Plan:
-├── 10.0.0.0/12  ──> Azure Enterprise Footprint
-│   ├── 10.0.0.0/16   ──> Hub & Shared Services (East US)
-│   ├── 10.1.0.0/16   ──> Production Workloads (East US)
-│   ├── 10.2.0.0/16   ──> Non-Production Workloads (East US)
-│   └── 10.8.0.0/16   ──> Disaster Recovery Hub & Workloads (West US)
-├── 10.16.0.0/12 ──> AWS Enterprise Footprint (VPCs)
-└── 10.32.0.0/11 ──> Physical On-Premises Data Centers & Campus Networks
+```mermaid
+flowchart TD
+    subgraph Allocation ["Enterprise RFC 1918 Allocation Plan"]
+        Root["Enterprise IP Space (10.0.0.0/8)"]
+        Azure["Azure Footprint<br/>10.0.0.0/12"]
+        AWS["AWS Footprint (VPCs)<br/>10.16.0.0/12"]
+        OnPrem["On-Premises Data Centers<br/>10.32.0.0/11"]
+
+        Root --> Azure
+        Root --> AWS
+        Root --> OnPrem
+
+        subgraph AzureSubnets ["Azure Allocation Breakdown"]
+            Hub["Hub & Shared Services (East US)<br/>10.0.0.0/16"]
+            Prod["Production Workloads (East US)<br/>10.1.0.0/16"]
+            NonProd["Non-Production Workloads (East US)<br/>10.2.0.0/16"]
+            DR["Disaster Recovery Hub & Workloads (West US)<br/>10.8.0.0/16"]
+        end
+
+        Azure --> Hub
+        Azure --> Prod
+        Azure --> NonProd
+        Azure --> DR
+    end
+
+    style Allocation fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style AzureSubnets fill:#1e293b,stroke:#06b6d4,stroke-width:1px,color:#67e8f9
+    style Root fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Azure fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style AWS fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style OnPrem fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style Hub fill:#1f2937,stroke:#10b981,stroke-width:1px,color:#fff
+    style Prod fill:#1f2937,stroke:#10b981,stroke-width:1px,color:#fff
+    style NonProd fill:#1f2937,stroke:#10b981,stroke-width:1px,color:#fff
+    style DR fill:#1f2937,stroke:#10b981,stroke-width:1px,color:#fff
 ```
 
 > [!CAUTION]
@@ -114,18 +140,11 @@ Enterprise RFC 1918 Allocation Plan:
 
 Subnets must segment workloads by trust boundary and blast radius:
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                               WORKLOAD VNET: 10.1.0.0/16                                |
-+-----------------------------+-----------------------------+-----------------------------+
-| TIER 1: INGRESS / WAF       | TIER 2: APPLICATION RUNTIME | TIER 3: DATA & PERSISTENCE  |
-| 10.1.0.0/24                 | 10.1.1.0/24                 | 10.1.2.0/24                 |
-+-----------------------------+-----------------------------+-----------------------------+
-| Application Gateway / ALB   | AKS Nodes / Microservice VMs| Private Endpoints for DBs   |
-| Public IP / Internet Inbound| NO Public IPs               | NO Public IPs               |
-| NSG: Allow 80/443 from Net  | NSG: Allow Inbound Tier 1   | NSG: Allow Inbound Tier 2   |
-+-----------------------------+-----------------------------+-----------------------------+
-```
+| Subnet Tier | CIDR Block | Deployed Workloads | IP Exposure | Inbound NSG Security Rule |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 1: Ingress / WAF** | `10.1.0.0/24` | Application Gateway / ALB, WAF v2 | Public IP / Internet Inbound | Allow HTTP (80) & HTTPS (443) from `Internet` |
+| **Tier 2: App Runtime** | `10.1.1.0/24` | AKS Nodes, Microservice VMs, App Service VNet Integration | **No Public IPs** (Private Only) | Allow Inbound from Tier 1 Subnet (`10.1.0.0/24`) |
+| **Tier 3: Data & Persistence** | `10.1.2.0/24` | Private Endpoints for Managed DBs (Azure SQL, Cosmos DB, RDS) | **No Public IPs** (Private Only) | Allow Inbound from Tier 2 Subnet (`10.1.1.0/24`) |
 
 ---
 
@@ -139,11 +158,26 @@ Both Azure and AWS inject automatic default system routes into every subnet:
 
 To enforce zero-trust security and inspect all outbound or cross-spoke traffic, architects attach a **User-Defined Route (UDR)** (Azure) or a **Custom Route Table** (AWS) to override default system routing:
 
-```text
-Subnet Route Table Evaluation Precedence:
-1. Longest Prefix Match (Most specific CIDR rule always wins).
-2. If prefix lengths are identical:
-   UDR (User-Defined Route) > BGP (ExpressRoute) > System Default Route.
+```mermaid
+flowchart TD
+    Ingress["Packet Ingress to Subnet Route Table"] --> Step1{"Check CIDR Prefix Length"}
+    Step1 -- "Different Prefix Lengths" --> LPM["Longest Prefix Match (LPM) Wins<br/>(e.g. /24 overrides /16 and /0)"]
+    Step1 -- "Identical Prefix Lengths" --> Step2{"Evaluate Route Origin Precedence"}
+    Step2 --> UDR["1. User-Defined Route (UDR) / Custom Route"]
+    UDR --> BGP["2. BGP Route (ExpressRoute / Direct Connect)"]
+    BGP --> Sys["3. System Default Route (VNet / Internet Default)"]
+
+    classDef proc fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef dec fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef route1 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef route2 fill:#1e3a5f,stroke:#06b6d4,stroke-width:1.5px,color:#e0f2fe;
+    classDef route3 fill:#78350f,stroke:#8b5cf6,stroke-width:1.5px,color:#fef3c7;
+
+    class Ingress,LPM proc;
+    class Step1,Step2 dec;
+    class UDR route1;
+    class BGP route2;
+    class Sys route3;
 ```
 
 ```bash
@@ -170,7 +204,7 @@ When private virtual machines make outbound calls to external APIs, Source Netwo
 
 # 3. Network Firewalls and Security Group Topologies
 
-### 3.1 Cloud Firewalls: Azure Firewall vs. AWS Network Firewall
+### 3.1 Cloud Next-Generation Firewalls (Azure Firewall Primary & AWS Network Firewall Counterpart)
 
 | Architecture Feature | Azure Firewall (Premium) | AWS Network Firewall |
 | :--- | :--- | :--- |
@@ -188,20 +222,17 @@ Enterprise best practice implements a two-tier firewall defense model:
 1. **Perimeter Inspection (Central Firewall):** Centralized filtering of north-south internet traffic and east-west cross-spoke transit.
 2. **Micro-Segmentation (NSGs / Security Groups):** Applied directly at the subnet and NIC boundary to enforce least-privilege intra-spoke communication.
 
-```text
-NSG Inbound Rule Evaluation Table:
-Priority | Name                 | Source        | Port  | Destination | Action
-──────────────────────────────────────────────────────────────────────────────
-100      | Allow_App_To_DB      | 10.1.1.0/24   | 5432  | 10.1.2.0/24 | ALLOW
-200      | Allow_Health_Probes  | AzureLoadBal  | ANY   | Subnet      | ALLOW
-4096     | Deny_All_Inbound     | *             | *     | *           | DENY
-```
+| Priority | Name | Source | Port | Destination | Action |
+| :---: | :--- | :--- | :---: | :--- | :---: |
+| **100** | `Allow_App_To_DB` | `10.1.1.0/24` | 5432 | `10.1.2.0/24` | **ALLOW** |
+| **200** | `Allow_Health_Probes` | `AzureLoadBalancer` | `ANY` | Subnet | **ALLOW** |
+| **4096** | `Deny_All_Inbound` | `*` | `*` | `*` | **DENY** |
 
 ---
 
 # 4. Private Link and Private Endpoints
 
-### 4.1 Architecture: Azure Private Link vs. AWS PrivateLink
+### 4.1 Private Endpoints & Backbone Integration (Azure Private Link Primary & AWS PrivateLink Counterpart)
 
 Traditionally, cloud PaaS services (Azure SQL, S3, Blob Storage) were reached over public internet endpoints. **Private Link** brings PaaS instances directly into your private virtual network using a **Private Endpoint** (a dedicated virtual network interface with a private RFC 1918 IP).
 
@@ -234,17 +265,29 @@ When accessing a PaaS resource via a private endpoint, the application still que
 
 Virtual Network Peering connects two VNets with low-latency SDN encapsulation. However, **peering is strictly non-transitive**:
 
-```text
-[Spoke A] <=========(Peered)=========> [Hub VNet] <=========(Peered)=========> [Spoke B]
-   │                                                                               │
-   └───(CANNOT reach Spoke B directly through Hub without a Next-Hop NVA Router)───┘
+```mermaid
+flowchart LR
+    subgraph NonTransitive ["Non-Transitive VNet Peering Hazard"]
+        SpokeA["Spoke A VNet<br/>(10.1.0.0/16)"]
+        Hub["Hub VNet<br/>(10.0.0.0/16)<br/>[Azure Firewall / NVA Router]"]
+        SpokeB["Spoke B VNet<br/>(10.2.0.0/16)"]
+
+        SpokeA <-->|"Peered Link"| Hub
+        Hub <-->|"Peered Link"| SpokeB
+        SpokeA -.->|"CANNOT reach directly<br/>without Next-Hop NVA Route!"| SpokeB
+    end
+
+    style NonTransitive fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style SpokeA fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Hub fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style SpokeB fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
 ```
 
 If Spoke A wants to communicate with Spoke B, traffic must explicitly traverse a Network Virtual Appliance (NVA) or Azure Firewall in the Hub using User-Defined Routes.
 
 ---
 
-### 5.2 Scaled Transit Fabrics: Azure Virtual WAN vs. AWS Transit Gateway
+### 5.2 Scaled Transit Networking Fabrics (Azure Virtual WAN Primary & AWS Transit Gateway Counterpart)
 
 As enterprise estates expand past 50+ VNets/VPCs, managing point-to-point peering and UDRs becomes unwieldy:
 
@@ -288,9 +331,21 @@ flowchart TD
 
 Production architectures deploy a Site-to-Site IPsec VPN running in parallel with ExpressRoute/Direct Connect as an automated backup:
 
-```text
-Primary Path:   [On-Prem] ──(BGP Local Pref: 200)──> [ExpressRoute Circuit] ──> [Cloud Hub]
-Secondary Path: [On-Prem] ──(BGP Local Pref: 100)──> [IPsec VPN Tunnel]    ──> [Cloud Hub]
+```mermaid
+flowchart TD
+    subgraph HybridConnectivity ["Hybrid Cloud Active-Passive Failover"]
+        OnPrem["On-Premises Core Router"]
+        CloudHub["Cloud Hub Gateway<br/>(Virtual Network Gateway / VGW)"]
+
+        OnPrem -->|"Primary Path (BGP Local Pref: 200)"| ER["ExpressRoute Circuit<br/>(Dedicated High-Speed Fiber)"] --> CloudHub
+        OnPrem -.->|"Secondary Backup (BGP Local Pref: 100)"| VPN["IPsec VPN Tunnel<br/>(Encrypted Public Internet)"] -.-> CloudHub
+    end
+
+    style HybridConnectivity fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style OnPrem fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style CloudHub fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style ER fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style VPN fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
 ```
 
 BGP Local Preference ensures all traffic flows over ExpressRoute during normal operations. If fiber cuts disrupt the circuit, BGP immediately reroutes packets across the IPsec tunnel within seconds.

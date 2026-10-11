@@ -181,9 +181,9 @@ flowchart LR
 
     subgraph ColumnOriented ["Column-Oriented Storage (Parquet / Column Pages)"]
         C1["Page 1 (ID): [1, 2, 3, 4]"]
-        C2["Page 2 (Name): ['Alice', 'Bob', 'Charlie', 'Diana']"]
+        C2["Page 2 (Name): <br>['Alice', 'Bob', 'Charlie', 'Diana']"]
         C3["Page 3 (Age): [30, 45, 28, 52]"]
-        C4["Page 4 (Zip): [94101, 10001, 94102, 10002]"]
+        C4["Page 4 (Zip): <br>[94101, 10001, 94102, 10002]"]
     end
 
     style RowOriented fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -294,6 +294,7 @@ Database normalization is the formal process of structuring a relational databas
 - **BCNF (Boyce-Codd Normal Form):** A stricter version of 3NF where for every functional dependency $X \rightarrow Y$, $X$ must be a super key.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'attributeBackgroundColorOdd': '#1e293b', 'attributeBackgroundColorEven': '#0f172a', 'entityBackgroundColor': '#1e293b', 'entityBorderColor': '#3b82f6', 'entityTextColor': '#ffffff' }}}%%
 erDiagram
     CUSTOMER ||--o{ ORDER : places
     ORDER ||--|{ ORDER_ITEM : contains
@@ -580,23 +581,27 @@ Without an index, the database engine must execute a **Full Table Scan (Sequenti
 
 ```mermaid
 flowchart TD
-    Query["SELECT * FROM users WHERE user_id = 45"]
+    Query["Target Query:<br/>SELECT * FROM users WHERE user_id = 45"]
     
     subgraph Without_Index ["Without Index: Full Table Scan"]
-        Scan["Scan Page 1 -> Page 2 -> Page 3 ... -> Page 1,000,000"]
-        Scan --> CostHigh["High Disk I/O & Memory Contention: O(N)"]
+        direction TB
+        Scan["Sequential Scan:<br/>Scan Page 1 -> 2 ... -> Page 1,000,000"] --> CostHigh["High Disk I/O & Memory Contention:<br/>O(N) Complexity"]
     end
     
-    subgraph With_Index ["With B-Tree Index"]
+    subgraph With_Index ["With B-Tree Index: Direct Lookup"]
+        direction TB
         Root["Root Page"] --> Branch["Intermediate Branch Page"]
-        Branch --> Leaf["Leaf Page (Contains Record Pointer Page 42, Slot 8)"]
-        Leaf --> Fetch["Direct Single Page Fetch: O(log N)"]
+        Branch --> Leaf["Leaf Page (Pointer: Page 42, Slot 8)"]
+        Leaf --> Fetch["Direct Single Page Fetch:<br/>O(log N) Complexity"]
     end
+
+    Query -->|"No index available"| Scan
+    Query -->|"Traverse index tree"| Root
 
     style Without_Index fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
     style With_Index fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
-    style Query fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Query fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Scan fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
     style CostHigh fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
     style Root fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
@@ -778,14 +783,16 @@ A **Covering Index** is an index that includes **all columns** requested by a qu
 When an index covers a query, the database engine executes an **Index-Only Scan**. The engine retrieves the required data directly from the index leaf pages in memory and **never touches the physical table heap pages on disk**, eliminating secondary table lookups.
 
 ```mermaid
-flowchart LR
-    subgraph StandardIndexScan ["Standard Index Scan (2-Step Fetch)"]
-        I1["Scan Index Leaf"] -->|Extract Tuple Pointer| Heap["Fetch Physical Table Heap Page"]
+flowchart TD
+    subgraph StandardIndexScan ["Standard Index Scan (2-Step Fetch: Index + Heap I/O)"]
+        direction LR
+        I1["1. Scan Index Leaf"] -->|Extract Tuple Pointer| Heap["2. Fetch Physical Table Heap Page"]
         Heap --> Result1["Return Query Results"]
     end
 
-    subgraph IndexOnlyScan ["Covering Index: Index-Only Scan (1-Step Instant)"]
-        I2["Scan Index Leaf (Contains ID, Date, Amount)"] --> Result2["Return Query Results Instantly (Zero Heap I/O!)"]
+    subgraph IndexOnlyScan ["Covering Index: Index-Only Scan (1-Step Direct Memory Access)"]
+        direction LR
+        I2["1. Scan Index Leaf (Contains all SELECT columns)"] --> Result2["Return Query Results Instantly (Zero Heap I/O!)"]
     end
 
     style StandardIndexScan fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -826,14 +833,16 @@ WHERE customer_id = 54092;
 - **Non-Clustered Index:** A separate, secondary auxiliary B-Tree structure whose leaf nodes contain sorted search keys and physical row locators (pointers) pointing back to the clustered index key or heap storage page. A table can have multiple non-clustered indexes.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Clustered ["Clustered Index (Data Pages IS the Index)"]
+        direction TB
         CRoot[Root Node] --> CBranch[Branch Node]
         CBranch --> CLeaf1["Data Page 1: [Row 1, Row 2]"]
         CBranch --> CLeaf2["Data Page 2: [Row 3, Row 4]"]
     end
 
     subgraph NonClustered ["Non-Clustered Index (Auxiliary Structure)"]
+        direction TB
         NCRoot[Root Node] --> NCBranch[Branch Node]
         NCBranch --> NCLeaf["Leaf: [Key: 'Bob', Ptr -> Clustered Key 3]"]
         NCLeaf -.->|Secondary Lookup| CLeaf2
@@ -956,20 +965,27 @@ An Execution Plan is the detailed roadmap generated by the database engine descr
 
 ```mermaid
 flowchart TD
-    SQL["Declarative SQL Query"] --> Parser["1. SQL Parser (Syntax Tree)"]
-    Parser --> Analyzer["2. Catalog Analyzer (Validate Tables & Columns)"]
-    Analyzer --> LogicalPlan["3. Logical Query Plan (Relational Algebra)"]
-    LogicalPlan --> Optimizer["4. Cost-Based Optimizer (Evaluate Plan Variations)"]
-    Optimizer --> PhysicalPlan["5. Selected Physical Execution Plan"]
-    PhysicalPlan --> Executor["6. Storage Engine Execution & Streaming"]
+    subgraph Phase1 ["Phase 1: Parsing, Semantic Analysis & Logical Plan"]
+        direction LR
+        SQL["SQL Query<br/>(Declarative text)"] --> Parser["1. Parser<br/>(Abstract Syntax Tree)"] --> Analyzer["2. Catalog Analyzer<br/>(Validate tables & schemas)"] --> LogicalPlan["3. Logical Plan<br/>(Relational algebra tree)"]
+    end
 
+    subgraph Phase2 ["Phase 2: Cost-Based Optimization & Physical Execution"]
+        direction LR
+        Optimizer["4. Cost-Based Optimizer<br/>(Estimate disk I/O & CPU costs)"] --> PhysicalPlan["5. Physical Plan<br/>(Index scan, hash join selection)"] --> Executor["6. Storage Engine Execution<br/>(Buffer pool scan & tuple streaming)"]
+    end
+
+    LogicalPlan -->|"Passes unoptimized tree"| Optimizer
+
+    style Phase1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Phase2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style SQL fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Parser fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Analyzer fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style LogicalPlan fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Optimizer fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style PhysicalPlan fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Executor fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Optimizer fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style PhysicalPlan fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Executor fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### Code Example
@@ -1048,12 +1064,12 @@ Statistics are metadata stored in system catalog tables that describe the volume
 **Histograms** divide the range of values in a column into buckets to capture data skew and frequency distributions (e.g., Equal-Width vs. Equal-Height / Equal-Depth Histograms).
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph EqualHeightHistogram ["Equal-Height Histogram (Equal Row Count Per Bucket)"]
-        B1["Bucket 1: Values 1 - 50 (1,000 rows)"]
-        B2["Bucket 2: Values 51 - 65 (1,000 rows)"]
-        B3["Bucket 3: Values 66 - 70 (1,000 rows - High Density!)"]
-        B4["Bucket 4: Values 71 - 1000 (1,000 rows)"]
+        direction LR
+        B1["Bucket 1: 1 - 50<br/>(1,000 rows)"] --> B2["Bucket 2: 51 - 65<br/>(1,000 rows)"]
+        B2 --> B3["Bucket 3: 66 - 70<br/>(1,000 rows: High Density)"]
+        B3 --> B4["Bucket 4: 71 - 1000<br/>(1,000 rows)"]
     end
 
     style EqualHeightHistogram fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -1103,12 +1119,14 @@ Predicate Pushdown is an optimization technique where filtering conditions (`WHE
 
 ```mermaid
 flowchart LR
-    subgraph WithoutPushdown ["Without Predicate Pushdown"]
+    subgraph WithoutPushdown ["Without Predicate Pushdown (Naive Full Scan)"]
+        direction LR
         Storage1[(Cloud Storage Parquet)] -->|Read & Decompress ALL 100M Rows| Compute1[Engine Memory]
         Compute1 -->|"Filter WHERE date = '2024-10-01'"| Output1[1,000 Rows Output]
     end
 
     subgraph WithPushdown ["With Predicate Pushdown (Storage Layer Pruning)"]
+        direction LR
         Storage2[(Cloud Storage Parquet)] -->|Evaluate Parquet Min/Max Metadata| Prune[Skip 99% of File Blocks!]
         Prune -->|Read ONLY matching 1,000 Rows| Compute2[Engine Memory]
         Compute2 --> Output2["1,000 Rows Output (100x Faster)"]
@@ -1325,19 +1343,27 @@ ACID represents the four essential guarantees of transaction processing:
 
 ```mermaid
 flowchart TD
-    subgraph ACID ["ACID Guarantees"]
-        A["Atomicity<br/>All-or-Nothing (Undo Log / Rollback)"]
-        C["Consistency<br/>Rules & Constraints Enforced"]
-        I["Isolation<br/>Transactions don't clash (MVCC / Locks)"]
-        D["Durability<br/>Committed data survives crashes (WAL)"]
+    subgraph ACID ["ACID Transaction Guarantees"]
+        subgraph G1 ["Transaction Integrity"]
+            direction LR
+            A["Atomicity<br/>All-or-Nothing (Undo Log / Rollback)"]
+            C["Consistency<br/>Rules & Constraints Enforced"]
+        end
+        subgraph G2 ["Concurrency & Persistence"]
+            direction LR
+            I["Isolation<br/>Transactions don't clash (MVCC / Locks)"]
+            D["Durability<br/>Committed data survives crashes (WAL)"]
+        end
     end
 
     style ACID fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style G1 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style G2 fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
-    style A fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style C fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style I fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style D fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style A fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style C fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style I fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style D fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### References
@@ -1354,6 +1380,7 @@ To achieve high write performance while guaranteeing Durability, modern database
 Before changes are written to the actual data pages in memory or on disk, an append-only log record describing the delta is flushed to non-volatile disk sequentially. If the system crashes mid-transaction, the engine replays the WAL log (**Redo**) to recover committed data and rolls back uncommitted changes (**Undo**).
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant App as Client Application
     participant Memory as Shared Buffer Cache
@@ -1450,6 +1477,7 @@ Concurrence conflicts produce three classic read anomalies:
 3. **Phantom Read:** Transaction A queries rows matching a range condition (`WHERE amount > 1000`, finds 5 rows). Transaction B inserts a new row matching that condition (`amount = 1200`) and commits. Transaction A re-runs the range query and finds 6 rows ("phantom" row appeared).
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant TxA as Transaction A
     participant DB as Database

@@ -10,20 +10,28 @@ All questions have been systematically grouped by conceptual similarity, mapped 
 
 ```mermaid
 flowchart TD
-    subgraph ChronologicalRoadmap ["Chronological Data Engineering Interview Study Roadmap"]
-        Step1["01. SQL – Real-Time & Advanced Scenarios<br/>(Logical order, deduplication, islands & gaps, window functions, query tuning)"]
-        --> Step2["02. Python & Programming Concepts<br/>(10GB file streaming, generators, JSON shredding, decorators, prefix sums)"]
-        --> Step3["03. Data Modeling & Warehousing<br/>(Star/Snowflake, SCD 1/2/3, Lending & Vendor Payment, inferred members)"]
-        --> Step4["04. Cloud & Distributed Systems<br/>(Partitioning, bucketing, consistent hashing, Hadoop vs Spark, Synapse, Glue)"]
-        --> Step5["05. Apache Spark & PySpark Architecture<br/>(DAG scheduler, joins, salting data skew, AQE, memory tuning, OOM fixes)"]
-        --> Step6["06. Databricks & Delta Lake<br/>(ACID log, incremental loads, MERGE, OPTIMIZE/Z-ORDER, VACUUM, Time Travel)"]
-        --> Step7["07. Unity Catalog & Data Governance<br/>(3-level namespace, column masks, row filters, lineage, audit system tables)"]
-        --> Step8["08. Auto Loader & Structured Streaming<br/>(CloudFiles, file notifications, checkpoints, watermarks, poison pills)"]
-        --> Step9["09. Azure Data Factory (ADF) & ETL Pipelines<br/>(Metadata-driven ingestion, dynamic Databricks, restartability, dbt, quality)"]
-        --> Step10["10. Data Engineering Architecture & System Design<br/>(Millions of records/hour, self-healing pipelines, multi-cloud lakehouse)"]
+    subgraph Tier1 ["Tier 1: Core Languages & Distributed Foundations"]
+        direction LR
+        Step1["01. SQL Scenarios<br/>(Logical order, deduplication, tuning)"] --> Step2["02. Python Programming<br/>(10GB streaming, generators, shredding)"] --> Step3["03. Data Modeling<br/>(Star/Snowflake, SCD 1/2/3)"] --> Step4["04. Cloud & Systems<br/>(Partitioning, hashing, Spark vs Hadoop)"]
     end
 
-    style ChronologicalRoadmap fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    subgraph Tier2 ["Tier 2: Spark Engine, Lakehouse & Data Governance"]
+        direction LR
+        Step5["05. Spark Architecture<br/>(DAG scheduler, salting skew, AQE, OOM)"] --> Step6["06. Databricks & Delta Lake<br/>(ACID log, MERGE, Z-ORDER, VACUUM)"] --> Step7["07. Unity Catalog<br/>(3-level namespace, column masks, audit)"]
+    end
+
+    subgraph Tier3 ["Tier 3: Streaming, Orchestration & Systems Design"]
+        direction LR
+        Step8["08. Auto Loader & Streaming<br/>(CloudFiles, checkpoints, watermarks)"] --> Step9["09. ADF & ETL Pipelines<br/>(Metadata ingestion, restartability, dbt)"] --> Step10["10. System Design<br/>(Millions rec/hr, self-healing lakehouse)"]
+    end
+
+    Step4 --> Step5
+    Step7 --> Step8
+
+    style Tier1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Tier2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Tier3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
     style Step1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step3 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff

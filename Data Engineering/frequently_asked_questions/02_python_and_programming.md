@@ -166,8 +166,7 @@ def optimize_pandas_memory(df: pd.DataFrame) -> pd.DataFrame:
 REST APIs commonly return hierarchical payloads containing nested dictionaries and embedded arrays of objects. For relational analytical modeling, these structures must be unnested (shredded) into tabular rows and columns.
 
 #### Visual Architecture
-```
-Raw API Payload:
+```json
 {
   "user_id": 101,
   "profile": {"name": "Alice", "country": "US"},
@@ -176,16 +175,14 @@ Raw API Payload:
     {"order_id": 5002, "amount": 85.5}
   ]
 }
-      │
-      ▼ pd.json_normalize(record_path='orders', meta=['user_id', ['profile', 'name']])
-Tabular DataFrame:
-┌─────────┬──────────────┬──────────┬────────┐
-│ user_id │ profile.name │ order_id │ amount │
-├─────────┼──────────────┼──────────┼────────┤
-│ 101     │ Alice        │ 5001     │ 120.0  │
-│ 101     │ Alice        │ 5002     │ 85.5   │
-└─────────┴──────────────┴──────────┴────────┘
 ```
+
+$$\Big\downarrow \quad \text{\small \texttt{pd.json\_normalize(record\_path='orders', meta=['user\_id', ['profile', 'name']])}}$$
+
+| `user_id` | `profile.name` | `order_id` | `amount` |
+| :---: | :--- | :---: | :---: |
+| 101 | Alice | 5001 | 120.0 |
+| 101 | Alice | 5002 | 85.5 |
 
 #### Production Implementation
 ```python
@@ -391,13 +388,20 @@ In Python, `*args` and `**kwargs` allow a function to accept an arbitrary, unspe
 - `*args` (Non-Keyword Arguments): Packs positional arguments into a **tuple**.
 - `**kwargs` (Keyword Arguments): Packs named key-value arguments into a **dictionary**.
 
-```
-Function Invocation:
-my_func("bronze", 100, cluster="prod", retries=3)
-           │      │           │            │
-           ▼      ▼           ▼            ▼
-Packed into *args tuple:   Packed into **kwargs dict:
-    ('bronze', 100)            {'cluster': 'prod', 'retries': 3}
+```mermaid
+flowchart TD
+    Call["Function Invocation:<br/><code>my_func('bronze', 100, cluster='prod', retries=3)</code>"]
+    
+    Call -->|"Positional Arguments"| Args["*args (Tuple):<br/><code>('bronze', 100)</code>"]
+    Call -->|"Keyword Arguments"| Kwargs["**kwargs (Dict):<br/><code>{'cluster': 'prod', 'retries': 3}</code>"]
+
+    classDef inv fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef tupleNode fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef dictNode fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+
+    class Call inv;
+    class Args tupleNode;
+    class Kwargs dictNode;
 ```
 
 #### Production Data Engineering Pipeline Pattern

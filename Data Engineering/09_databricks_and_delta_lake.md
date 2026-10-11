@@ -7,24 +7,27 @@ A unified, comprehensive, production-grade guide to the Databricks Lakehouse Pla
 ## Architectural Overview: High-Level Platform & Lakehouse Architecture
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph ControlPlane ["Databricks Managed Control Plane"]
-        UI[Workspace Web UI & IDEs]
-        JobMgr[Workflows & Cluster Manager]
-        CatalogServ[Unity Catalog Metadata Service]
+        direction LR
+        UI["Workspace Web UI & IDEs"]
+        JobMgr["Workflows & Cluster Manager"]
+        CatalogServ["Unity Catalog Metadata Service"]
     end
 
     subgraph DataPlane ["Data Plane: Customer Cloud VPC / VNet"]
-        Driver[Driver Node - Photon / JVM]
-        W1[Worker 1 - Task Execution]
-        W2[Worker 2 - Task Execution]
+        direction TB
+        Driver["Driver Node - Photon / JVM"]
+        W1["Worker 1 - Task Execution"]
+        W2["Worker 2 - Task Execution"]
         Driver <--> W1
         Driver <--> W2
     end
 
     subgraph CloudObjectStorage ["Cloud Object Storage: ADLS Gen2 / S3 / GCS"]
+        direction TB
         DeltaTable[("Delta Lake Storage<br/>Parquet Data Files + _delta_log/")]
-        Checkpoints[Checkpoints .parquet & .json]
+        Checkpoints["Checkpoints .parquet & .json"]
         DeltaTable --- Checkpoints
     end
 
@@ -156,20 +159,24 @@ Databricks separates its architecture into two distinct administrative planes:
 - **Serverless Data Plane:** Managed elastically inside Databricks compute accounts with secure PrivateLink isolation to customer cloud storage.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph ControlPlane ["Databricks Control Plane (Databricks Cloud Tenant)"]
+        direction LR
         UI["Web UI & Notebook Server"]
         WorkflowEng["Orchestration Engine (Workflows)"]
         ClusterCoord["Cluster Management Daemon"]
         UCMeta["Unity Catalog Metastore Service"]
     end
 
-    subgraph SecureNetwork ["Secure Tunnel (No Public Inbound Ports)"]
-        Tunnel["Relay / PrivateLink Tunnel"]
+    subgraph SecureNetwork ["Secure Transit"]
+        direction TB
+        Tunnel["Relay / PrivateLink Tunnel<br/>(No Public Inbound Ports)"]
     end
 
     subgraph CustomerDataPlane ["Customer Data Plane (Customer VPC / VNet)"]
+        direction TB
         subgraph Cluster1 ["Active Spark Cluster"]
+            direction TB
             DriverVM["Driver Node"]
             WorkerVM1["Worker Node 1"]
             WorkerVM2["Worker Node 2"]
@@ -272,20 +279,25 @@ Databricks decouples compute from storage, allowing compute clusters to spin up 
 
 ```mermaid
 flowchart TD
-    subgraph ComputeTypes ["All-Purpose vs. Job Compute"]
+    subgraph AllPurposeCompute ["All-Purpose Compute (Interactive Development)"]
+        direction TB
         Dev["Engineer Developing in Notebook"] -->|Interactive Queries| AllPurpose["All-Purpose Cluster<br/>(Higher DBU Cost, Persistent)"]
-        
-        Scheduler["Automated Daily Workflow (2:00 AM)"] -->|Spin up on trigger| JobCompute["Job Cluster<br/>(50% Cheaper DBU Cost, Auto-Terminates)"]
+    end
+
+    subgraph JobComputeCluster ["Job Compute (Automated Production)"]
+        direction TB
+        Scheduler["Automated Workflow (2:00 AM)"] -->|Spin up on trigger| JobCompute["Job Cluster<br/>(50% Cheaper DBU, Auto-Terminates)"]
         JobCompute -->|Finish Task| Destroy["Cluster Destroyed Immediately"]
     end
 
-    style ComputeTypes fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style AllPurposeCompute fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style JobComputeCluster fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
     style Dev fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style AllPurpose fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Scheduler fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style JobCompute fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Destroy fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Destroy fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fff
 ```
 
 #### Cost Optimization Rule
@@ -406,25 +418,25 @@ An **Instance Pool** maintains a set of pre-acquired, idle virtual machines runn
 - When clusters finish or scale down, VMs return to the warm pool rather than terminating.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph WarmPool ["Databricks Instance Pool (Pre-Warmed VMs in Cloud Account)"]
-        IdleVM1["Pre-Warmed VM 1\n(DBR Image Pre-Cached)"]
-        IdleVM2["Pre-Warmed VM 2\n(DBR Image Pre-Cached)"]
-        IdleVM3["Pre-Warmed VM 3\n(DBR Image Pre-Cached)"]
+        direction LR
+        IdleVM1["Pre-Warmed VM 1<br/>(DBR Pre-Cached)"] --- IdleVM2["Pre-Warmed VM 2<br/>(DBR Pre-Cached)"] --- IdleVM3["Pre-Warmed VM 3<br/>(DBR Pre-Cached)"]
     end
 
-    subgraph TriggerJob ["Databricks Job Trigger (<30s Cluster Launch)"]
-        JobCluster["Active Job Cluster\n(Acquires Pre-Warmed VMs Instantly)"]
+    subgraph TriggerJob ["Databricks Job Compute Fleet"]
+        direction LR
+        JobCluster["Active Job Cluster<br/>(Acquires Pre-Warmed VMs in <30s)"]
     end
 
-    WarmPool -->|"Instant Allocation (<30s)"| JobCluster
+    IdleVM1 & IdleVM2 & IdleVM3 -->|"Instant Allocation (<30s)"| JobCluster
 
     style WarmPool fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
     style TriggerJob fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style IdleVM1 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style IdleVM2 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style IdleVM3 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style JobCluster fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style JobCluster fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 #### Pool Configuration Parameters:
@@ -1064,6 +1076,7 @@ $$	ext{Delta Table} = 	ext{Parquet Data Files} + 	ext{Transaction Log (\_delta\_
 flowchart TD
     subgraph DeltaTableDirectory ["Delta Lake Table Directory (/lakehouse/sales_orders/)"]
         subgraph DeltaLogDir ["_delta_log/ (The Single Source of Truth)"]
+            direction LR
             Commit0["00000000000000000000.json (Initial Create & Adds)"]
             Commit1["00000000000000000001.json (Append 2 Files)"]
             Commit2["00000000000000000002.json (Remove 1 File, Add 1 File)"]
@@ -1109,9 +1122,31 @@ Every state change in a Delta table (insert, update, delete, schema alteration) 
 
 #### Structure of a Commit JSON
 ```json
-{"commitInfo":{"timestamp":1727913600000,"operation":"WRITE","operationParameters":{"mode":"Append"}}}
-{"add":{"path":"part-0001.snappy.parquet","size":1048576,"modificationTime":1727913600000,"dataChange":true,"stats":"{\"numRecords\":1000,\"minValues\":{\"id\":1},\"maxValues\":{\"id\":1000}}"}}
-{"remove":{"path":"part-0000.snappy.parquet","deletionTimestamp":1727913600000,"dataChange":true}}
+{
+    "commitInfo": {
+        "timestamp": 1727913600000,
+        "operation": "WRITE",
+        "operationParameters": {
+            "mode": "Append"
+        }
+    }
+}
+{
+    "add": {
+        "path": "part-0001.snappy.parquet",
+        "size": 1048576,
+        "modificationTime": 1727913600000,
+        "dataChange": true,
+        "stats": "{\"numRecords\":1000,\"minValues\":{\"id\":1},\"maxValues\":{\"id\":1000}}"
+    }
+}
+{
+    "remove": {
+        "path": "part-0000.snappy.parquet",
+        "deletionTimestamp": 1727913600000,
+        "dataChange": true
+    }
+}
 ```
 - `add`: Declares a new active data file and registers its min/max column statistics for data skipping.
 - `remove`: Declares a file logically deleted (tombstoned). The file remains physically on disk for historical time-travel queries until purged by `VACUUM`.
@@ -1163,26 +1198,35 @@ Delta Lake uses **Optimistic Concurrency Control (OCC)** to manage concurrent tr
    - If updates conflict on the exact same row/file, Transaction A aborts with a `ConcurrentModificationException`.
 
 ```mermaid
-flowchart TD
-    Tx1["Tx 1: Starts at v5"] --> Work1["Write Files"]
-    Tx2["Tx 2: Starts at v5"] --> Work2["Write Files"]
-    
-    Work2 --> Commit2["Tx 2 Commits v6 (Wins!)"]
-    Work1 --> Check{"Tx 1 Attempts Commit v6:<br/>Version Already Exists!"}
-    
-    Check --> Reconcile{"Mutually Exclusive Partitions?"}
-    Reconcile -- Yes --> AutoRetry["Auto-Rebase & Commit as v7 (Success)"]
-    Reconcile -- No --> Abort["Abort: ConcurrentModificationException"]
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    box rgba(49, 46, 129, 0.5) Concurrent Writers
+        participant Tx1 as Transaction 1
+        participant Tx2 as Transaction 2
+    end
+    box rgba(6, 78, 59, 0.5) Storage Engine
+        participant Log as Delta Transaction Log (_delta_log/)
+    end
 
-    style Tx1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Work1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Tx2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Work2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Commit2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Check fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Reconcile fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style AutoRetry fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Abort fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    Tx1->>Log: 1. Read snapshot at version 5
+    Tx2->>Log: 2. Read snapshot at version 5
+    Note over Tx1,Tx2: Both compute writes in private staging memory
+
+    Tx2->>Log: 3. Commit 000006.json (Atomic Put)
+    Log-->>Tx2: 200 OK (Tx 2 wins version 6!)
+
+    Tx1->>Log: 4. Attempt Commit 000006.json
+    Log-->>Tx1: 409 Conflict (000006.json already exists!)
+
+    alt Mutually Exclusive Partitions (No Overlap)
+        Tx1->>Log: 5. Re-read version 6 & replay operations
+        Tx1->>Log: 6. Commit as 000007.json
+        Log-->>Tx1: 200 OK (Auto-rebase successful!)
+    else Overlapping Target Files (Conflict)
+        Note over Tx1: Abort transaction
+        Tx1-->>Tx1: Throw ConcurrentModificationException
+    end
 ```
 
 #### References
@@ -1357,8 +1401,9 @@ Traditionally, deleting or updating a single row inside a 500MB Parquet file req
 **Deletion Vectors (DVs)** revolutionize this: Delta writes a tiny bit-array file (a few bytes) that lists the exact row offsets that have been deleted. Reader engines read the original Parquet file and simply mask out rows marked in the Deletion Vector. **100x faster updates and deletes.**
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph TraditionalCOW ["Traditional Copy-On-Write (Slow)"]
+        direction LR
         OldP["Old 500MB Parquet (1M Rows)"] -->|Delete 1 Row| Rewrite["Rewrite Entire NEW 500MB Parquet!"]
     end
 

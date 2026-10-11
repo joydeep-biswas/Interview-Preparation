@@ -92,20 +92,12 @@ flowchart TD
 
 ### 1.1 The Continuum: Chains vs. Routers vs. State Machines vs. Autonomous Agents
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| ARCHITECTURAL PATTERN | CONTROL FLOW DETERMINISM    | PRODUCTION SUITABILITY        |
-+-----------------------+-----------------------------+-------------------------------+
-| Prompt Chains         | 100% Deterministic (Step A  | ETL, document summarization,  |
-|                       | -> Step B -> Step C).       | linear transformations.       |
-| Router Patterns       | Conditional branch governed | Routing queries to specialized|
-|                       | by LLM classifier.          | domain handlers.              |
-| State Machines        | Structured states with code-| Enterprise business processes |
-| (LangGraph Workflows) | governed transitions & loops| requiring strict guardrails.  |
-| Autonomous Agents     | LLM decides next state, tool| Exploratory research, coding  |
-| (Unconstrained ReAct) | and termination dynamically.| assistance, debugging.        |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Architectural Pattern | Control Flow Determinism | Production Suitability |
+| :--- | :--- | :--- |
+| **Prompt Chains** | 100% Deterministic (Step A $\rightarrow$ Step B $\rightarrow$ Step C). | ETL, document summarization, linear batch transformations. |
+| **Router Patterns** | Conditional branch governed by LLM classifier. | Routing queries to specialized domain handlers or task-specific models. |
+| **State Machines**<br/>(LangGraph Workflows) | Structured states with code-governed transitions & loops. | Enterprise business processes requiring strict guardrails, human approval gates. |
+| **Autonomous Agents**<br/>(Unconstrained ReAct) | LLM decides next state, tool invocation, and termination dynamically. | Exploratory research, coding assistance, open-ended problem solving. |
 
 ---
 
@@ -255,18 +247,11 @@ print(f"Final Message: {final_output['messages'][-1]['content']}")
 
 # 5. Memory Systems: Working vs. Short-Term vs. Persistent Episodic Memory
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| MEMORY TIER           | STORAGE BACKEND & RETRIEVAL | FUNCTION & LIFECYCLE          |
-+-----------------------+-----------------------------+-------------------------------+
-| Working Memory        | Prompt context window       | Scratchpad for current task   |
-| (Immediate Context)   | (In-memory token list).     | execution (active step).      |
-| Short-Term Memory     | Session cache (Redis,       | Multi-turn conversation state |
-| (Session State)       | LangGraph checkpointer).    | spanning a single user session|
-| Persistent Episodic   | Vector Database / Relational| Long-term memories, user      |
-| Memory                | (pgvector, Qdrant, Mem0).   | preferences, past resolutions.|
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Memory Tier | Storage Backend & Retrieval | Function & Lifecycle |
+| :--- | :--- | :--- |
+| **Working Memory**<br/>(Immediate Context) | Prompt context window (In-memory token list). | Scratchpad for current task execution and immediate step reasoning. |
+| **Short-Term Memory**<br/>(Session State) | Session cache (Redis, LangGraph checkpointer). | Multi-turn conversation state and thread checkpoint spanning an active user session. |
+| **Persistent Episodic Memory** | Vector Database / Relational (pgvector, Qdrant, Mem0). | Long-term factual recall, personalized user preferences, and cross-session historical resolutions. |
 
 ---
 
@@ -285,19 +270,33 @@ As an agent executes 15 successive tool calls, raw tool outputs (e.g., massive 5
 For high-consequence operations (deleting a production database, executing wire transfers, sending customer-facing emails), agents must not execute autonomously without human review:
 
 ```mermaid
-flowchart TD
-    Agent["Agent proposes Action:<br/>execute_refund(order_id='ORD-991', amount='$450.00')"] --> Interrupt["Graph Interrupts Execution<br/>(State frozen in Postgres checkpointer)"]
-    Interrupt --> UI["Admin Dashboard / Slack Notification<br/>'Approve Refund of $450.00 for Order ORD-991?'"]
-    UI --> Decision{Human Decision}
-    Decision -- Approve --> Resume["Resume Graph with Approval Payload<br/>Graph executes refund tool"]
-    Decision -- Reject --> Abort["Resume Graph with Rejection Payload<br/>Agent synthesizes cancellation message"]
+stateDiagram-v2
+    classDef proposing fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    classDef paused fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    classDef approved fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef rejected fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
 
-    style Agent fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Interrupt fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style UI fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Decision fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Resume fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Abort fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    [*] --> ProposingAction: Agent evaluates plan & synthesizes tool call
+    ProposingAction --> InterruptedPaused: Proposes high-consequence action (e.g. refund, DB drop)
+    
+    state InterruptedPaused {
+        [*] --> CheckpointPersisted: Durable state snapshot frozen in checkpointer DB
+        CheckpointPersisted --> AwaitingHumanReview: Interactive Slack / UI webhook notification emitted
+    }
+
+    InterruptedPaused --> ResumedApproved: Human reviews and grants approval
+    InterruptedPaused --> ResumedRejected: Human denies action request
+
+    ResumedApproved --> ToolExecuted: Sandboxed runner executes tool with approval token
+    ResumedRejected --> CancellationSynthesized: Agent appends rejection reason & informs user
+
+    ToolExecuted --> [*]: Cycle completes
+    CancellationSynthesized --> [*]: Safe halt
+
+    class ProposingAction proposing
+    class InterruptedPaused paused
+    class ResumedApproved,ToolExecuted approved
+    class ResumedRejected,CancellationSynthesized rejected
 ```
 
 ---

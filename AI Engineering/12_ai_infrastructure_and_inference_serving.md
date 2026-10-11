@@ -89,18 +89,14 @@ flowchart TD
 
 ### 1.1 Modern GPU Architectures: Ampere A100 vs. Hopper H100 vs. Blackwell B200
 
-```text
-+-----------------------+-------------------+-------------------+-------------------+
-| HARDWARE SPEC         | NVIDIA A100 (80GB)| NVIDIA H100 (80GB)| NVIDIA B200 (192GB|
-+-----------------------+-------------------+-------------------+-------------------+
-| GPU Architecture      | Ampere            | Hopper            | Blackwell         |
-| Memory Type           | HBM2e             | HBM3              | HBM3e             |
-| Memory Bandwidth      | 2.039 TB/s        | 3.35 TB/s         | 8.0 TB/s          |
-| FP16 / BF16 Tensor    | 312 TFLOPS        | 989 TFLOPS        | 2,250 TFLOPS      |
-| FP8 Tensor Cores      | Not Supported     | 1,979 TFLOPS      | 4,500 TFLOPS      |
-| NVLink Bandwidth      | 600 GB/s          | 900 GB/s          | 1,800 GB/s        |
-+-----------------------+-------------------+-------------------+-------------------+
-```
+| Hardware Spec | NVIDIA A100 (80GB) | NVIDIA H100 (80GB) | NVIDIA B200 (192GB) |
+| :--- | :--- | :--- | :--- |
+| **GPU Architecture** | Ampere | Hopper | Blackwell |
+| **Memory Type** | HBM2e | HBM3 | HBM3e |
+| **Memory Bandwidth** | 2.039 TB/s | 3.35 TB/s | 8.0 TB/s |
+| **FP16 / BF16 Tensor** | 312 TFLOPS | 989 TFLOPS | 2,250 TFLOPS |
+| **FP8 Tensor Cores** | Not Supported | 1,979 TFLOPS | 4,500 TFLOPS |
+| **NVLink Bandwidth** | 600 GB/s | 900 GB/s | 1,800 GB/s |
 
 ---
 
@@ -217,18 +213,12 @@ flowchart TD
 
 # 5. Model Quantization & Tensor Precision Formats
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| PRECISION / SCHEME    | VRAM PER PARAMETER          | RUNTIME CHARACTERISTICS       |
-+-----------------------+-----------------------------+-------------------------------+
-| BF16 (Unquantized)    | 2.0 Bytes                   | Baseline full quality.        |
-| FP8 (Hopper Native)   | 1.0 Byte                    | Supported on H100 Tensor      |
-|                       |                             | Cores; zero perplexity loss.  |
-| INT4 AWQ             | 0.5 Bytes                   | Weights quantized; activations|
-|                       |                             | in FP16. High perplexity retention.|
-| INT4 GPTQ             | 0.5 Bytes                   | Layer-wise Hessian inversion. |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Precision / Scheme | VRAM per Parameter | Runtime Characteristics |
+| :--- | :---: | :--- |
+| **BF16 (Unquantized)** | 2.0 Bytes | Baseline full quality; standard format for modern training and unquantized serving. |
+| **FP8 (Hopper Native)** | 1.0 Byte | Supported natively on H100 Tensor Cores; 2x throughput boost with near-zero perplexity loss. |
+| **INT4 AWQ** | 0.5 Bytes | Weights quantized to 4-bit; activations in FP16. High perplexity retention on complex reasoning. |
+| **INT4 GPTQ** | 0.5 Bytes | Layer-wise second-order Hessian inversion; fast offline calibration for production inference. |
 
 ---
 
@@ -238,16 +228,45 @@ flowchart TD
 
 When a model cannot fit in a single GPU's VRAM (e.g., Llama-3-70B in FP16 requires 145GB; an H100 has 80GB), the weights must be sharded across multiple GPUs:
 
-```text
-MEGATRON TENSOR PARALLELISM (TP = 2):
-Column-Parallel Linear Layer (W_1):
-  GPU 0 computes: Y_1 = X * W_1_top
-  GPU 1 computes: Y_2 = X * W_1_bottom
-Row-Parallel Linear Layer (W_2):
-  GPU 0 computes: Z_1 = Y_1 * W_2_left
-  GPU 1 computes: Z_2 = Y_2 * W_2_right
-All-Reduce Collective:
-  Z = Z_1 + Z_2 (Transferred across NVLink @ 900 GB/s)
+```mermaid
+flowchart TD
+    X["Input Activations X"] --> Split["Broadcast X to GPUs"]
+
+    subgraph ColPar["Column-Parallel Linear Layer (W1)"]
+        direction LR
+        GPU0_W1["GPU 0: Y1 = X * W1_top"]
+        GPU1_W1["GPU 1: Y2 = X * W1_bottom"]
+    end
+
+    Split --> GPU0_W1
+    Split --> GPU1_W1
+
+    subgraph RowPar["Row-Parallel Linear Layer (W2)"]
+        direction LR
+        GPU0_W2["GPU 0: Z1 = Y1 * W2_left"]
+        GPU1_W2["GPU 1: Z2 = Y2 * W2_right"]
+    end
+
+    GPU0_W1 --> GPU0_W2
+    GPU1_W1 --> GPU1_W2
+
+    subgraph AllReduce["All-Reduce Collective (NVLink @ 900 GB/s)"]
+        AR["Z = Z1 + Z2 (Element-wise Sum)"]
+    end
+
+    GPU0_W2 --> AR
+    GPU1_W2 --> AR
+    AR --> Out["Output Activations Z"]
+
+    classDef act fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef gpu0 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef gpu1 fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px,color:#e0f2fe;
+    classDef comm fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#fef3c7;
+
+    class X,Split,Out act;
+    class GPU0_W1,GPU0_W2 gpu0;
+    class GPU1_W1,GPU1_W2 gpu1;
+    class AR comm;
 ```
 
 > [!IMPORTANT]

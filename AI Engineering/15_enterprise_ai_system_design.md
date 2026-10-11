@@ -106,16 +106,11 @@ Forward Deployed Engineers operate at the intersection of enterprise business st
 
 ### 1.2 Enterprise System Integrations: Salesforce CRM, SAP ERP, Jira
 
-```text
-ENTERPRISE INTEGRATION PATTERNS:
-1. Salesforce CRM / HubSpot:
-   OAuth2 token exchange; webhooks for lead updates; LangGraph tool wrappers.
-2. SAP ERP / NetSuite:
-   Strict transactional boundaries; all write operations staged as draft orders
-   requiring ERP approval workflows.
-3. Jira / ServiceNow:
-   Automated ticket triage, sentiment routing, and initial diagnostic generation.
-```
+| Target Enterprise Platform | Protocol & Authentication | Integration Pattern & Operational Guardrails |
+| :--- | :--- | :--- |
+| **Salesforce CRM / HubSpot** | OAuth 2.0 token exchange, mTLS | Webhooks for real-time lead updates; LangGraph tool wrappers with strict schema validation. |
+| **SAP ERP / NetSuite** | Mutual TLS, private VPC peering | Strict transactional boundaries; write actions staged as draft orders requiring ERP approval workflows. |
+| **Jira / ServiceNow** | API Keys / Webhooks | Automated ticket classification, sentiment-based routing, and draft diagnostic generation. |
 
 ---
 
@@ -124,14 +119,13 @@ ENTERPRISE INTEGRATION PATTERNS:
 > [!CAUTION]
 > **Cascading Agent Failures:** Never deploy multi-step agent loops without durable checkpointing, loop iteration guards (e.g., max 5 hops), and automated fallbacks. Unbounded agent recursions can quickly consume thousands of dollars in API tokens and crash user sessions.
 
-```text
-ENTERPRISE ACCEPTANCE CRITERIA MATRIX:
-- Groundedness SLA: >= 99.0% of factual assertions must have verifiable citations.
-- Hallucination Threshold: < 0.5% ungrounded statements on monthly audit.
-- Refusal Calibration: If retrieval confidence < 0.70, system must explicitly refuse
-  with standard message rather than guessing.
-- Latency SLA: TTFT p95 < 1200ms; Total task latency < 5000ms.
-```
+| SLA / Acceptance Metric | Target Threshold | Verification Mechanism | Fallback / Degradation Action |
+| :--- | :---: | :--- | :--- |
+| **Groundedness SLA** | $\ge 99.0\%$ | Ragas / TruLens automated claim citation checking. | Re-prompt with narrowed context or trigger web search. |
+| **Hallucination Threshold** | $< 0.5\%$ | Monthly offline gold-dataset audit by domain SME. | Quarantine suspect prompt templates and alert engineering. |
+| **Refusal Calibration** | Confidence $\ge 0.70$ | Vector cosine similarity + re-ranker cross-encoder score. | Return standardized refusal message; zero speculative generation. |
+| **Time-to-First-Token (TTFT)** | $p95 < 1200\text{ ms}$ | Gateway distributed APM tracing (OpenTelemetry). | Stream immediate status heartbeat or switch to provisioned throughput. |
+| **Total Task Latency** | $< 5000\text{ ms}$ | End-to-end request timer. | Cancel secondary reflection cycles to preserve user responsiveness. |
 
 ---
 
@@ -194,27 +188,63 @@ SCALE TARGET: 2,000 concurrent streaming users, 10,000 requests/minute.
 
 # 5. Blueprint 3: Enterprise Autonomous Multi-Agent Operations Platform
 
-```text
-USE CASE: Automated IT DevOps Incident Triage and Resolution.
-- Supervisor: ReAct orchestrator evaluating incoming PagerDuty alerts.
-- Diagnostic Worker: Runs read-only queries against Prometheus, Datadog, and Kubernetes.
-- Mitigation Worker: Generates remediation scripts (e.g., restart crashed pod).
-- Human-in-the-Loop Gate:
-  Interrupts state execution; dispatches Slack interactive approval button to SRE on-call.
-  Only executes `kubectl rollout restart` upon receiving cryptographic SRE signature.
+```mermaid
+flowchart TD
+    Alert["Incoming PagerDuty Alert"] --> Sup["Supervisor: ReAct Orchestrator"]
+    Sup --> Diag["Diagnostic Worker<br/>(Prometheus, Datadog, K8s)"]
+    Diag --> Sup
+    Sup --> Mit["Mitigation Worker<br/>(Generates Remediation Script)"]
+    Mit --> Gate{"Human-in-the-Loop Gate<br/>(Slack Interactive Button)"}
+    Gate -- "Approved by SRE" --> Exec["Execute Remediation<br/><code>kubectl rollout restart</code>"]
+    Gate -- "Rejected" --> Escal["Escalate to Incident Commander"]
+
+    classDef alert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
+    classDef sup fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef worker fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#f8fafc;
+    classDef gate fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef act fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+
+    class Alert,Escal alert;
+    class Sup sup;
+    class Diag,Mit worker;
+    class Gate gate;
+    class Exec act;
 ```
 
 ---
 
 # 6. Blueprint 4: Continuous Evaluation & Data Flywheel System
 
-```text
-PIPELINE FLOW:
-1. Production Traffic Mirroring: Async fork sends 5% of production queries to shadow worker.
-2. Groundedness Evaluation: Automated Ragas Faithfulness metric runs asynchronously.
-3. Negative Mining: Queries scoring <0.70 are flagged and routed to internal review queue.
-4. Golden Dataset Evolution: Human annotators correct failed queries; added to golden test suite.
-5. Automated LoRA Training: Weekly pipeline triggers QLoRA fine-tuning run on newly curated pairs.
+```mermaid
+flowchart TD
+    subgraph Stage1 ["Stage 1: Production Ingress & Continuous Shadow Evaluation"]
+        direction LR
+        Prod["Production Live Traffic"] -->|"Async Fork (5%)"| Shadow["Shadow Evaluation Worker"]
+        Shadow --> Eval["Automated Faithfulness Eval<br/>(Ragas / DeepEval Framework)"]
+        Eval --> Check{"Quality Gate<br/>Score < 0.70?"}
+        Check -- "No (Passed)" --> Archive["Observability Metric Logged"]
+    end
+
+    subgraph Stage2 ["Stage 2: Human Curation & Active Learning Retraining"]
+        direction LR
+        Review["Human Review & Annotation Queue<br/>(Edge Cases & Low-Scoring Traces)"] --> Golden["Curated Golden Test Suite<br/>(Regression Benchmark Dataset)"]
+        Golden --> LoRA["Weekly Automated QLoRA Retraining<br/>(Parameter-Efficient Fine-Tuning)"]
+    end
+
+    Check -- "Yes (Failed Gate)" --> Review
+    LoRA -.->|"Canary Deployment"| Prod
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
+    style Prod fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc
+    style Shadow fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#f8fafc
+    style Eval fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#f8fafc
+    style Check fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc
+    style Archive fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#ecfdf5
+    style Review fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#f8fafc
+    style Golden fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#f8fafc
+    style LoRA fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5
 ```
 
 ---
@@ -252,7 +282,7 @@ $$\text{Latency per Token} = \frac{140 \times 10^9}{4.0 \times 10^{12}} = 35\tex
 # 8. The 4-Step AI System Design Interview Framework
 
 ```mermaid
-flowchart TD
+flowchart LR
     Step1["Step 1: Clarify Scope & SLAs (5-8 mins)<br/>(Functional vs Non-Functional requirements, Latency SLA, Throughput, Accuracy)"]
     Step2["Step 2: High-Level Architecture & Estimation (10-12 mins)<br/>(Data flow diagram, Model selection, VRAM & GPU cluster sizing)"]
     Step3["Step 3: Component Deep-Dive & Low-Level Mechanics (15-20 mins)<br/>(HNSW vs IVF, PagedAttention, HITL, Context window chunking)"]

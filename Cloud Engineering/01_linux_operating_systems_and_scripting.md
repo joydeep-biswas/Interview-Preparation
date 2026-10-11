@@ -111,20 +111,27 @@ flowchart TD
 
 In Linux, everything is an abstraction over a sequence of bytes accessed via file descriptors. The **Virtual File System (VFS)** acts as an indirection layer mediating between user-space syscalls (`open`, `read`, `write`) and concrete storage formats (ext4, XFS, Btrfs, NFS).
 
-```text
-User Space:       fd = 3 (Process File Descriptor Table)
-                      │
-                      ▼
-Kernel VFS:      struct file (Pointer to struct dentry, file offset, flags)
-                      │
-                      ▼
-                 struct dentry (Directory Cache: Name -> inode mapping)
-                      │
-                      ▼
-                 struct inode (Metadata: UID, GID, Mode, Size, Extent Pointers)
-                      │
-                      ▼
-Disk Storage:    Data Blocks (Actual file payload stored in extents)
+```mermaid
+flowchart TD
+    subgraph Stage1 ["Stage 1: User Space & File Descriptor Resolution"]
+        direction LR
+        UserSpace["User Space<br/>(Process FD Table: fd = 3)"] --> KernelVFS["Kernel VFS: struct file<br/>(File offset, access flags & dentry ref)"]
+    end
+
+    subgraph Stage2 ["Stage 2: Directory Cache & Storage Block Traversal"]
+        direction LR
+        Dentry["struct dentry<br/>(Directory cache: Path Name → Inode ID)"] --> Inode["struct inode<br/>(Metadata: Mode, UID, Size & Block Extents)"] --> Disk["Disk Storage: Data Blocks<br/>(Raw byte payload in physical blocks)"]
+    end
+
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style UserSpace fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style KernelVFS fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style Dentry fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Inode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Disk fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
 1. **Inode (Index Node):** Contains metadata describing file ownership, access timestamps (`atime`, `mtime`, `ctime`), permission bits, link count, and block extent pointers. The inode does **not** store the file name.
@@ -143,17 +150,11 @@ Disk Storage:    Data Blocks (Actual file payload stored in extents)
 
 Standard POSIX file permissions are represented internally by the kernel as a **12-bit unsigned integer** stored in the inode's `st_mode` field. This bitfield is structured into four 3-bit octal groups:
 
-```text
- 11 10  9    8  7  6    5  4  3    2  1  0  (Bit Positions in st_mode)
-┌──────────┬──────────┬──────────┬──────────┐
-│ Special  │  User    │  Group   │  Other   │
-│ SUID/    │  Owner   │  Members │  World   │
-│ SGID/Stk │  (u)     │  (g)     │  (o)     │
-├──────────┼──────────┼──────────┼──────────┤
-│ 4  2  1  │ 4  2  1  │ 4  2  1  │ 4  2  1  │ (Octal Weighting: 2^2, 2^1, 2^0)
-│ s  s  t  │ r  w  x  │ r  w  x  │ r  w  x  │
-└──────────┴──────────┴──────────┴──────────┘
-```
+| Bit Positions in `st_mode` | 11, 10, 9 | 8, 7, 6 | 5, 4, 3 | 2, 1, 0 |
+| :--- | :---: | :---: | :---: | :---: |
+| **Permission Class** | **Special (SUID / SGID / Sticky)** | **User Owner (`u`)** | **Group Members (`g`)** | **Other World (`o`)** |
+| **Octal Weighting ($2^2, 2^1, 2^0$)** | 4, 2, 1 | 4, 2, 1 | 4, 2, 1 | 4, 2, 1 |
+| **Bit Representation** | `s`, `s`, `t` | `r`, `w`, `x` | `r`, `w`, `x` | `r`, `w`, `x` |
 
 #### 1. Binary Representation & Octal Weighting
 Each triplet represents three independent permission bits:
@@ -250,48 +251,45 @@ getfacl /var/www/releases
 Every process in Linux is represented in kernel memory by a `struct task_struct` allocated via the Slab allocator. The kernel maintains process scheduling states across distinct operational phases:
 
 ```mermaid
-flowchart TD
-    subgraph Spawning ["Process Spawning & Allocation"]
-        Fork["Parent Process fork() / clone()<br/>(Allocates task_struct via Slab, COW memory)"]
-    end
+stateDiagram-v2
+    classDef running fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef waiting fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    classDef stopped fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef zombie fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    classDef dead fill:#0f172a,stroke:#64748b,stroke-width:2px,color:#ffffff
 
-    subgraph SchedState ["CPU Scheduling & Execution States"]
-        Running["TASK_RUNNING (R State)<br/>(Executing on CPU core or queued in CFS runqueue)"]
-        Stopped["TASK_STOPPED / TRACED (T State)<br/>(Suspended via SIGSTOP, Ctrl+Z, or ptrace)"]
-    end
+    [*] --> TASK_RUNNING: fork() / clone() creates task_struct (COW memory)
+    
+    state TASK_RUNNING {
+        [*] --> InCFSRunqueue: Queued by CFS scheduler
+        InCFSRunqueue --> ExecutingOnCPU: Scheduled on CPU core
+        ExecutingOnCPU --> InCFSRunqueue: Time slice exhausted / preempted
+    }
 
-    subgraph SleepState ["Sleeping & I/O Wait States"]
-        IntSleep["TASK_INTERRUPTIBLE (S State)<br/>(Sleeping: waiting on socket, timer, or signals)"]
-        UnintSleep["TASK_UNINTERRUPTIBLE (D State)<br/>(Deep hardware wait: disk fsync, NFS lock, cannot kill)"]
-    end
+    TASK_RUNNING --> TASK_INTERRUPTIBLE: I/O wait (sys_read, select, socket wait)
+    TASK_INTERRUPTIBLE --> TASK_RUNNING: Data ready or signal delivered
 
-    subgraph Termination ["Process Termination & Reaping"]
-        Zombie["EXIT_ZOMBIE (Z State)<br/>(Exited: resources freed, PID kept in table for parent)"]
-        Dead["EXIT_DEAD (X State)<br/>(Parent calls waitpid: task_struct and PID released)"]
-    end
+    TASK_RUNNING --> TASK_UNINTERRUPTIBLE: Device I/O wait (disk fsync, uninterruptible D-state)
+    TASK_UNINTERRUPTIBLE --> TASK_RUNNING: Hardware interrupt returns
 
-    Fork -->|"clone() returns child PID"| Running
-    Running -->|"I/O wait: sys_read(), select()"| IntSleep
-    IntSleep -->|"Data ready / Signal delivered"| Running
-    Running -->|"Device I/O: uninterruptible disk wait"| UnintSleep
-    UnintSleep -->|"Hardware interrupt returns"| Running
-    Running -->|"SIGSTOP / SIGTSTP delivered"| Stopped
-    Stopped -->|"SIGCONT delivered"| Running
-    Running -->|"exit() / exit_group() executed"| Zombie
-    Zombie -->|"Parent invokes wait() / waitpid()"| Dead
+    TASK_RUNNING --> TASK_STOPPED: SIGSTOP / SIGTSTP (Ctrl+Z) delivered
+    TASK_STOPPED --> TASK_RUNNING: SIGCONT delivered
 
-    style Spawning fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style SchedState fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style SleepState fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style Termination fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    TASK_RUNNING --> EXIT_ZOMBIE: exit() / exit_group() executed
+    note right of EXIT_ZOMBIE
+        Process terminated.
+        Memory freed, PID held in table
+        awaiting parent reaping.
+    end note
 
-    style Fork fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Running fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Stopped fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style IntSleep fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style UnintSleep fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Zombie fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Dead fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    EXIT_ZOMBIE --> EXIT_DEAD: Parent calls wait() / waitpid()
+    EXIT_DEAD --> [*]: task_struct and PID released
+
+    class TASK_RUNNING running
+    class TASK_INTERRUPTIBLE,TASK_UNINTERRUPTIBLE waiting
+    class TASK_STOPPED stopped
+    class EXIT_ZOMBIE zombie
+    class EXIT_DEAD dead
 ```
 
 - **Fork and Copy-On-Write (COW):** The `fork()` syscall duplicates the caller's page tables while marking all underlying physical memory pages as read-only. Physical memory is cloned only when either parent or child executes a write, triggering a minor page fault.
@@ -395,15 +393,10 @@ The **Completely Fair Scheduler (CFS)** allocates CPU time proportionally using 
 
 Linux uses virtual memory to provide address space isolation. Memory is allocated in 4KB physical frames.
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                                    TOTAL SYSTEM RAM                                     |
-+------------------------------------+----------------------------------------------------+
-| ACTIVE ANONYMOUS MEMORY            | PAGE CACHE (FILE-BACKED)                           |
-| (Heap, Stack, Malloc buffers)      | (Read buffers, mmap files, unwritten dirty pages)  |
-| Cannot be evicted without swap.    | Can be immediately reclaimed under pressure.       |
-+------------------------------------+----------------------------------------------------+
-```
+| Active Anonymous Memory | Page Cache (File-Backed) |
+| :--- | :--- |
+| **Components:** Heap, Stack, Malloc buffers | **Components:** Read buffers, `mmap` files, unwritten dirty pages |
+| **Eviction Behavior:** Cannot be evicted without swap partition. | **Eviction Behavior:** Can be immediately reclaimed by the kernel under memory pressure. |
 
 1. **Page Cache Mechanics:** When an application reads from disk, the kernel stores the blocks in the Page Cache. Write operations mark pages as "dirty".
 2. **Flushing Dirty Pages:** The `flusher` kernel threads wake up to write dirty pages back to physical block storage based on `/etc/sysctl.conf`:
@@ -472,8 +465,20 @@ When a packet arrives from the Network Interface Card (NIC):
 3. **NAPI Polling:** The kernel NAPI loop processes packets from the ring buffer into `sk_buff` structs.
 4. **Socket Buffer (`sk_buff`):** Traverses the Netfilter hooks, IP routing lookup, and is placed in the socket's receive queue (`SO_RCVBUF`).
 
-```text
-NIC Rx Ring Buffer ──(DMA)──> sk_buff ──(IP / Netfilter)──> Socket Receive Queue ──(read/recv)──> Application
+```mermaid
+flowchart LR
+    subgraph NetRX ["Linux Kernel Network Packet Ingress Flow"]
+        direction LR
+        NIC["NIC Rx Ring Buffer"] -->|"DMA"| SKB["sk_buff"]
+        SKB -->|"IP / Netfilter"| SockQ["Socket Receive Queue"]
+        SockQ -->|"read / recv"| App["User Application"]
+    end
+
+    style NetRX fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style NIC fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style SKB fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style SockQ fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style App fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 ---
@@ -730,12 +735,22 @@ if __name__ == "__main__":
 
 Cloud-init handles early machine initialization during cloud instance creation across AWS, Azure, and GCP. Execution spans four sequential stages:
 
-```text
-1. Generator Stage  -> Checks if cloud-init is enabled by kernel cmdline.
-2. Local Stage      -> Identifies cloud datasource (e.g. AWS IMDS, Azure IMDS) and configures network interfaces.
-3. Network Stage    -> Runs package updates, user creation, SSH key deployment, and disk partitioning.
-4. Final Stage      -> Runs scripts in runcmd, Chef/Ansible pull, and phone-home notifications.
+```mermaid
+flowchart LR
+    S1["1. Generator Stage<br/>Checks kernel cmdline"] --> S2["2. Local Stage<br/>Identifies cloud datasource & configures networking"]
+    S2 --> S3["3. Network Stage<br/>Package updates, SSH keys, disk partitioning"]
+    S3 --> S4["4. Final Stage<br/>Executes `runcmd`, config management, phone-home"]
+
+    classDef stage fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    class S1,S2,S3,S4 stage;
 ```
+
+| Stage Number | Stage Name | Timing & Execution Scope | Key Tasks |
+| :---: | :--- | :--- | :--- |
+| **1** | **Generator Stage** | Early systemd generator phase | Evaluates kernel cmdline parameters (`cloud-init=disabled`) to determine whether cloud-init should run. |
+| **2** | **Local Stage** | Before networking is active | Identifies local cloud metadata service (AWS/Azure IMDS), pulls network config, and brings up network interfaces. |
+| **3** | **Network Stage** | Network online; before user logins | Mounts filesystems, partitions ephemeral disks, adds SSH keys, creates sudo users, updates package repos. |
+| **4** | **Final Stage** | Near end of boot process (`multi-user.target`) | Executes user data scripts in `runcmd`, triggers configuration managers, and sends phone-home webhooks. |
 
 ---
 

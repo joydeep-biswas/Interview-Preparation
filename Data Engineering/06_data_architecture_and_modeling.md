@@ -7,7 +7,7 @@ A comprehensive, production-grade guide to enterprise data architectures (Data L
 ## Architectural Overview: Enterprise Data Architecture & Medallion Lakehouse Modeling
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph IngestionRaw ["Bronze Layer (Raw Ingestion)"]
         Raw["Raw Event Stream & CDC Data<br/>(Immutable, append-only, original format preserved)"]
     end
@@ -284,7 +284,7 @@ Kappa Architecture simplifies the data pipeline by **eliminating the batch layer
 ```mermaid
 flowchart LR
     EventStream["Incoming Events"] --> LogStorage[("Kafka / Distributed Immutable Event Log")]
-    LogStorage -->|Stream Processing Pipeline (Single Codebase)| Processor["Stream Processor (Flink / Spark Streaming)"]
+    LogStorage -->|"Stream Processing Pipeline (Single Codebase)"| Processor["Stream Processor (Flink / Spark Streaming)"]
     Processor --> ServingView[("Serving Data Store / Lakehouse (Elasticsearch / ClickHouse / Delta)")]
     ServingView --> Analytics[Real-Time & Historical Dashboards]
 
@@ -431,19 +431,22 @@ flowchart TD
 Data Fabric is an architectural approach that leverages **active metadata, automated machine learning, and knowledge graphs** to dynamically connect, integrate, and govern disparate data assets across multi-cloud, on-premises, and edge environments without requiring all data to be physically relocated into a single storage repository.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph DataSources ["Disparate Heterogeneous Sources"]
+        direction LR
         S1[(AWS S3 Data Lake)]
         S2[(Azure Synapse EDW)]
         S3[(On-Prem Oracle ERP)]
     end
 
     subgraph ActiveMetadataEngine ["Data Fabric Engine (Active Metadata & Knowledge Graphs)"]
+        direction LR
         KG["Knowledge Graph / Metadata Discovery Engine"]
         AutoPipe["Automated Schema Mapping & Quality Scoring"]
     end
 
     subgraph UnifiedAccess ["Unified Semantic Consumption Layer"]
+        direction LR
         API["Virtual Data API / GraphQL / Presto"]
         Consumer[Data Analysts & AI Applications]
     end
@@ -522,7 +525,7 @@ Data modeling progresses through three distinct levels of abstraction:
 3. **Physical Data Model:** Concrete database-specific implementation detailing exact data types (`BIGINT`, `VARCHAR(100)`), partitioning strategies, clustering keys, index definitions, and storage formats.
 
 ```mermaid
-flowchart TD
+flowchart LR
     Conceptual["1. Conceptual Model<br/>(Business Entities & High-Level Relationships)"]
     Logical["2. Logical Model<br/>(Attributes, Keys, Relationships, Normalized Entities)"]
     Physical["3. Physical Model<br/>(Data Types, Primary Keys, Indexes, Partitioning, Storage Formats)"]
@@ -574,6 +577,7 @@ Developed by Ralph Kimball, Dimensional Modeling optimizes data structures for r
 A Star Schema is a dimensional design where a central **Fact Table** is surrounded by and directly connected to one or more denormalized **Dimension Tables**. The topology resembles a star.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'attributeBackgroundColorOdd': '#1e293b', 'attributeBackgroundColorEven': '#0f172a', 'entityBackgroundColor': '#1e293b', 'entityBorderColor': '#3b82f6', 'entityTextColor': '#ffffff' }}}%%
 erDiagram
     FACT_SALES }o--|| DIM_DATE : "references date_key"
     FACT_SALES }o--|| DIM_CUSTOMER : "references customer_key"
@@ -634,6 +638,7 @@ erDiagram
 A Snowflake Schema is a variation of the Star Schema where **dimension tables are normalized** into multiple related sub-tables. The diagram branches out like a snowflake.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'attributeBackgroundColorOdd': '#1e293b', 'attributeBackgroundColorEven': '#0f172a', 'entityBackgroundColor': '#1e293b', 'entityBorderColor': '#3b82f6', 'entityTextColor': '#ffffff' }}}%%
 erDiagram
     FACT_SALES }o--|| DIM_PRODUCT : "references product_key"
     DIM_PRODUCT }o--|| DIM_SUBCATEGORY : "references subcategory_key"
@@ -698,18 +703,26 @@ Fact tables record the numerical metrics resulting from a business process. Kimb
 ```mermaid
 flowchart TD
     subgraph FactTypes ["Fact Table Taxonomy"]
-        T["Transaction Fact<br/>(One row per discrete atomic event: Swipes, Clicks)"]
-        PS["Periodic Snapshot Fact<br/>(State of system at regular intervals: Daily Bank Balance)"]
-        AS["Accumulating Snapshot Fact<br/>(Workflow milestones updated over time: Order Fulfillment)"]
-        FL["Factless Fact<br/>(Only foreign keys; captures events/coverage: Student Attendance)"]
+        subgraph Row1 ["Event-Driven Facts"]
+            direction LR
+            T["Transaction Fact<br/>Atomic events: Swipes, Clicks"]
+            PS["Periodic Snapshot Fact<br/>Regular intervals: Daily Balance"]
+        end
+        subgraph Row2 ["Stateful & Associative Facts"]
+            direction LR
+            AS["Accumulating Snapshot Fact<br/>Milestones: Order Fulfillment"]
+            FL["Factless Fact<br/>Foreign keys only: Attendance"]
+        end
     end
 
     style FactTypes fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Row1 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Row2 fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
-    style T fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style PS fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style AS fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style FL fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style T fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style PS fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style AS fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style FL fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### References
@@ -741,22 +754,30 @@ Dimension tables provide the descriptive textual context for fact measurements.
 - **Definition:** A secondary dimension table referenced by another dimension table (rather than directly by the fact table) to avoid bloating the primary dimension table with high-cardinality or specialized attributes.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph DimensionTaxonomy ["Dimension Tables Taxonomy"]
-        CD["Conformed Dimension<br/>Shared across multiple facts (dim_date)"]
-        RPD["Role-Playing Dimension<br/>One table playing multiple roles via SQL aliases"]
-        JD["Junk Dimension<br/>Combines random flags & indicators into one table"]
-        DD["Degenerate Dimension<br/>Dimension key kept in fact table (Invoice #)"]
-        OD["Outrigger Dimension<br/>Dimension hanging off another dimension"]
+        subgraph Row1 ["Shared & Composite Dimensions"]
+            direction LR
+            CD["Conformed Dimension<br/>Shared across facts (dim_date)"]
+            RPD["Role-Playing Dimension<br/>Multiple roles via SQL aliases"]
+            JD["Junk Dimension<br/>Combines miscellaneous flags"]
+        end
+        subgraph Row2 ["Embedded & Linked Dimensions"]
+            direction LR
+            DD["Degenerate Dimension<br/>Stored directly in fact (Invoice #)"]
+            OD["Outrigger Dimension<br/>Secondary linked dimension"]
+        end
     end
 
     style DimensionTaxonomy fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style Row1 fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style Row2 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
 
-    style CD fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style RPD fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style JD fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style DD fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style OD fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style CD fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style RPD fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style JD fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style DD fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style OD fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
 ```
 
 #### References
@@ -783,7 +804,7 @@ Attributes in dimension tables change over time (e.g., a customer moves to a new
 - **Use Case:** Customer moving cities, employee territory realignment. Full historical auditability.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph SCD2_Flow ["SCD Type 2 Lifecycle"]
         OldRow["Row 1: [Key: 101, CustomerID: C1, City: Chicago, Start: 2022-01-01, End: 2024-05-01, Current: FALSE]"]
         NewRow["Row 2: [Key: 205, CustomerID: C1, City: New York, Start: 2024-05-01, End: 9999-12-31, Current: TRUE]"]
@@ -841,6 +862,7 @@ JOIN core.dim_customer_scd2 c
 Data Vault 2.0 is an agile, audit-centric modeling methodology engineered specifically for enterprise data integration at massive scale. It isolates business keys, relationships, and descriptive context into three distinct structural components using deterministic cryptographic hash keys (MD5 or SHA-256).
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'attributeBackgroundColorOdd': '#1e293b', 'attributeBackgroundColorEven': '#0f172a', 'entityBackgroundColor': '#1e293b', 'entityBorderColor': '#3b82f6', 'entityTextColor': '#ffffff' }}}%%
 erDiagram
     HUB_CUSTOMER ||--o{ LINK_ORDER_CUSTOMER : "relates"
     HUB_ORDER ||--o{ LINK_ORDER_CUSTOMER : "relates"
@@ -924,6 +946,7 @@ A **Semantic Layer** (e.g., dbt Semantic Layer / MetricFlow, Cube, Looker LookML
 ```mermaid
 flowchart TD
     subgraph StorageLayer ["Data Warehouse & Lakehouse Gold Tables"]
+        direction TD
         FOrders[("gold.fact_orders")]
         DCustomers[("gold.dim_customers")]
         DProducts[("gold.dim_products")]
@@ -1040,19 +1063,36 @@ Data Governance provides the policies, frameworks, and tools to ensure that data
 Data Lineage is the end-to-end lifecycle map that traces the origin, transformation path, and destination of data from source operational databases through ETL stages to downstream BI dashboards and ML feature stores.
 
 ```mermaid
-flowchart LR
-    SourceDB[(PostgreSQL Raw)] -->|Airbyte Extract| S3Raw[(S3 Raw Bronze)]
-    S3Raw -->|Spark Cleanse| DeltaSilver[(Delta Silver Table)]
-    DeltaSilver -->|dbt Aggregate| GoldMart[(Snowflake Gold Mart)]
-    GoldMart --> Tableau[Executive KPI Dashboard]
-    GoldMart --> MLModel[Customer Churn Classifier]
+flowchart TD
+    subgraph Stage1 ["Stage 1: Raw Ingestion & Bronze Storage"]
+        direction LR
+        SourceDB[("Operational PostgreSQL<br/>(Transactional Source)")] -->|"Airbyte CDC / Extract"| S3Raw[("S3 Bronze Bucket<br/>(Immutable Raw Parquet)")]
+    end
+
+    subgraph Stage2 ["Stage 2: Cleansing & Curated Silver Lakehouse"]
+        direction LR
+        DeltaSilver[("Delta Silver Table<br/>(Cleaned, Deduplicated & Typed)")]
+    end
+
+    subgraph Stage3 ["Stage 3: Gold Aggregation & Downstream Consumption"]
+        direction LR
+        GoldMart[("Snowflake Gold Mart<br/>(Aggregated Dimensional Model)")] --> Tableau["Executive KPI Dashboard<br/>(BI Reporting Layer)"]
+        GoldMart --> MLModel["Customer Churn Classifier<br/>(Production ML Feature Store)"]
+    end
+
+    S3Raw -->|"Spark Distributed Cleanse"| DeltaSilver
+    DeltaSilver -->|"dbt Incremental Aggregate"| GoldMart
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Stage3 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
 
     style SourceDB fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style S3Raw fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style DeltaSilver fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style GoldMart fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Tableau fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style MLModel fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DeltaSilver fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style GoldMart fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Tableau fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style MLModel fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
 #### Importance in Data Engineering

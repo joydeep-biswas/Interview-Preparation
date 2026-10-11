@@ -91,9 +91,11 @@ Foundational join mechanics (covered in [01. SQL Fundamentals](01_sql_fundamenta
 ```mermaid
 flowchart LR
     subgraph SemiJoin ["LEFT SEMI JOIN"]
+        direction LR
         L1["Left: Customer 101"] --- R1["Right: Order A (101)<br/>Right: Order B (101)"] ==> SJ["Customer 101 (Appears EXACTLY ONCE)"]
     end
     subgraph AntiJoin ["LEFT ANTI JOIN"]
+        direction LR
         L2["Left: Customer 102"] --- R2["Right: No Matching Orders"] ==> AJ["Customer 102 (Retained)"]
     end
 
@@ -194,8 +196,9 @@ INNER JOIN security.user_logins AS u2
 In distributed engines (Apache Spark, Databricks, Snowflake, BigQuery, AWS Athena), large-scale joins fall into three major execution physical operators:
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph BroadcastStrategy ["1. Broadcast Hash Join (Map-Side)"]
+        direction LR
         BDim[("Small Dimension Table<br/>(< 10MB - 100MB)")] -.->|Broadcast Full Copy to All Nodes| N1["Worker 1 (In-Memory Join)"]
         BDim -.->|Broadcast Full Copy to All Nodes| N2["Worker 2 (In-Memory Join)"]
         F1["Fact Partition 1"] --> N1

@@ -104,13 +104,15 @@ flowchart TD
 - **ABAC (Attribute-Based Access Control):** Permissions are evaluated dynamically at runtime based on **Attributes** of the user (department, clearance), resource (data classification `PII`), action (`SELECT`), and environment context (IP address, time of day, geographic location).
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph RBAC_Model ["1. RBAC: Role-Based Access Control"]
+        direction LR
         User1[User: User 1] --> Role[Role: Data_Scientist]
         Role --> Perm1[Read table: raw_features]
     end
 
     subgraph ABAC_Model ["2. ABAC: Attribute-Based Access Control (Dynamic Context)"]
+        direction LR
         User2[User: User 2]
         Policy{"Policy Engine Evaluates Context:<br/>User.Dept == 'Marketing'<br/>Resource.Classification == 'Internal'<br/>Env.Location == 'Corporate VPN'<br/>Time.Hour BETWEEN 9 AND 17"}
         User2 --> Policy
@@ -272,7 +274,7 @@ Under GDPR Article 17, customers have the legal right to request the permanent d
 3. Run `VACUUM` with the retention period expired to permanently purge the physical underlying Parquet files from cloud storage.
 
 ```mermaid
-flowchart TD
+flowchart LR
     Req["GDPR Deletion Request: Customer 101"] --> Del["1. DELETE FROM delta_table WHERE customer_id = 101"]
     Del --> State["2. Delta Log writes 'remove' commit (Row hidden from queries)"]
     State --> Vacuum["3. VACUUM delta_table RETAIN 0 HOURS (Purges physical Parquet from S3)"]
@@ -354,7 +356,7 @@ SET MASKING POLICY security.email_mask;
 A Data Clean Room is a secure, privacy-preserving computational environment that allows two or more distinct organizations (e.g., a Retailer and an Advertiser) to collaborate and analyze joint datasets **without either party sharing or exposing their raw underlying customer data**.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph OrgA ["Organization A (Retailer)"]
         DataA[(Customer Purchases: Emails & Spend)]
     end
@@ -393,13 +395,13 @@ flowchart TD
 # 5. The 5 Pillars of Data Observability
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph FivePillars ["The 5 Pillars of Data Observability"]
         P1["1. Freshness<br/>(Is data up to date?)"]
         P2["2. Volume<br/>(Are expected rows present?)"]
-        P3["3. Quality<br/>(Do values match business rules?)"]
-        P4["4. Schema<br/>(Has table structure drifted?)"]
-        P5["5. Lineage<br/>(What is upstream/downstream impact?)"]
+        P3["3. Quality<br/>(Do values match rules?)"]
+        P4["4. Schema<br/>(Has structure drifted?)"]
+        P5["5. Lineage<br/>(Upstream/downstream impact?)"]
     end
 
     style FivePillars fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
@@ -523,29 +525,38 @@ $$Z = \frac{x - \mu}{\sigma} \quad (\text{Flag if } |Z| > 3.0)$$
 A Circuit Breaker halts downstream DAG tasks whenever staging data fails volume or quality assertions, preventing corrupted records from polluting production Gold marts.
 
 ```mermaid
-flowchart TD
-    subgraph OperationalState ["Normal Execution Flow"]
-        ClosedState["CLOSED State (Healthy)<br/>(Pipeline executes normally, assertions passing)"]
-    end
+stateDiagram-v2
+    classDef operational fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef tripped fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef trial fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
 
-    subgraph ProtectionState ["Fault Isolation & Alerting"]
-        TrippedState["TRIPPED State<br/>(Quality / Volume anomaly detected in staging batch)"]
-        OpenState["OPEN State (Circuit Breaker Active)<br/>(Downstream DAG tasks blocked, alert dispatched to on-call)"]
-        HalfOpenState["RESET / HALF-OPEN State<br/>(Remediation verified, dry-run batch validated)"]
-    end
+    [*] --> CLOSED
+    
+    CLOSED --> TRIPPED: Quality/volume anomaly detected (e.g. nulls > threshold, row drop > 30%)
+    note right of CLOSED
+        Healthy execution state.
+        Pipeline flows normally.
+        Data quality assertions passing.
+    end note
 
-    ClosedState -->|"Assertion failure (nulls > threshold, row drop > 30%)"| TrippedState
-    TrippedState -->|"Automated DAG halt & pager trigger"| OpenState
-    OpenState -->|"Data engineer investigates, fixes bad source data"| HalfOpenState
-    HalfOpenState -->|"Validation tests pass"| ClosedState
+    TRIPPED --> OPEN: Automated DAG halt & PagerDuty alert triggered
+    note right of OPEN
+        Protection active.
+        Downstream Gold tasks blocked.
+        Polluted data quarantined.
+    end note
 
-    style OperationalState fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style ProtectionState fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    OPEN --> HALF_OPEN: Bad source data fixed / dry-run test initiated
+    HALF_OPEN --> CLOSED: Validation tests pass on trial run
+    HALF_OPEN --> OPEN: Validation fails on trial run
+    note right of HALF_OPEN
+        Reset trial state.
+        Single batch dry-run evaluated.
+    end note
 
-    style ClosedState fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style TrippedState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style OpenState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style HalfOpenState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    class CLOSED operational
+    class TRIPPED,OPEN tripped
+    class HALF_OPEN trial
 ```
 
 ```sql
@@ -590,8 +601,8 @@ SELECT
     last_altered,
     DATEDIFF('hour', last_altered, CURRENT_TIMESTAMP()) AS hours_since_last_refresh
 FROM snowflake.account_usage.tables
-WHERE deleted IS NULL                                         -- Exclude dropped tables
-  AND table_schema = 'GOLD_MARTS'                             -- Target presentation layer
+WHERE deleted IS NULL                                          -- Exclude dropped tables
+  AND table_schema = 'GOLD_MARTS'                              -- Target presentation layer
   AND last_altered < DATEADD('hour', -24, CURRENT_TIMESTAMP()) -- Flag tables older than 24h SLA
 ORDER BY hours_since_last_refresh DESC;
 ```
@@ -609,19 +620,26 @@ ORDER BY hours_since_last_refresh DESC;
 ### 8.4 Root Cause Analysis (RCA) Workflows
 
 ```mermaid
-flowchart TD
-    Incident["Alert: Gold Mart 'fct_revenue' Dropped by 40%"] --> Lineage["1. Inspect Lineage: Trace upstream to 'stg_stripe_payments'"]
-    Lineage --> Logs["2. Inspect Ingestion Logs: Check connector sync status"]
-    Logs --> Discovery["3. Root Cause Found: Stripe API Key Expired at 01:00 AM!"]
-    Discovery --> Fix["4. Remediation: Rotate API Token & Backfill Staging Data"]
-    Fix --> Resolve["5. Post-Mortem Documentation & Close Ticket"]
+flowchart LR
+    subgraph Stage1 ["Stage 1: Triage & Root Cause Discovery"]
+        direction LR
+        Incident["Alert Triggered<br/>(fct_revenue dropped by 40%)"] --> Lineage["1. Inspect Lineage & Logs<br/>(Trace upstream to stg_stripe)"] --> Discovery["2. Root Cause Identified<br/>(API Key expired at 01:00 AM)"]
+    end
 
+    subgraph Stage2 ["Stage 2: Remediation & Resolution"]
+        direction LR
+        Fix["3. Remediation & Backfill<br/>(Rotate secret in Key Vault & re-trigger sync)"] --> Resolve["4. Post-Mortem & Closure<br/>(Publish incident report & resolve ticket)"]
+    end
+
+    Discovery --> Fix
+
+    style Stage1 fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Incident fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
     style Lineage fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Logs fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Discovery fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Fix fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Resolve fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Discovery fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Fix fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Resolve fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---

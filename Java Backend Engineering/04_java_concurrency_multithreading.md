@@ -126,45 +126,39 @@ flowchart TD
 
 #### Visual State Diagram
 ```mermaid
-flowchart TD
-    subgraph InactiveInit ["Thread Creation"]
-        NewState["NEW<br/>(Thread instantiated: new Thread(), start() not called)"]
-    end
+stateDiagram-v2
+    classDef transient fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    classDef running fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef blocked fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef waiting fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    classDef terminated fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
 
-    subgraph ActiveExecution ["Active Execution & Scheduling"]
-        RunnableState["RUNNABLE<br/>(Executing on OS CPU core or in OS ready runqueue)"]
-    end
+    [*] --> NEW: new Thread()
+    NEW --> RUNNABLE: thread.start()
+    
+    state RUNNABLE {
+        [*] --> Ready: In OS ready queue
+        Ready --> Running: CPU time slice scheduled
+        Running --> Ready: Thread.yield() / Preempted
+    }
 
-    subgraph SynchronizationWait ["Synchronization & Resource Blocking"]
-        BlockedState["BLOCKED<br/>(Waiting to acquire intrinsic monitor lock for synchronized block)"]
-        WaitingState["WAITING<br/>(Indefinite wait: wait(), join(), LockSupport.park())"]
-        TimedWaitingState["TIMED_WAITING<br/>(Timed sleep/wait: sleep(ms), wait(timeout), parkNanos())"]
-    end
+    RUNNABLE --> BLOCKED: Enters synchronized block (monitor lock held)
+    BLOCKED --> RUNNABLE: Intrinsic monitor lock acquired
 
-    subgraph LifecycleEnd ["Termination"]
-        TerminatedState["TERMINATED<br/>(run() returned cleanly or uncaught exception thrown)"]
-    end
+    RUNNABLE --> WAITING: Object.wait() / Thread.join() / LockSupport.park()
+    WAITING --> RUNNABLE: notify() / notifyAll() / LockSupport.unpark()
 
-    NewState -->|"thread.start()"| RunnableState
-    RunnableState -->|"Enters synchronized block, lock held by other thread"| BlockedState
-    BlockedState -->|"Monitor lock acquired"| RunnableState
-    RunnableState -->|"Object.wait(), Thread.join(), LockSupport.park()"| WaitingState
-    WaitingState -->|"notify(), notifyAll(), LockSupport.unpark()"| RunnableState
-    RunnableState -->|"Thread.sleep(ms), Object.wait(timeout), LockSupport.parkNanos()"| TimedWaitingState
-    TimedWaitingState -->|"Timeout expires, notify(), unpark()"| RunnableState
-    RunnableState -->|"run() finishes or unhandled exception"| TerminatedState
+    RUNNABLE --> TIMED_WAITING: Thread.sleep(ms) / wait(timeout) / parkNanos()
+    TIMED_WAITING --> RUNNABLE: Timeout expires / notify() / unpark()
 
-    style InactiveInit fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style ActiveExecution fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style SynchronizationWait fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style LifecycleEnd fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    RUNNABLE --> TERMINATED: run() exits cleanly or unhandled exception
+    TERMINATED --> [*]
 
-    style NewState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style RunnableState fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style BlockedState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style WaitingState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style TimedWaitingState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style TerminatedState fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    class NEW transient
+    class RUNNABLE running
+    class BLOCKED blocked
+    class WAITING,TIMED_WAITING waiting
+    class TERMINATED terminated
 ```
 
 #### The Six Java Thread States (`Thread.State`)
@@ -311,6 +305,7 @@ A race condition occurs when multiple threads concurrently read and write shared
 
 #### Visual Interleaving
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant T1 as Thread 1
     participant Mem as Shared Variable: count = 0
@@ -843,6 +838,7 @@ The Executor Framework decouples task submission from thread management and allo
 ```mermaid
 flowchart TD
     subgraph Submission["Task Submission"]
+        direction TD
         T1["Task 1"]
         T2["Task 2"]
         T3["Task 3"]

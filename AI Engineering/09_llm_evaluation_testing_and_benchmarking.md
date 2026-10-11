@@ -397,10 +397,10 @@ jobs:
 
 | Metric / Evaluation Framework | Latency | Cost | Automation Level | Production Role |
 | :--- | :--- | :--- | :--- | :--- |
-| **Recall@k / MRR** | $<1\text{ms}$ | $0.00$ | 100% Automated | Retrieval engine validation & indexing optimization. |
+| **Recall@k / MRR** | $<1\text{ms}$ | \$0.00 | 100% Automated | Retrieval engine validation & indexing optimization. |
 | **Ragas Faithfulness** | $\sim 1\text{--}2\text{s}$ | 1 LLM call | 100% Automated | Hallucination detection in continuous CI/CD pipelines. |
 | **LLM Pairwise Judge** | $\sim 2\text{--}4\text{s}$ | 2 LLM calls | 100% Automated | Prompt version upgrades and model migration sign-off. |
-| **Human Expert Audit** | Days | $\$5\text{--}\$25$ / sample | Manual | Ground-truth curation and judge calibration (monthly). |
+| **Human Expert Audit** | Days | \$5 – \$25 / sample | Manual | Ground-truth curation and judge calibration (monthly). |
 
 ---
 

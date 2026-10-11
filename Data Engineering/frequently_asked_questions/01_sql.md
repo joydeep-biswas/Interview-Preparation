@@ -75,22 +75,38 @@ While SQL queries are written starting with `SELECT`, the database management sy
 #### Visual Flow
 ```mermaid
 flowchart TD
-    subgraph ExecutionOrder ["Logical SQL Query Execution Pipeline"]
-        S1["1. FROM & JOINs<br/>Assemble tables, evaluate Cartesian products, apply ON predicates"] --> S2["2. WHERE<br/>Filter individual source rows prior to aggregation"]
-        S2 --> S3["3. GROUP BY<br/>Bucket rows into discrete groups based on grouping keys"]
-        S3 --> S4["4. HAVING<br/>Filter aggregated group rows based on summary predicates"]
-        S4 --> S5["5. SELECT<br/>Evaluate expressions, assign column aliases, apply scalar logic"]
-        S5 --> S6["6. DISTINCT<br/>Remove duplicate rows across projected columns"]
-        S6 --> S7["7. UNION / INTERSECT / EXCEPT<br/>Combine rowsets from distinct subqueries"]
-        S7 --> S8["8. ORDER BY<br/>Sort final result set (aliases become accessible here)"]
-        S8 --> S9["9. LIMIT / OFFSET / FETCH<br/>Restrict the output cardinality for the client"]
+    subgraph Stage1 ["Stage 1: Source & Ingestion Filtering"]
+        direction LR
+        S1["1. FROM & JOINs<br/>Identify source tables, Cartesian combinations & ON filters"] --> S2["2. WHERE<br/>Filter raw rows prior to grouping (prune scan volume)"]
     end
 
-    style ExecutionOrder fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    subgraph Stage2 ["Stage 2: Grouping & Aggregation"]
+        direction LR
+        S3["3. GROUP BY<br/>Bucket rows into discrete aggregate groups"] --> S4["4. HAVING<br/>Filter aggregated group metrics (post-grouping prune)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Projection & Sets"]
+        direction LR
+        S5["5. SELECT<br/>Evaluate expressions, scalar math & aliases"] --> S6["6. DISTINCT<br/>Hash/sort deduplication across projected columns"] --> S7["7. UNION / INTERSECT / EXCEPT<br/>Combine rowsets from distinct subqueries"]
+    end
+
+    subgraph Stage4 ["Stage 4: Ordering & Limiting"]
+        direction LR
+        S8["8. ORDER BY<br/>Sort final unified result set (aliases accessible)"] --> S9["9. LIMIT / OFFSET / FETCH<br/>Restrict output cardinality for client"]
+    end
+
+    S2 --> S3
+    S4 --> S5
+    S7 --> S8
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Stage4 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
     style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style S2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S4 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style S3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style S4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style S5 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style S6 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style S7 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
@@ -330,12 +346,12 @@ WHERE id IN (
 - `RANK()`: Assigns identical rank for ties, but **skips subsequent ranks** (1, 2, 2, 4...).
 - `DENSE_RANK()`: Assigns identical rank for ties **without skipping subsequent ranks** (1, 2, 2, 3...). **Crucial for N-th highest salary calculations.**
 
-```
-Values:     [100,  90,  90,  80]
-ROW_NUMBER:   1     2    3    4
-RANK:         1     2    2    4
-DENSE_RANK:   1     2    2    3   <-- 2nd distinct highest is 90, 3rd is 80!
-```
+| Salary Value | `ROW_NUMBER()` | `RANK()` | `DENSE_RANK()` | Operational Ranking Behavior |
+| :---: | :---: | :---: | :---: | :--- |
+| **\$100** | 1 | 1 | 1 | Highest salary (1st rank) |
+| **\$90** | 2 | 2 | 2 | Tied salary (shares 2nd rank) |
+| **\$90** | 3 | 2 | 2 | Tied salary (shares 2nd rank; `RANK` records tie) |
+| **\$80** | 4 | 4 | 3 | Next distinct salary (`RANK` skips 3 to 4; `DENSE_RANK` smoothly continues to 3) |
 
 ---
 

@@ -113,6 +113,7 @@ flowchart TD
 ### 1.2 End-to-End HTTP Request Lifecycle Sequence
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor Client as Client Browser / App
@@ -231,6 +232,7 @@ Content-Type: application/json-patch+json
 When a browser makes a cross-origin HTTP request (`https://frontend.com` calling `https://api.backend.com`) involving custom headers (`Authorization`, `Idempotency-Key`) or methods other than simple `GET`/`POST`, the browser **automatically pauses** and issues an `OPTIONS` **Preflight Request**:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor Browser as Web Browser (https://app.com)
@@ -305,26 +307,41 @@ The **`Idempotency-Key` specification (IETF Draft)** resolves this:
 
 ```mermaid
 flowchart TD
-    ClientReq["Incoming POST /api/payments<br/>Header: Idempotency-Key: 'uuid-123'"] --> CheckRedis{"Check Redis for 'idempotency:uuid-123'"}
-    
-    CheckRedis -- "State: COMPLETED" --> CompareHash{"Compare Request SHA-256 Hash"}
-    CompareHash -- "Hash Matches" --> ReturnCached["Return Cached Original Response (200/201)<br/>Zero Business Logic Re-execution!"]
-    CompareHash -- "Hash Differs (Payload Tampered)" --> Return422["Return HTTP 422 Unprocessable Entity<br/>(Idempotency Key Reused with Different Payload!)"]
-    
-    CheckRedis -- "State: IN_FLIGHT" --> Return409["Return HTTP 409 Conflict<br/>(Concurrent Request in Progress. Retry with backoff.)"]
-    
-    CheckRedis -- "Key Absent (First Request)" --> AcquireLock["Acquire Redis Distributed Mutex Lock (TTL: 30s)<br/>Mark State: IN_FLIGHT"]
-    AcquireLock --> ExecuteLogic["Execute Business Logic & DB Transactions"]
-    ExecuteLogic --> SaveResponse["Save Response Status & Body to Redis<br/>Mark State: COMPLETED (TTL: 24 Hours)"]
-    SaveResponse --> ReleaseLock["Release Mutex Lock"]
-    ReleaseLock --> ReturnResponse["Return HTTP 201 Created to Client"]
+    subgraph Stage1 ["Stage 1: Ingress & Distributed Lock Evaluation"]
+        direction LR
+        ClientReq["Incoming POST Request<br/>Header: Idempotency-Key"] --> CheckRedis{"Lookup Redis Key<br/>'idempotency:uuid-123'"}
+    end
+
+    subgraph Stage2 ["Stage 2: Cache Validation & Concurrency Resolution"]
+        direction LR
+        CompareHash{"Compare Request<br/>SHA-256 Hash"}
+        CompareHash -- "Hash Matches" --> ReturnCached["Return Cached Response (200/201)<br/>(Zero Business Re-execution)"]
+        CompareHash -- "Payload Tampered" --> Return422["Return HTTP 422 Unprocessable<br/>(Reused Key with Different Body)"]
+        Return409["Return HTTP 409 Conflict<br/>(Request In-Flight. Retry with Backoff)"]
+    end
+
+    subgraph Stage3 ["Stage 3: First-Execution Pipeline & Cache Mutation"]
+        direction LR
+        AcquireLock["Acquire Redis Mutex<br/>(TTL: 30s, State: IN_FLIGHT)"] --> ExecuteLogic["Execute Business Logic<br/>& ACID DB Transactions"]
+        ExecuteLogic --> SaveResponse["Save Response to Redis<br/>(State: COMPLETED, TTL: 24h)"]
+        SaveResponse --> ReleaseLock["Release Mutex Lock"]
+        ReleaseLock --> ReturnResponse["Return HTTP 201 Created<br/>(Delivered to Client)"]
+    end
+
+    CheckRedis -- "State: COMPLETED" --> CompareHash
+    CheckRedis -- "State: IN_FLIGHT" --> Return409
+    CheckRedis -- "Key Absent (First Request)" --> AcquireLock
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
     style ClientReq fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
     style CheckRedis fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style CompareHash fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style ReturnCached fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
-    style Return422 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
-    style Return409 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Return422 fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style Return409 fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
     style AcquireLock fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style ExecuteLogic fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style SaveResponse fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
@@ -745,7 +762,7 @@ public class GlobalExceptionHandler {
 Enterprise architectures utilize distinct architectural styles for distributed client-to-service and service-to-service communication:
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph REST_Paradigm["Resource-Oriented: REST (HTTP/1.1 & JSON)"]
         R_Client["Client"] -->|GET /orders/123| R_Server["Server"]
         R_Client -->|POST /orders| R_Server
@@ -809,8 +826,9 @@ flowchart LR
 gRPC supports four distinct communication patterns:
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Mode1["1. Unary RPC (1-to-1)"]
+        direction LR
         C1["Client"] -->|Single Request| S1["Server"]
         S1 -->|Single Response| C1
     end
@@ -830,6 +848,7 @@ flowchart TD
     end
 
     subgraph Mode4["4. Bidirectional Streaming (Full-Duplex)"]
+        direction LR
         C4["Client"] <-->|Concurrent Asynchronous Stream| S4["Server"]
     end
 

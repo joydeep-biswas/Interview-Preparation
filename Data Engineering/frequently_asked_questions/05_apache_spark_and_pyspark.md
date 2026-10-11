@@ -63,10 +63,8 @@ A comprehensive, production-grade guide answering Apache Spark and PySpark archi
 ```mermaid
 flowchart TD
     subgraph DriverNode ["Driver Node (JVM Coordinator)"]
-        SparkContext["SparkContext / SparkSession"]
-        DAGSched["DAG Scheduler<br/>(Breaks Job into Stages at Shuffle Boundaries)"]
-        TaskSched["Task Scheduler<br/>(Launches Tasks via TaskSet)"]
-        SparkContext --> DAGSched --> TaskSched
+        direction LR
+        SparkContext["SparkContext / SparkSession"] --> DAGSched["DAG Scheduler<br/>(Stages at Shuffles)"] --> TaskSched["Task Scheduler<br/>(TaskSets)"]
     end
 
     subgraph ClusterMgr ["Cluster Manager (Kubernetes / YARN / Standalone)"]
@@ -75,22 +73,20 @@ flowchart TD
 
     subgraph Worker1 ["Worker Node 1"]
         subgraph Exec1 ["Executor 1 (JVM Container)"]
-            Slot1["Task Slot 1 (Core)"]
-            Slot2["Task Slot 2 (Core)"]
-            BlockMgr1["Block Manager (RAM / Cache)"]
+            direction LR
+            Slot1["Task Slot 1 (Core)"] --- Slot2["Task Slot 2 (Core)"] --- BlockMgr1["Block Manager (RAM)"]
         end
     end
 
     subgraph Worker2 ["Worker Node 2"]
         subgraph Exec2 ["Executor 2 (JVM Container)"]
-            Slot3["Task Slot 1 (Core)"]
-            Slot4["Task Slot 2 (Core)"]
-            BlockMgr2["Block Manager (RAM / Cache)"]
+            direction LR
+            Slot3["Task Slot 1 (Core)"] --- Slot4["Task Slot 2 (Core)"] --- BlockMgr2["Block Manager (RAM)"]
         end
     end
 
-    DriverNode <-->|Request & Allocate Containers| ClusterMgr
-    ClusterMgr -->|Launch Executors| Worker1 & Worker2
+    SparkContext <-->|Request & Allocate Containers| CM
+    CM -->|Launch Containers| BlockMgr1 & BlockMgr2
     TaskSched -->|Distribute Tasks| Slot1 & Slot2 & Slot3 & Slot4
 
     style DriverNode fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -162,10 +158,12 @@ An **RDD (Resilient Distributed Dataset)** is an immutable, distributed collecti
 ```mermaid
 flowchart TD
     subgraph groupByKey ["groupByKey: Massive Network Transfer (Anti-Pattern)"]
+        direction LR
         M1["Mapper: ('a', 1), ('a', 1), ('a', 1)"] --> S1["Shuffle ALL 3 records over Network"] --> R1["Reducer: ('a', [1, 1, 1])"]
     end
     
     subgraph reduceByKey ["reduceByKey: Local Pre-Aggregation (Combiner Optimized)"]
+        direction LR
         M2["Mapper: ('a', 1), ('a', 1), ('a', 1)"] --> C1["Map-Side Combiner: ('a', 3)"] --> S2["Shuffle ONLY 1 record over Network"] --> R2["Reducer: ('a', 3)"]
     end
 
@@ -311,12 +309,14 @@ When 199 tasks finish in 10 seconds but Task 200 runs for 45 minutes:
 #### Mitigation Technique 1: Key Salting (Q3)
 **Salting** breaks down a hot skewed key into $K$ uniform sub-keys by appending a random integer.
 ```mermaid
-flowchart TD
-    subgraph HotKeyProblem ["Before Salting: All rows hashed to Single Partition"]
+flowchart LR
+    subgraph HotKeyProblem ["Before Salting: Single Partition Bottleneck"]
+        direction TB
         R1["Row: Key='NULL'"] & R2["Row: Key='NULL'"] & R3["Row: Key='NULL'"] --> P3["Partition 3 (OOM Crash / Straggler Task)"]
     end
 
-    subgraph SaltingSolution ["After Salting: Split into Uniform K=3 Sub-Buckets"]
+    subgraph SaltingSolution ["After Salting: Split into K=3 Sub-Buckets"]
+        direction TB
         S1["Row: Key='NULL_0'"] --> P1["Partition 1"]
         S2["Row: Key='NULL_1'"] --> P2["Partition 2"]
         S3["Row: Key='NULL_2'"] --> P3_new["Partition 3"]
@@ -387,13 +387,15 @@ When AQE detects a partition larger than the threshold, it automatically splits 
 | **Production Use Case** | Before an expensive join or group-by to eliminate skew, or to scale up partition count. | Right before writing output to disk to reduce small files without triggering a shuffle! |
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Repartition ["repartition(2) from 4: Full Network Shuffle"]
+        direction TB
         P1["Part 1"] & P2["Part 2"] & P3["Part 3"] & P4["Part 4"] --> Shuff["Full Network Shuffle (Hash Partitioned)"]
         Shuff --> NP1["New Part 1"] & NP2["New Part 2"]
     end
 
-    subgraph Coalesce ["coalesce(2) from 4: Local Narrow Merge (Zero Shuffle)"]
+    subgraph Coalesce ["coalesce(2) from 4: Local Narrow Merge"]
+        direction TB
         CP1["Part 1"] & CP2["Part 2"] --> CNP1["New Part 1 (Merged Locally)"]
         CP3["Part 3"] & CP4["Part 4"] --> CNP2["New Part 2 (Merged Locally)"]
     end
@@ -525,23 +527,43 @@ When an intermediate DataFrame becomes massive and degrades downstream stages:
 
 #### Spark Unified Memory Architecture Breakdown (Q36)
 Inside each Executor JVM container (e.g., 32 GB RAM):
+```mermaid
+flowchart TD
+    subgraph Container["Total Executor Memory Container (e.g. 32 GB)"]
+        subgraph Heap["JVM On-Heap Memory (spark.executor.memory)"]
+            Reserved["Reserved Memory: 300 MB<br/>(Hardcoded engine safety buffer)"]
+            User["User Memory: ~40% of remaining heap<br/>(User data structures, UDF arrays, internal hashes)"]
+            subgraph SparkPool["Spark Memory Pool: ~60% (spark.memory.fraction = 0.6)"]
+                direction LR
+                Storage["Storage Memory (50%)<br/>• Cached DataFrames / RDDs<br/>• Broadcast variables"]
+                Execution["Execution Memory (50%)<br/>• Shuffles, Joins, Aggregations<br/>• Dynamically borrows from Storage"]
+            end
+        end
+        OffHeap["Off-Heap Memory (spark.memory.offHeap.size)<br/>Tungsten raw binary format, zero GC overhead"]
+        Overhead["Memory Overhead (spark.executor.memoryOverhead)<br/>max(384MB, 10% of executor memory) for OS & Python workers"]
+    end
+
+    classDef res fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fef2f2;
+    classDef usr fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#f8fafc;
+    classDef stor fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef exec fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef ext fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#f8fafc;
+
+    class Reserved res;
+    class User usr;
+    class Storage stor;
+    class Execution exec;
+    class OffHeap,Overhead ext;
 ```
-Total Executor RAM = spark.executor.memory (e.g., 32 GB)
-┌────────────────────────────────────────────────────────────────────────┐
-│ Reserved Memory: 300 MB (Hardcoded Spark internal engine safety)       │
-├────────────────────────────────────────────────────────────────────────┤
-│ User Memory: ~40% (User data structures, UDF arrays, internal hashes)  │
-├────────────────────────────────────────────────────────────────────────┤
-│ Spark Memory Pool: ~60% (Controlled by spark.memory.fraction = 0.6)    │
-│  ┌──────────────────────────────┬───────────────────────────────────┐  │
-│  │ Storage Memory (50%)         │ Execution Memory (50%)            │  │
-│  │ Cached DataFrames, Broadcast │ Shuffles, Joins, Aggregations     │  │
-│  │ Blocks                       │ (Can borrow from Storage!)        │  │
-│  └──────────────────────────────┴───────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
-+ Off-Heap Memory: spark.memory.offHeap.enabled (Direct OS memory / Tungsten)
-+ Overhead Memory: spark.executor.memoryOverhead (max(384MB, 10% of RAM))
-```
+
+| Memory Region | Allocation / Configuration Flag | Operational Purpose & Eviction Behavior |
+| :--- | :--- | :--- |
+| **Reserved Memory** | Hardcoded `300 MB` | Spark internal engine execution safety buffer. Unaffected by configs. |
+| **User Memory** | `(Heap - 300MB) * (1 - spark.memory.fraction)` (~40%) | User-defined data structures, custom Python/Java UDF arrays, metadata hashes. |
+| **Storage Memory** | `Spark Pool * spark.memory.storageFraction` (~50% of pool) | Cached DataFrames (`persist`), broadcast variables, unrolled block buffers. |
+| **Execution Memory** | `Spark Pool * (1 - storageFraction)` (~50% of pool) | Shuffle buffers, hash aggregation maps, join sorting. Can borrow from Storage memory dynamically. |
+| **Off-Heap Memory** | `spark.memory.offHeap.size` | Off-heap memory managed via Project Tungsten; avoids JVM GC pauses. |
+| **Overhead Memory** | `spark.executor.memoryOverhead` (`max(384MB, 10%)`) | Container OS overhead, native libraries, and PySpark daemon processes. |
 
 ---
 

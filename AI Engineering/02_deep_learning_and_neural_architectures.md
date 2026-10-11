@@ -117,14 +117,30 @@ $$\frac{\partial \mathcal{L}}{\partial \mathbf{b}} = \frac{\partial \mathcal{L}}
 
 $$\frac{\partial \mathcal{L}}{\partial \mathbf{x}} = \mathbf{W}^T \left( \frac{\partial \mathcal{L}}{\partial \mathbf{z}} \right)$$
 
-```text
-REVERSE-MODE AUTOGRAD MEMORY MECHANICS:
-Forward Pass:
-  Stores intermediate activations x and z in GPU VRAM (Activation Memory).
-Backward Pass:
-  Traverses the computational graph in reverse topological order.
-  Consumes stored activations to compute parameter gradients dL/dW and dL/db.
-  Frees activation memory dynamically or via activation checkpointing.
+```mermaid
+flowchart LR
+    subgraph Forward["Forward Pass (Topological Order)"]
+        direction LR
+        In["Inputs x"] --> Op["Forward Compute:<br/>z = Wx + b, a = σ(z)"]
+        Op --> ActMem[("GPU VRAM:<br/>Store Activations x, z")]
+    end
+
+    subgraph Backward["Backward Pass (Reverse Topological Order)"]
+        direction LR
+        GradIn["Incoming Loss Gradient ∂L/∂a"] --> GradOp["Compute Gradients:<br/>∂L/∂W, ∂L/∂b, ∂L/∂x"]
+        ActMem -.->|"Retrieve x, z"| GradOp
+        GradOp --> FreeMem["Free Activation Memory<br/>(or Activation Checkpointing)"]
+    end
+
+    Op --> GradIn
+
+    classDef fwd fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef bwd fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef mem fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+
+    class In,Op fwd;
+    class GradIn,GradOp,FreeMem bwd;
+    class ActMem mem;
 ```
 
 ---
@@ -210,18 +226,21 @@ $$\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{softmax}\left( \f
 ### 4.2 Multi-Head Attention (MHA) vs. Multi-Query (MQA) vs. Grouped-Query (GQA)
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph MHA ["Multi-Head Attention (MHA)"]
+        direction LR
         Q1["Q Heads: 32"] --- K1["K Heads: 32"] --- V1["V Heads: 32"]
         MHA_Desc["Highest Quality, Largest KV Cache Footprint"]
     end
 
     subgraph GQA ["Grouped-Query Attention (GQA - Llama 3)"]
+        direction LR
         Q2["Q Heads: 32"] --- K2["K Groups: 8"] --- V2["V Groups: 8"]
         GQA_Desc["Balanced Quality, 4x-8x Reduced KV Cache"]
     end
 
     subgraph MQA ["Multi-Query Attention (MQA)"]
+        direction LR
         Q3["Q Heads: 32"] --- K3["K Head: 1"] --- V3["V Head: 1"]
         MQA_Desc["Fastest Serving, Minimal Memory, Slight Quality Loss"]
     end
@@ -244,18 +263,11 @@ flowchart TD
 
 # 5. The Transformer Architecture: Encoders, Decoders & Hybrid Models
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| ARCHITECTURE FAMILY   | CANONICAL EXAMPLES          | OPTIMAL PRODUCTION DOMAINS    |
-+-----------------------+-----------------------------+-------------------------------+
-| Encoder-Only          | BERT, RoBERTa, DeBERTa, BGE | Semantic Search, Document     |
-| (Bidirectional)       | Embeddings, NER, Sentiment. | Embeddings, Classification.   |
-| Decoder-Only          | GPT-4, Llama 3, Mistral,    | Text Generation, Conversational|
-| (Causal Autoregressive)| Claude, DeepSeek-V3.       | AI, Code Synthesis, Agents.   |
-| Encoder-Decoder       | T5, BART, Whisper, ByT5.    | Translation, Summarization,   |
-| (Seq2Seq Cross-Attn)  |                             | Speech-to-Text Transcription. |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Architecture Family | Canonical Examples | Optimal Production Domains |
+| :--- | :--- | :--- |
+| **Encoder-Only**<br/>(Bidirectional) | BERT, RoBERTa, DeBERTa, BGE Embeddings | Semantic Search, Document Embeddings, NER, Text Classification. |
+| **Decoder-Only**<br/>(Causal Autoregressive) | GPT-4, Llama 3, Mistral, Claude, DeepSeek-V3 | Text Generation, Conversational AI, Code Synthesis, Autonomous Agents. |
+| **Encoder-Decoder**<br/>(Seq2Seq Cross-Attention) | T5, BART, Whisper, ByT5 | Machine Translation, Abstractive Summarization, Speech-to-Text Transcription. |
 
 ---
 
@@ -402,16 +414,12 @@ print(f"Training Step Completed. Batch Loss: {loss.item():.4f}")
 
 ### 7.1 Tensor Precision: FP32, FP16, BF16, FP8
 
-```text
-+-----------+-------+------------+-----------+----------------------------------------+
-| FORMAT    | BITS  | EXPONENT   | MANTISSA  | DYNAMIC RANGE & NUMERICAL STABILITY    |
-+-----------+-------+------------+-----------+----------------------------------------+
-| FP32      | 32    | 8 bits     | 23 bits   | Standard full precision. High memory.  |
-| FP16      | 16    | 5 bits     | 10 bits   | Fast on V100/A100; prone to underflow. |
-| BF16      | 16    | 8 bits     | 7 bits    | Matches FP32 dynamic range. Stable.    |
-| FP8 (E4M3)| 8     | 4 bits     | 3 bits    | Hopper H100 inference/training format. |
-+-----------+-------+------------+-----------+----------------------------------------+
-```
+| Format | Bits | Exponent | Mantissa | Dynamic Range & Numerical Stability |
+| :--- | :---: | :---: | :---: | :--- |
+| **FP32** | 32 | 8 bits | 23 bits | Standard full precision. High memory footprint. |
+| **FP16** | 16 | 5 bits | 10 bits | Fast on V100/A100; prone to numerical underflow. |
+| **BF16** | 16 | 8 bits | 7 bits | Matches FP32 dynamic range. Highly stable for training. |
+| **FP8 (E4M3)** | 8 | 4 bits | 3 bits | Hopper H100 inference/training format; 2x throughput boost. |
 
 > [!IMPORTANT]
 > **BF16 (Bfloat16)** is the default format for modern LLM pretraining (Llama 3, Mistral). By retaining 8 exponent bits identical to FP32, it eliminates loss scale instability and gradient underflow without requiring complex dynamic loss scaling.

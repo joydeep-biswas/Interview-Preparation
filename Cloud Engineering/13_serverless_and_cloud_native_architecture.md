@@ -58,17 +58,17 @@ flowchart TD
 ---
 
 ## Table of Contents
-1. [Serverless Compute Mechanics: Azure Functions vs. AWS Lambda](#1-serverless-compute-mechanics-azure-functions-vs-aws-lambda)
-   - [1.1 Execution Environments: Firecracker MicroVMs vs. WebJobs Host](#11-execution-environments-firecracker-microvms-vs-webjobs-host)
+1. [Serverless Compute Execution Mechanics (Azure Functions Primary & AWS Lambda Counterpart)](#1-serverless-compute-execution-mechanics-azure-functions-primary--aws-lambda-counterpart)
+   - [1.1 Execution Environments: WebJobs Host (Primary) & Firecracker MicroVM Counterpart](#11-execution-environments-webjobs-host-primary--firecracker-microvm-counterpart)
    - [1.2 Cold Start Physics, Init Phase, and Provisioned Concurrency](#12-cold-start-physics-init-phase-and-provisioned-concurrency)
    - [1.3 Input/Output Bindings vs. Direct Cloud SDK Clients](#13-inputoutput-bindings-vs-direct-cloud-sdk-clients)
-2. [Containerized Serverless: Azure Container Apps vs. ECS Fargate](#2-containerized-serverless-azure-container-apps-vs-ecs-fargate)
+2. [Containerized Serverless Application Platforms (Azure Container Apps Primary & ECS Fargate Counterpart)](#2-containerized-serverless-application-platforms-azure-container-apps-primary--ecs-fargate-counterpart)
    - [2.1 When to Choose Serverless Containers over FaaS](#21-when-to-choose-serverless-containers-over-faas)
    - [2.2 KEDA, Envoy, and Dapr Integration in ACA](#22-keda-envoy-and-dapr-integration-in-aca)
 3. [Event-Driven Architecture (EDA) & Reactive Routing](#3-event-driven-architecture-eda-reactive-routing)
    - [3.1 Event Choreography vs. Event Orchestration](#31-event-choreography-vs-event-orchestration)
    - [3.2 CloudEvents Specification and Schema Registry Validation](#32-cloudevents-specification-and-schema-registry-validation)
-4. [Distributed Workflow Orchestration: Durable Functions & Step Functions](#4-distributed-workflow-orchestration-durable-functions-step-functions)
+4. [Distributed Workflow Orchestration (Azure Durable Functions Primary & AWS Step Functions Counterpart)](#4-distributed-workflow-orchestration-azure-durable-functions-primary--aws-step-functions-counterpart)
    - [4.1 Durable Functions State Storage: Azure Storage Queues & Tables](#41-durable-functions-state-storage-azure-storage-queues-tables)
    - [4.2 AWS Step Functions: States Language, Task Tokens, and Parallel Branches](#42-aws-step-functions-states-language-task-tokens-and-parallel-branches)
 5. [The Saga Pattern: Managing Distributed Transactions](#5-the-saga-pattern-managing-distributed-transactions)
@@ -87,9 +87,9 @@ flowchart TD
 
 ---
 
-# 1. Serverless Compute Mechanics: Azure Functions vs. AWS Lambda
+# 1. Serverless Compute Execution Mechanics (Azure Functions Primary & AWS Lambda Counterpart)
 
-### 1.1 Execution Environments: Firecracker MicroVMs vs. WebJobs Host
+### 1.1 Execution Environments: WebJobs Host (Primary) & Firecracker MicroVM Counterpart
 
 The underlying virtualization engines differ fundamentally between cloud providers:
 - **AWS Lambda & Firecracker MicroVMs:** AWS spins up an isolated, lightweight KVM microVM using **Firecracker** in $<5$ms. Each microVM handles **exactly one concurrent request at a time**. If 100 concurrent requests arrive, AWS spins up 100 distinct microVMs.
@@ -101,10 +101,24 @@ The underlying virtualization engines differ fundamentally between cloud provide
 
 A **Cold Start** occurs when a serverless request arrives and no pre-warmed execution worker is available in the pool:
 
-```text
-COLD START LIFECYCLE (AWS Lambda / Azure Functions):
-[Allocate MicroVM / Container] ──> [Download App Zip Package] ──> [Boot Runtime (JVM/Node/Python)] ──> [Execute Init Code (DB Connections)] ──> [Invoke Handler]
-|<────────────────────────────── COLD START OVERHEAD (200ms - 3000ms) ──────────────────────────────────>|
+```mermaid
+flowchart LR
+    A["Allocate MicroVM / Container<br/>(100ms - 500ms)"] --> B["Download App Package<br/>(50ms - 300ms)"]
+    B --> C["Boot Runtime<br/>(JVM / Node / Python)"]
+    C --> D["Execute Init Code<br/>(DB Pools / Global State)"]
+    D --> E["Invoke Handler<br/>(Warm Execution)"]
+
+    subgraph Overhead["Cold Start Overhead (200ms – 3000ms)"]
+        A
+        B
+        C
+        D
+    end
+
+    classDef cold fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef warm fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    class A,B,C,D cold;
+    class E warm;
 ```
 
 - **Mitigation Techniques:**
@@ -139,7 +153,7 @@ def process_order(msg: func.QueueMessage, document: func.Out[func.Document]) -> 
 
 ---
 
-# 2. Containerized Serverless: Azure Container Apps vs. ECS Fargate
+# 2. Containerized Serverless Application Platforms (Azure Container Apps Primary & ECS Fargate Counterpart)
 
 ### 2.1 When to Choose Serverless Containers over FaaS
 
@@ -163,17 +177,37 @@ While Functions (FaaS) are ideal for simple event processing, **Serverless Conta
 
 ### 3.1 Event Choreography vs. Event Orchestration
 
-```text
-CHOREOGRAPHY (Decentralized, Reactive):
-[Order Service] ──(Emits OrderPlaced)──> [Event Bus] ──┬──> [Inventory Service] (Reserves Stock)
-                                                       └──> [Payment Service] (Charges Card)
-Trade-off: High decoupling; difficult to visualize distributed failure states or cross-service timeouts.
+```mermaid
+flowchart LR
+    subgraph Choreography["Event Choreography (Decentralized, Reactive)"]
+        direction LR
+        OS["Order Service"] -->|"Emits OrderPlaced"| EB["Event Bus"]
+        EB -->|"Subscribes"| Inv["Inventory Service<br/>(Reserves Stock)"]
+        EB -->|"Subscribes"| Pay["Payment Service<br/>(Charges Card)"]
+    end
 
-ORCHESTRATION (Centralized State Machine):
-[Saga State Machine] ──> 1. Call Payment ──(Success)──> 2. Call Inventory ──(Success)──> Complete
-                     └── 1. Call Payment ──(Failure)──> Abort & Notify User
-Trade-off: Explicit visibility and error recovery; introduces centralized coordinator dependency.
+    subgraph Orchestration["Event Orchestration (Centralized State Machine)"]
+        direction LR
+        Saga["Saga Coordinator"] -->|"1. Charge Card"| PaySvc["Payment Service"]
+        PaySvc -->|"Success"| Saga
+        Saga -->|"2. Reserve Stock"| InvSvc["Inventory Service"]
+        InvSvc -->|"Success"| Complete["Transaction Completed"]
+        PaySvc -.->|"Failure"| Rollback["Abort & Compensate"]
+    end
+
+    classDef comp fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef bus fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef ok fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef fail fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
+
+    class OS,Inv,Pay,Saga,PaySvc,InvSvc comp;
+    class EB bus;
+    class Complete ok;
+    class Rollback fail;
 ```
+
+> - **Choreography Trade-off:** High architectural decoupling; difficult to visualize distributed failure states or monitor cross-service timeouts.
+> - **Orchestration Trade-off:** Explicit visibility and robust end-to-end failure recovery; introduces a centralized coordinator dependency.
 
 ---
 
@@ -199,7 +233,7 @@ Enterprise events adhere to the CNCF **CloudEvents** specification to ensure int
 
 ---
 
-# 4. Distributed Workflow Orchestration: Durable Functions & Step Functions
+# 4. Distributed Workflow Orchestration (Azure Durable Functions Primary & AWS Step Functions Counterpart)
 
 ### 4.1 Durable Functions State Storage: Azure Storage Queues & Tables
 
@@ -325,22 +359,11 @@ flowchart TD
 
 ### 7.2 Total Cost of Ownership (TCO) Inflection Point Analysis
 
-```text
-COST ($)
-  ▲
-  │                                     / (Serverless Cost scales linearly with requests)
-  │                                    /
-  │                                   /
-  │                      Inflection  /
-  │                      Point      /
-  │                        ▼       /
-  │────────────────────────X────────────────────── (Fixed Cost: 3x Provisioned Kubernetes Nodes)
-  │                       /
-  │                      /
-  │                     /
-  └────────────────────/───────────────────────────► TOTAL REQUEST VOLUME / MONTH
-    (Low Volume: Serverless is $0-$5)
-```
+| Operating Regime | Request Volume | Serverless Cost (FaaS / Invocations) | Provisioned Baseline (e.g. 3x K8s Nodes) | Architectural Verdict |
+| :--- | :--- | :--- | :--- | :--- |
+| **Below Inflection Point** | Low / Variable / Burst-heavy ($< 1\text{M}$ req/mo) | **\$0 – \$15/mo** (Scales to absolute zero when idle) | **\$300 – \$450/mo** (Fixed baseline cost regardless of traffic) | **Serverless (FaaS / ACA)**: Avoids paying for idle VMs. |
+| **At Inflection Point** | Medium steady-state (~$5\text{M} - 10\text{M}$ req/mo) | **~\$350/mo** (Cost parity reached) | **~\$350/mo** (Even breakeven point) | **Hybrid / Transition**: Evaluate operational overhead vs compute. |
+| **Above Inflection Point** | High continuous throughput ($> 50\text{M}$ req/mo) | **\$1,500 – \$5,000+/mo** (Linear per-call cost explosion) | **\$350 – \$600/mo** (Reserved Instances / Savings Plans amortize load) | **Provisioned Cluster (AKS / EKS / VMs)**: Dedicated compute wins. |
 
 - **Below Inflection Point:** Serverless is vastly cheaper because you pay strictly for compute time used ($0 baseline idle cost).
 - **Above Inflection Point (High, Steady-State Throughput):** Serverless becomes significantly more expensive than running dedicated, right-sized virtual machines or reserved Kubernetes instances.

@@ -8,50 +8,51 @@ A comprehensive, production-grade guide to the Spring ecosystem, covering Spring
 
 ```mermaid
 flowchart TD
-    subgraph Spring_Boot_Bootstrap["1. Spring Boot Startup & Auto-Configuration"]
-        Main["@SpringBootApplication Main Method"] --> SpringApplication["SpringApplication.run()"]
-        SpringApplication --> Env["Prepare Environment (application.yml, Profiles, Env Vars)"]
-        Env --> ContextCreate["Create ApplicationContext (AnnotationConfigServletWebServerApplicationContext)"]
-        ContextCreate --> AutoConfig["Evaluate Auto-Configuration (META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports)"]
-        AutoConfig --> ConditionEval{"Evaluate @ConditionalOnClass / @ConditionalOnMissingBean"}
+    subgraph Stage1 ["1. Spring Boot Startup & Auto-Configuration"]
+        direction LR
+        Main["SpringApplication.run()<br/>(Bootstrap & main entry)"] --> Env["Environment Preparation<br/>(application.yml, profiles, env vars)"] --> Ctx["Create ApplicationContext<br/>(AnnotationConfigWebServerContext)"] --> AutoCfg["Auto-Configuration<br/>(imports & @ConditionalOnClass)"]
     end
 
-    subgraph Spring_IoC_Container["2. Spring IoC Container & Bean Lifecycle"]
-        ConditionEval --> BeanDefs["Register Bean Definitions"]
-        BeanDefs --> BFPP["BeanFactoryPostProcessors Execute (Modify Definitions)"]
-        BFPP --> Instantiate["Instantiate Beans (Constructors)"]
-        Instantiate --> Populate["Populate Properties (Dependency Injection)"]
-        Populate --> BPP_Before["BeanPostProcessors: postProcessBeforeInitialization()"]
-        BPP_Before --> Init["Initialization (@PostConstruct / afterPropertiesSet())"]
-        Init --> BPP_After["BeanPostProcessors: postProcessAfterInitialization() (Create AOP Dynamic Proxies)"]
+    subgraph Stage2 ["2. IoC Container: Definition & Instantiation"]
+        direction LR
+        Defs["Register Bean Definitions<br/>(Scanned @Component & @Bean)"] --> BFPP["BeanFactoryPostProcessors<br/>(Modify definitions before creation)"] --> Instantiate["Instantiate Beans<br/>(Constructor reflection)"]
     end
 
-    subgraph Runtime_Server["3. Embedded Web Server & Actuator"]
-        BPP_After --> Tomcat["Start Embedded Tomcat Server (Port 8080)"]
-        Tomcat --> Actuator["Expose Actuator Observability Endpoints (/actuator/health, /actuator/metrics)"]
-        Tomcat --> AppReady["Application Ready to Accept Traffic"]
+    subgraph Stage3 ["3. IoC Container: Injection, Lifecycle & AOP Proxying"]
+        direction LR
+        Populate["Populate Properties<br/>(Field / Setter @Autowired DI)"] --> Init["Bean Initialization<br/>(@PostConstruct & afterPropertiesSet)"] --> AOP["BPP Post-Process After<br/>(Wrap dynamic AOP CGLIB/JDK proxies)"]
     end
 
-    style Spring_Boot_Bootstrap fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Spring_IoC_Container fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-    style Runtime_Server fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    subgraph Stage4 ["4. Embedded Web Server & Actuator Observability"]
+        direction LR
+        Tomcat["Start Embedded Server<br/>(Tomcat / Jetty on port 8080)"] --> Actuator["Actuator Endpoints<br/>(/actuator/health, /actuator/metrics)"] --> Ready["Application Ready<br/>(Accept incoming HTTP traffic)"]
+    end
+
+    Stage1 --> Stage2
+    Stage2 --> Stage3
+    Stage3 --> Stage4
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style Stage4 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
     style Main fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style SpringApplication fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Env fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ContextCreate fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style AutoConfig fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ConditionEval fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style BeanDefs fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style BFPP fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Instantiate fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Ctx fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style AutoCfg fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+
+    style Defs fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style BFPP fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Instantiate fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+
     style Populate fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style BPP_Before fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style Init fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style BPP_After fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style AOP fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+
     style Tomcat fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style Actuator fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style AppReady fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Ready fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -109,10 +110,12 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Without_IoC["Traditional Flow (Tight Coupling)"]
+        direction LR
         Client1["OrderService"] -->|"calls new"| Dep1["PostgresOrderRepository"]
     end
     
     subgraph With_IoC["IoC Container Flow (Loose Coupling)"]
+        direction LR
         Container["Spring IoC Container<br/>(ApplicationContext)"]
         Container -->|"1. Instantiates"| Dep2["PostgresOrderRepository"]
         Container -->|"2. Injects into"| Client2["OrderService"]
@@ -236,22 +239,34 @@ public class NotificationManager {
 
 ```mermaid
 flowchart TD
-    Step1["1. Instantiation (Constructor Invocation)"] --> Step2["2. Populate Properties (Dependency Injection)"]
-    Step2 --> Step3["3. Aware Interfaces (BeanNameAware, ApplicationContextAware)"]
-    Step3 --> Step4["4. BeanPostProcessor: postProcessBeforeInitialization()"]
-    Step4 --> Step5["5. Initialization (@PostConstruct -> InitializingBean.afterPropertiesSet())"]
-    Step5 --> Step6["6. BeanPostProcessor: postProcessAfterInitialization() (AOP Dynamic Proxies Wrapped Here!)"]
-    Step6 --> Step7["7. Bean Ready for Use in Application"]
-    Step7 --> Step8["8. Context Shutdown (@PreDestroy -> DisposableBean.destroy())"]
+    subgraph Stage1 ["Stage 1: Instantiation & Dependency Injection"]
+        direction LR
+        Step1["1. Instantiation<br/>(Constructor invocation)"] --> Step2["2. Populate Properties<br/>(Dependency injection)"] --> Step3["3. Aware Interfaces<br/>(BeanNameAware, ApplicationContextAware)"]
+    end
 
+    subgraph Stage2 ["Stage 2: Initialization & Proxy Wrapping"]
+        direction LR
+        Step4["4. BPP BeforeInit<br/>(postProcessBeforeInitialization)"] --> Step5["5. Initialization<br/>(@PostConstruct -> afterPropertiesSet)"] --> Step6["6. BPP AfterInit<br/>(AOP proxy generation)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Ready & Context Teardown"]
+        direction LR
+        Step7["7. Ready in ApplicationContext<br/>(Serving business traffic)"] --> Step8["8. Context Destruction<br/>(@PreDestroy -> DisposableBean.destroy)"]
+    end
+
+    Stage1 --> Stage2 --> Stage3
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Step1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Step2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Step3 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Step2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Step3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Step4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Step5 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style Step6 fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style Step7 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Step8 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Step5 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Step6 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Step7 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Step8 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -455,6 +470,7 @@ Secrets stored in Azure Key Vault (e.g. `datasource-password`) are transparently
 When database passwords or TLS API tokens rotate, restarting dozens of microservice pods induces unnecessary downtime and cache invalidation. Spring Cloud's `@RefreshScope` enables zero-downtime hot reloading of configuration beans:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant SecOps as Security Operations / Key Vault
@@ -515,7 +531,7 @@ curl -X POST http://localhost:8080/actuator/refresh
 Spring AOP provides declarative separation of cross-cutting concerns (logging, transaction management, rate limiting, security, metrics) without cluttering business logic:
 
 ```mermaid
-flowchart TD
+flowchart LR
     Client["Client Caller"] --> Proxy["Spring AOP Proxy Object"]
     Proxy --> AroundBefore["@Around (Before logic) / @Before Advice"]
     AroundBefore --> Target["Target Service Instance (Business Logic)"]
@@ -595,7 +611,7 @@ Spring AOP is runtime proxy-based. Spring creates a surrogate proxy object that 
 The single most common bug in Spring enterprise applications is the **Self-Invocation Trap**: when a method within a bean calls another method on `this`, the call bypasses the Spring AOP Proxy entirely!
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph External_Call["External Client Call (Intercepted)"]
         Client1["External Controller"] -->|"Invokes placeOrder()"| ProxyObj["OrderService Proxy (CGLIB)"]
         ProxyObj -->|"Applies @Transactional"| TargetObj1["OrderService Instance: placeOrder()"]

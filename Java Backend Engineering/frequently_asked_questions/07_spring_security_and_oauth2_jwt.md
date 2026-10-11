@@ -7,31 +7,51 @@ A comprehensive guide answering all 20 questions on authentication vs authorizat
 ## Architectural Overview: Spring Security Internal Request Flow
 
 ```mermaid
-flowchart TD
-    Req["Incoming HTTP Request"] --> DelegatingProxy["DelegatingFilterProxy"]
-    DelegatingProxy --> FilterChainProxy["FilterChainProxy"]
-    FilterChainProxy --> SecChain["SecurityFilterChain"]
-
-    subgraph FilterChain["SecurityFilterChain Sequence"]
-        CorsFilter["CorsFilter"] --> CsrfFilter["CsrfFilter"]
-        CsrfFilter --> JwtFilter["Custom JwtAuthFilter"]
-        JwtFilter --> UserPassFilter["UsernamePasswordAuthenticationFilter"]
-        UserPassFilter --> FilterSecurity["AuthorizationFilter (Access Decision)"]
+flowchart LR
+    subgraph ServletBridge ["1. Servlet Ingress & Bridge"]
+        direction TB
+        Req["Incoming HTTP Request"] --> DelegatingProxy["DelegatingFilterProxy"]
+        DelegatingProxy --> FilterChainProxy["FilterChainProxy"]
     end
 
-    SecChain --> FilterChain
-    JwtFilter -->|"Extracts Bearer Token"| AuthManager["AuthenticationManager"]
-    AuthManager -->|"Delegates to"| AuthProvider["AuthenticationProvider"]
-    AuthProvider -->|"Loads User Details"| UserDetails["UserDetailsService"]
-    AuthProvider -->|"Sets Authentication"| SecContext["SecurityContextHolder.getContext().setAuthentication(auth)"]
-    FilterSecurity -->|"Authorized"| Controller["Target @RestController Endpoint"]
+    subgraph FilterChain ["2. SecurityFilterChain Sequence"]
+        direction TB
+        CorsFilter["CorsFilter"] --> CsrfFilter["CsrfFilter"]
+        CsrfFilter --> JwtFilter["Custom JwtAuthFilter"]
+        JwtFilter --> UserPassFilter["UsernamePasswordAuthFilter"]
+        UserPassFilter --> FilterSecurity["AuthorizationFilter<br/>(Access Decision)"]
+    end
 
-    style Req fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style DelegatingProxy fill:#0f172a,stroke:#06b6d4,stroke-width:1px,color:#67e8f9
-    style FilterChainProxy fill:#0f172a,stroke:#8b5cf6,stroke-width:1px,color:#c4b5fd
-    style AuthManager fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
-    style SecContext fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
-    style Controller fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    subgraph AuthSubsystem ["3. Auth Subsystem & Endpoint"]
+        direction TB
+        AuthManager["AuthenticationManager"] --> AuthProvider["AuthenticationProvider"]
+        AuthProvider --> UserDetails["UserDetailsService"]
+        AuthProvider --> SecContext["SecurityContextHolder<br/>(Set Authentication)"]
+        FilterSecurity -->|"Authorized"| Controller["Target @RestController"]
+    end
+
+    FilterChainProxy -->|"Dispatches request"| CorsFilter
+    JwtFilter -->|"Extracts Bearer Token"| AuthManager
+
+    style ServletBridge fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style FilterChain fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
+    style AuthSubsystem fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
+    style Req fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DelegatingProxy fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#67e8f9
+    style FilterChainProxy fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#c4b5fd
+
+    style CorsFilter fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style CsrfFilter fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style JwtFilter fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style UserPassFilter fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style FilterSecurity fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+
+    style AuthManager fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style AuthProvider fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style UserDetails fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style SecContext fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Controller fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 ---

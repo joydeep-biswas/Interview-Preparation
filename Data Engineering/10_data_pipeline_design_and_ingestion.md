@@ -155,7 +155,7 @@ flowchart LR
 - **Streaming Processing:** Processes unbounded streams of continuous events in near-real-time (millisecond to second latency) as events occur.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph BatchParadigm ["Batch Processing (Bounded)"]
         BIn[24 Hours of Data] --> BProc[Batch Spark Job at 2 AM] --> BOut[Updated Daily Dashboard]
     end
@@ -190,9 +190,9 @@ flowchart LR
 ```mermaid
 flowchart TD
     subgraph PullModel ["Pull Model (Polling Overhead)"]
-        IngestP[Ingestion Service] -->|1. Any new rows?| DB[(Source DB)]
+        IngestP[Ingestion Service] -->|"1. Any new rows?"| DB[(Source DB)]
         DB -->|2. No new rows| IngestP
-        IngestP -->|3. Any new rows? (Repeats every 5 mins)| DB
+        IngestP -->|"3. Any new rows? (Repeats every 5 mins)"| DB
     end
 
     subgraph PushModel ["Push Model (Instant & Efficient)"]
@@ -306,7 +306,7 @@ Replayability is the architectural ability to reset stream consumer offsets back
 Distributed pipelines typically operate on **At-Least-Once delivery** (network retries can send duplicate messages). To achieve **Effectively-Once (Exactly-Once)** downstream semantics, pipelines use deterministic deduplication:
 
 ```mermaid
-flowchart TD
+flowchart LR
     Stream["Kafka Stream (May contain retried duplicates)"] --> Window["Deduplication Window (Key: event_uuid, Order: timestamp DESC)"]
     Window --> Filter["Filter: ROW_NUMBER() = 1"]
     Filter --> Sink["Sink to Delta Lake / Snowflake (Zero Duplicates)"]
@@ -820,6 +820,7 @@ Change Data Capture (CDC) observes, identifies, and extracts state changes (inse
 Log-Based CDC reads the database's internal transaction log directly (**PostgreSQL WAL, MySQL Binlog, Oracle Redo Log, SQL Server CDC**). It captures every row modification with zero impact on transactional application query performance.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant App as Application
     participant RDBMS as PostgreSQL (Source DB)

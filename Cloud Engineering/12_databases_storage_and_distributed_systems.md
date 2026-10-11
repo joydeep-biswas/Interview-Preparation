@@ -79,8 +79,7 @@ flowchart TD
    - [4.2 Cache Stampede (Thundering Herd) and Mutex Locking](#42-cache-stampede-thundering-herd-and-mutex-locking)
 5. [Messaging Queues and Event Streaming](#5-messaging-queues-and-event-streaming)
    - [5.1 Message Broker vs. Append-Only Distributed Log](#51-message-broker-vs-append-only-distributed-log)
-   - [5.2 Azure Service Bus vs. AWS SQS/SNS Deep Dive](#52-azure-service-bus-vs-aws-sqssns-deep-dive)
-   - [5.3 High-Throughput Streaming: Azure Event Hubs vs. AWS Kinesis](#52-azure-service-bus-vs-aws-sqssns-deep-dive)
+   - [5.2 Enterprise Message Brokers & Queuing Systems (Azure Service Bus Primary & AWS SQS/SNS Counterpart)](#52-enterprise-message-brokers--queuing-systems-azure-service-bus-primary--aws-sqssns-counterpart)
 6. [Distributed Idempotency and Transaction Coordination](#6-distributed-idempotency-and-transaction-coordination)
    - [6.1 Exactly-Once Semantics vs. At-Least-Once Delivery](#61-exactly-once-semantics-vs-at-least-once-delivery)
    - [6.2 Idempotency Keys and Distributed Deduplication Tables](#62-idempotency-keys-and-distributed-deduplication-tables)
@@ -103,16 +102,22 @@ In a distributed network where network partitions ($P$) are inevitable across ph
 - **Consistency ($C$):** Every read receives the most recent write or an error. (e.g. Traditional RDBMS with synchronous two-phase commit).
 - **Availability ($A$):** Every non-failing node returns a non-error response, but without guaranteeing it is the most recent write. (e.g. DNS, Amazon DynamoDB).
 
-```text
-       Consistency (C)
-          /       \
-         /  (RDBMS)\
-        /   CP     CA
-       /             \
-Partition (P) ────── Availability (A)
-           \   AP    /
-            \ (DNS) /
-             \     /
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'quadrant1Fill': '#1e293b', 'quadrant2Fill': '#0f172a', 'quadrant3Fill': '#1e293b', 'quadrant4Fill': '#0f172a', 'quadrantPointFill': '#3b82f6', 'quadrantPointTextFill': '#ffffff', 'quadrantTitleFill': '#ffffff', 'quadrantAxisTextFill': '#93c5fd', 'quadrantInternalBorderStrokeFill': '#334155', 'quadrantExternalBorderStrokeFill': '#475569' }}}%%
+quadrantChart
+    title CAP & PACELC Trade-Off Landscape in Cloud Storage
+    x-axis "Low Consistency (Eventual / Prefix)" --> "Strong Consistency (Linearizable)"
+    y-axis "High Normal Latency (Global Quorum)" --> "Ultra-Low Latency (Sub-10ms Local Reads)"
+    quadrant-1 "AP/EL Cloud Systems (High Availability & Speed)"
+    quadrant-2 "Theoretical Unachievable Zone"
+    quadrant-3 "CP/EC Cloud Systems (Strict Data Durability)"
+    quadrant-4 "Tunable Consistency Engines"
+    "DynamoDB / Cosmos DB (Eventual)": [0.20, 0.88]
+    "Apache Cassandra": [0.25, 0.85]
+    "Google Cloud Spanner": [0.94, 0.22]
+    "Azure SQL / Managed Instance": [0.88, 0.28]
+    "Cosmos DB (Strong Tier)": [0.90, 0.30]
+    "Cosmos DB (Session Tier)": [0.60, 0.70]
 ```
 
 ---
@@ -145,15 +150,23 @@ Azure Cosmos DB formally provides five mathematically bounded consistency tiers:
 
 Modern cloud-native databases (Amazon Aurora and Azure SQL Hyperscale) discard traditional monolithic monolithic architecture where compute and local disks were coupled:
 
-```text
-Traditional Monolithic RDBMS:
-[Compute Node] ──(Flushes Dirty Pages + WAL to local disk)──> [Local SSD Raid]
+```mermaid
+flowchart LR
+    subgraph Mono["Traditional Monolithic RDBMS"]
+        direction LR
+        MComp["Compute Node"] -->|"Flushes Dirty Pages + WAL"| MDisk["Local SSD / SAN Storage"]
+    end
 
-Cloud-Native Decoupled RDBMS (Aurora / Hyperscale):
-[Compute Node (Stateless)] ──(Pushes ONLY Write-Ahead Log Stream via 100Gbps network)──> [Distributed Storage Cluster]
-                                                                                              │
-                                                                                              ▼
-                                                                           [Storage Nodes Apply Redo Logs in Parallel]
+    subgraph Decoupled["Cloud-Native Decoupled RDBMS (Aurora / Hyperscale)"]
+        direction LR
+        DComp["Compute Node (Stateless)"] -->|"Streams ONLY WAL Log Records (100 Gbps Fabric)"| DStor["Distributed Multi-Tenant Storage Fleet"]
+        DStor -->|"Asynchronous Redo Application in Parallel"| DPages["Storage Page Slices"]
+    end
+
+    classDef comp fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef disk fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+    class MComp,DComp comp;
+    class MDisk,DStor,DPages disk;
 ```
 
 - **Zero Dirty Page I/O:** The compute engine never pushes dirty pages to disk, reducing network write traffic by $>80\%$.
@@ -177,16 +190,10 @@ Distributed NoSQL databases partition data across storage nodes using a **Hash F
 
 $$\text{Physical Partition Node} = \text{MD5}(\text{PartitionKey}) \pmod{\text{Total Partitions}}$$
 
-```text
-ANTI-PATTERN (HOT PARTITION):
-Partition Key: CreatedDate ("2026-10-10")
-Result: ALL writes for today hit Partition 1 (100% saturation / HTTP 429 Throttling).
-        Partitions 2, 3, and 4 sit completely idle.
-
-BEST PRACTICE (UNIFORM HASH DISTRIBUTION):
-Partition Key: CustomerUUID or Synthetic Suffix (CustomerID + "_" + Random(0,9))
-Result: Writes scatter uniformly across all physical partitions.
-```
+| Strategy | Partition Key Example | Write Distribution Pattern | Operational Consequence |
+| :--- | :--- | :--- | :--- |
+| **Anti-Pattern (Hot Partition)** | `CreatedDate` (e.g. `"2026-10-10"`) | Monotonic; 100% of current traffic targets the single partition hosting today's date. | Physical node saturates with HTTP 429 throttling while other partitions sit completely idle. |
+| **Best Practice (Uniform Hash)** | `CustomerUUID` or Synthetic Suffix (`CustomerID + "_" + Random(0,9)`) | High-cardinality hashing scatters writes uniformly across all physical partition boundaries. | Load is evenly distributed across partition servers, achieving near-linear horizontal scalability. |
 
 ---
 
@@ -233,7 +240,7 @@ When an expensive, highly requested cache key expires under heavy load, thousand
 
 ---
 
-### 5.2 Azure Service Bus vs. AWS SQS/SNS Deep Dive
+### 5.2 Enterprise Message Brokers & Queuing Systems (Azure Service Bus Primary & AWS SQS/SNS Counterpart)
 
 - **Dead-Letter Queuing (DLQ):** Messages failing processing $N$ times (exceeding `maxDeliveryCount`) are automatically moved to a sub-queue (`$DeadLetterQueue`) for inspection without blocking valid messages.
 - **Message Sessions:** In Azure Service Bus, setting `SessionId` guarantees strict first-in, first-out (FIFO) processing across concurrent consumers.

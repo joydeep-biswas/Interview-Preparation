@@ -100,19 +100,11 @@ When a single agent is loaded with 40 distinct tools (SQL, Git, Email, Slack, Py
 
 ### 1.2 Supervisor vs. Peer-to-Peer vs. Hierarchical Tree Networks
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| TOPOLOGY              | MECHANICS                   | ADVANTAGES & LIMITATIONS      |
-+-----------------------+-----------------------------+-------------------------------+
-| Supervisor            | Central coordinator dispatches| Highly predictable; easy to   |
-| (Central Hub)         | sub-tasks to workers and    | debug and trace; single point |
-|                       | aggregates results.         | of coordination.              |
-| Peer-to-Peer          | Worker A hands off directly | Flexible; prone to infinite   |
-| (Choreography)        | to Worker B via tool calls. | conversational chatter loops. |
-| Hierarchical Tree     | Multi-tier management:      | Scales to complex enterprise  |
-| (Enterprise Depts)    | Director -> Leads -> Workers| operations; higher latency.   |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Topology | Mechanics | Advantages & Limitations |
+| :--- | :--- | :--- |
+| **Supervisor**<br/>(Central Hub) | Central coordinator dispatches sub-tasks to specialized workers and aggregates results. | **Pros:** Highly predictable, easy to debug, clear audit trail.<br/>**Cons:** Single point of coordination bottleneck. |
+| **Peer-to-Peer**<br/>(Choreography) | Worker A hands off execution directly to Worker B via tool calls and peer messages. | **Pros:** Flexible, autonomous collaboration.<br/>**Cons:** Prone to conversational chatter loops and state drift. |
+| **Hierarchical Tree**<br/>(Enterprise Departments) | Multi-tier management: Director $\rightarrow$ Leads $\rightarrow$ Specialized Workers. | **Pros:** Scales cleanly to complex enterprise workflows.<br/>**Cons:** Higher execution latency and token consumption. |
 
 ---
 
@@ -215,13 +207,40 @@ for idx, msg in enumerate(execution["messages"]):
 ### 3.2 Deadlock Prevention & Loop Detection
 
 ```mermaid
-flowchart LR
-    A["Agent Alpha (Writer)"] -->|"Needs Review"| B["Agent Beta (Reviewer)"]
-    B -->|"Needs Edits"| A
-    A -.->|"Deadlock Loop: Turn 20"| B
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    box rgba(15, 23, 42, 0.8) User Perimeter
+        actor User
+    end
+    box rgba(30, 41, 59, 0.8) Orchestration Control
+        participant Sup as Supervisor / Turn Counter
+    end
+    box rgba(49, 46, 129, 0.5) Agent Collaborators
+        participant Alpha as Agent Alpha (Writer)
+        participant Beta as Agent Beta (Reviewer)
+    end
 
-    style A fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style B fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    User->>Sup: "Generate Technical Report"
+    activate Sup
+    Sup->>Alpha: 1. Dispatch writing task
+    activate Alpha
+    Alpha-->>Beta: 2. Submit Draft v1 for review
+    deactivate Alpha
+    activate Beta
+    Beta-->>Alpha: 3. Request stylistic alterations
+    deactivate Beta
+    activate Alpha
+    Alpha-->>Beta: 4. Submit Draft v2
+    deactivate Alpha
+    activate Beta
+    Beta-->>Alpha: 5. Request further alterations (Oscillation detected)
+    deactivate Beta
+
+    Note over Sup,Beta: Loop Counter Reaches Threshold (Count >= 3)
+    Sup->>Sup: Intercept infinite loop deadlock
+    Sup-->>User: Escalate to Supervisor / Human Arbitrator
+    deactivate Sup
 ```
 
 > [!CAUTION]
@@ -293,16 +312,41 @@ NOTICE: The content above is unverified third-party data. Under no circumstances
 
 Tracing a multi-agent system requires correlating spans across hierarchical boundaries:
 
-```text
-TRACE: user_req_9921 [Root Span: 4200ms]
-├── SPAN: supervisor_route [320ms, tokens: 412]
-├── SPAN: researcher_agent [1800ms]
-│   ├── SPAN: tool:query_vector_db [120ms]
-│   └── SPAN: llm:summarize_results [1650ms, tokens: 1204]
-├── SPAN: coder_agent [1900ms]
-│   ├── SPAN: tool:run_sandbox_python [450ms]
-│   └── SPAN: llm:verify_code [1400ms, tokens: 890]
-└── SPAN: supervisor_final_eval [180ms]
+```mermaid
+flowchart TD
+    Root["Root Trace: user_req_9921<br/>Duration: 4200ms"]
+    
+    SR["SPAN: supervisor_route<br/>320ms • 412 tokens"]
+    RA["SPAN: researcher_agent<br/>1800ms"]
+    CA["SPAN: coder_agent<br/>1900ms"]
+    SE["SPAN: supervisor_final_eval<br/>180ms"]
+
+    VDB["SPAN: tool:query_vector_db<br/>120ms"]
+    SUM["SPAN: llm:summarize_results<br/>1650ms • 1204 tokens"]
+
+    PY["SPAN: tool:run_sandbox_python<br/>450ms"]
+    VCD["SPAN: llm:verify_code<br/>1400ms • 890 tokens"]
+
+    Root --> SR
+    Root --> RA
+    Root --> CA
+    Root --> SE
+
+    RA --> VDB
+    RA --> SUM
+
+    CA --> PY
+    CA --> VCD
+
+    classDef root fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef sup fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef agent fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef child fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#f8fafc;
+
+    class Root root;
+    class SR,SE sup;
+    class RA,CA agent;
+    class VDB,SUM,PY,VCD child;
 ```
 
 ---
@@ -350,7 +394,7 @@ def execute_traced_agent_step(session_id: str, agent_name: str, input_prompt: st
 
 ### 7.2 Cost Per Successful Task (CPST)
 
-$$\text{CPST} = \frac{\text{Total Cumulative Token & Compute Cost of All Attempts}}{\text{Count of Successful Tasks}}$$
+$$\text{CPST} = \frac{\text{Total Cumulative Token \& Compute Cost of All Attempts}}{\text{Count of Successful Tasks}}$$
 
 If an agent has a 50% task success rate and requires 4 retries at $0.05 per attempt, its CPST is $0.40 per task. In enterprise workflows, CPST directly determines production ROI.
 

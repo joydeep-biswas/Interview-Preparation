@@ -97,17 +97,13 @@ flowchart TD
 
 ### 1.1 Evolution from SysOps to DevOps to Platform Engineering
 
-```text
-ERA 1: TRADITIONAL SYSOPS (Ticket-Driven)
-Developer writes code ──(Opens Jira Ticket)──> SysAdmin manually provisions VM (Takes 2-4 weeks)
-
-ERA 2: DEVOPS "YOU BUILD IT, YOU RUN IT" (Cognitive Overload)
-Developer forced to learn Terraform, Helm, Docker, IAM, BGP routing, Istio, Prometheus, and TLS.
-Result: Developer cognitive overload; velocity grinds to a halt.
-
-ERA 3: PLATFORM ENGINEERING (Self-Service Paved Road)
-Platform Team builds an Internal Developer Platform (IDP) exposing self-service APIs.
-Developer self-provisions production-ready stacks in 5 minutes within security guardrails.
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'timelineColor': '#3b82f6', 'cScale0': '#1e293b', 'cScale1': '#1e3a8a', 'cScale2': '#064e3b', 'cScaleLabel0': '#ffffff', 'cScaleLabel1': '#ffffff', 'cScaleLabel2': '#ffffff' }}}%%
+timeline
+    title Evolution of Infrastructure Delivery Models
+    Era 1 : Traditional SysOps : Ticket-driven workflows (Jira) : Manual VM provisioning (2-4 weeks) : Strict silos between Dev & SysAdmin
+    Era 2 : DevOps & Cloud Wave : "You build it, you run it" : Extreme cognitive overload : Devs must master Docker, K8s, Terraform, IAM : Context-switching becomes delivery bottleneck
+    Era 3 : Platform Engineering : Platform as a Product : Internal Developer Platform (IDP) : Golden Paths & Self-Service APIs : Automated compliance guardrails & 5-minute deploys
 ```
 
 ---
@@ -129,18 +125,12 @@ The core mission of Platform Engineering is **reducing cognitive load** for prod
 
 **Backstage** (donated by Spotify to the CNCF) is an extensible open-source developer portal framework built on Node.js and React:
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                                SPOTIFY BACKSTAGE ARCHITECTURE                           |
-+---------------------+-------------------+---------------------+-------------------------+
-| SOFTWARE CATALOG    | TECHDOCS          | SOFTWARE TEMPLATES  | PLUGINS ECOSYSTEM       |
-+---------------------+-------------------+---------------------+-------------------------+
-| Central inventory of| Markdown docs     | "Scaffolder" wizard | Kubernetes status,      |
-| all microservices,  | stored alongside  | creating new repo,  | CI/CD pipeline views,   |
-| APIs, databases,    | code; compiled to | CI/CD, and infra in | PagerDuty on-call,      |
-| owners, and repos.  | portal pages.     | 3 clicks.           | Cost tracking.          |
-+---------------------+-------------------+---------------------+-------------------------+
-```
+| Core Pillar | Component | Capability & Operational Function |
+| :--- | :--- | :--- |
+| **Software Catalog** | System & Component Inventory | Centralized catalog tracking microservices, libraries, websites, APIs, databases, owning teams, and source code repositories. |
+| **TechDocs** | Docs-like-Code Engine | Markdown documentation stored directly alongside source code in Git; compiled at build time into searchable web documentation. |
+| **Software Templates** | "Scaffolder" Wizard | Parameterized templates for bootstrapping new repositories, CI/CD pipelines, and cloud resources in 3 clicks with security defaults baked in. |
+| **Plugin Ecosystem** | Extensibility Marketplace | Rich open-source plugin ecosystem integrating Kubernetes workload status, GitHub Actions, PagerDuty on-call, SonarQube, and FinOps metrics. |
 
 ---
 
@@ -303,8 +293,19 @@ Kubernetes Secrets are simply base64-encoded strings stored in etcd. Storing cre
 
 **External Secrets Operator (ESO)** bridges cloud key management and Kubernetes:
 
-```text
-[Azure Key Vault / AWS Secrets Manager] ──(Pulls Secret via OIDC Workload Identity)──> [External Secrets Operator] ──(Generates K8s Secret)──> [Pod Volume / Env Var]
+```mermaid
+flowchart LR
+    Vault["Azure Key Vault /<br/>AWS Secrets Manager"] -->|"Pulls Secret via OIDC<br/>Workload Identity"| ESO["External Secrets<br/>Operator (ESO)"]
+    ESO -->|"Reconciles Native<br/>K8s Secret"| K8sSec["Kubernetes<br/>Secret Object"]
+    K8sSec -->|"Mounted as Volume<br/>or Environment Variable"| Pod["Application<br/>Pod Container"]
+
+    classDef cloud fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef op fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef k8s fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+
+    class Vault cloud;
+    class ESO op;
+    class K8sSec,Pod k8s;
 ```
 
 ```yaml
@@ -334,6 +335,7 @@ spec:
 ### 7.1 Pull-Request-Driven Ephemeral Lifecycle Orchestration
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant Dev as Developer

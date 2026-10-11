@@ -98,22 +98,13 @@ flowchart TD
 > [!IMPORTANT]
 > **Zero-Trust Input Sanitization:** Scrub sensitive PII (Social Security numbers, credit cards, health records) using local regex and Presidio NLP pipelines BEFORE transmitting payloads to third-party model provider APIs. Maintain encrypted surrogate maps for authorized re-identification downstream.
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| OWASP THREAT          | MECHANISM                   | ENTERPRISE IMPACT             |
-+-----------------------+-----------------------------+-------------------------------+
-| LLM01: Prompt         | Adversarial text overrides  | System compromise, unauthorized|
-| Injection             | system instructions.        | tool execution, jailbreaking. |
-| LLM02: Sensitive      | Model inadvertently reveals | Regulatory fines (GDPR/HIPAA),|
-| Data Exposure         | PII or secrets in output.   | intellectual property loss.   |
-| LLM05: Supply Chain   | Vulnerable third-party base | Backdoors in fine-tuned models|
-| Vulnerabilities       | models or unvetted packages.| or hijacked PyPI packages.    |
-| LLM06: Permission     | Agent tools inherit higher  | Unauthorized database writes, |
-| Flaws (Excess Agency) | privileges than user role.  | unauthorized funds transfers. |
-| LLM08: Vector & Model | Ingestion of maliciously    | Denial of Service (DoS),      |
-| Denial of Service     | bloated context sequences.  | excessive token cloud bills.  |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| OWASP Threat | Mechanism | Enterprise Impact |
+| :--- | :--- | :--- |
+| **LLM01: Prompt Injection** | Adversarial text overrides system instructions and prompt boundaries. | System compromise, unauthorized tool execution, jailbreaking corporate policies. |
+| **LLM02: Sensitive Data Exposure** | Model inadvertently reveals proprietary PII, intellectual property, or secrets in output. | Regulatory fines (GDPR, HIPAA, SOC 2), intellectual property loss, reputational damage. |
+| **LLM05: Supply Chain Vulnerabilities** | Vulnerable third-party base models, malicious weights, or unvetted dependencies. | Backdoors in fine-tuned models, compromised weights, or hijacked package dependencies. |
+| **LLM06: Permission Flaws (Excess Agency)** | Autonomous agent tools inherit higher system privileges than the requesting user role. | Unauthorized database writes, data destruction, unauthorized funds transfers. |
+| **LLM08: Vector & Model Denial of Service** | Maliciously bloated context payloads or resource-intensive recursive prompts. | Denial of Service (DoS), GPU cluster resource exhaustion, massive cloud token bills. |
 
 ---
 

@@ -9,16 +9,19 @@ A comprehensive guide covering Java Virtual Machine (JVM) internals, memory regi
 ```mermaid
 flowchart TD
     subgraph ClassLoader ["Class Loader Subsystem"]
+        direction LR
         Load["Loading<br/>(Bootstrap, Platform, App)"] --> Link["Linking<br/>(Verify, Prepare, Resolve)"] --> Init["Initialization<br/>(static initializers)"]
     end
 
     subgraph RuntimeDataAreas ["JVM Runtime Data Areas"]
+        direction TD
         Heap["JVM Heap Memory<br/>(Eden, Survivor, Tenured Old Generation)"]
         Metaspace["Metaspace<br/>(Native Memory: Klass Word, vtable)"]
         Stack["Per-Thread JVM Stack<br/>(Stack Frames, Local Variables, PC Register)"]
     end
 
     subgraph ExecutionEngine ["Execution Engine"]
+        direction TD
         JIT["JIT Compiler<br/>(C1 Client / C2 Server)"]
         GC["Garbage Collectors<br/>(G1 GC, ZGC, Parallel)"]
     end
@@ -121,6 +124,7 @@ flowchart TD
     Bytecode[".class Files"] --> ClassLoaderSubsystem["Class Loader Subsystem"]
 
     subgraph ClassLoaderSubsystem["Class Loader Subsystem"]
+        direction LR
         Loading["1. Loading (Bootstrap -> Platform -> Application)"]
         Linking["2. Linking (Verify -> Prepare -> Resolve)"]
         Init["3. Initialization (Execute static blocks & field inits)"]
@@ -130,6 +134,7 @@ flowchart TD
     ClassLoaderSubsystem --> RuntimeDataAreas["Runtime Data Areas (Memory)"]
 
     subgraph RuntimeDataAreas["Runtime Data Areas (JVM Memory)"]
+        direction TD
         Heap["Heap (Shared across threads)"]
         Metaspace["Metaspace / Method Area (Shared)"]
         PC["Program Counter Registers (Per Thread)"]
@@ -140,6 +145,7 @@ flowchart TD
     RuntimeDataAreas --> ExecutionEngine["Execution Engine"]
 
     subgraph ExecutionEngine["Execution Engine"]
+        direction TD
         Interpreter["Bytecode Interpreter"]
         JIT["JIT Compiler (C1 / C2 Compiler)"]
         GC["Garbage Collector"]

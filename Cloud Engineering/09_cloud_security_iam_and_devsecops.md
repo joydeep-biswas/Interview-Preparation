@@ -64,8 +64,8 @@ flowchart TD
 ---
 
 ## Table of Contents
-1. [Identity Foundations: Entra ID vs. AWS IAM](#1-identity-foundations-entra-id-vs-aws-iam)
-   - [1.1 Azure RBAC Scope Inheritance vs. AWS IAM Policy Evaluation Logic](#11-azure-rbac-scope-inheritance-vs-aws-iam-policy-evaluation-logic)
+1. [Cloud Identity Foundations & Access Boundaries (Entra ID Primary & AWS IAM Counterpart)](#1-cloud-identity-foundations--access-boundaries-entra-id-primary--aws-iam-counterpart)
+   - [1.1 Azure RBAC Scope Inheritance (Primary) & AWS IAM Policy Evaluation Counterpart](#11-azure-rbac-scope-inheritance-primary--aws-iam-policy-evaluation-counterpart)
    - [1.2 The Principle of Least Privilege and Just-In-Time (JIT) Elevation](#12-the-principle-of-least-privilege-and-just-in-time-jit-elevation)
 2. [Service Principals, Managed Identities, and OIDC](#2-service-principals-managed-identities-and-oidc)
    - [2.1 System-Assigned vs. User-Assigned Managed Identities](#21-system-assigned-vs-user-assigned-managed-identities)
@@ -75,7 +75,7 @@ flowchart TD
    - [3.2 Hardware Security Modules (HSM) and Automated Key Rotation](#32-hardware-security-modules-hsm-and-automated-key-rotation)
 4. [Cloud Perimeter Security: WAF and DDoS Protection](#4-cloud-perimeter-security-waf-and-ddos-protection)
    - [4.1 Web Application Firewall (WAF) Rule Mechanics: OWASP Core Rule Set](#41-web-application-firewall-waf-rule-mechanics-owasp-core-rule-set)
-   - [4.2 Layer 3/4 DDoS Mitigation: Azure DDoS Protection vs. AWS Shield](#42-layer-34-ddos-mitigation-azure-ddos-protection-vs-aws-shield)
+   - [4.2 Layer 3/4 Distributed Denial-of-Service Defense (Azure DDoS Protection Primary & AWS Shield Counterpart)](#42-layer-34-distributed-denial-of-service-defense-azure-ddos-protection-primary--aws-shield-counterpart)
 5. [Policy as Code and Cloud Governance](#5-policy-as-code-and-cloud-governance)
    - [5.1 Azure Policy Architecture: Definitions, Initiatives, and Remediations](#51-azure-policy-architecture-definitions-initiatives-and-remediations)
    - [5.2 AWS Config and Service Control Policy Guardrails](#2-service-principals-managed-identities-and-oidc)
@@ -83,7 +83,7 @@ flowchart TD
    - [6.1 Kernel-Level Intrusion Detection with Falco & eBPF](#61-kernel-level-intrusion-detection-with-falco-ebpf)
    - [6.2 Vulnerability Scanning and Software Supply Chain Gates](#62-vulnerability-scanning-and-software-supply-chain-gates)
 7. [Threat Detection, CSPM, and Incident Response](#7-threat-detection-cspm-and-incident-response)
-   - [7.1 Microsoft Defender for Cloud vs. Amazon GuardDuty](#71-microsoft-defender-for-cloud-vs-amazon-guardduty)
+   - [7.1 Cloud Security Posture Management & Threat Intelligence (Microsoft Defender for Cloud Primary & Amazon GuardDuty Counterpart)](#71-cloud-security-posture-management--threat-intelligence-microsoft-defender-for-cloud-primary--amazon-guardduty-counterpart)
    - [7.2 Immutable Audit Logging and SIEM Analytics](#12-the-principle-of-least-privilege-and-just-in-time-jit-elevation)
 8. [Automated Cloud Security Audit and Misconfiguration Scanner](#8-automated-cloud-security-audit-and-misconfiguration-scanner)
    - [8.1 Security Baseline Inspection Engine](#81-security-baseline-inspection-engine)
@@ -93,27 +93,41 @@ flowchart TD
 
 ---
 
-# 1. Identity Foundations: Entra ID vs. AWS IAM
+# 1. Cloud Identity Foundations & Access Boundaries (Entra ID Primary & AWS IAM Counterpart)
 
-### 1.1 Azure RBAC Scope Inheritance vs. AWS IAM Policy Evaluation Logic
+### 1.1 Azure RBAC Scope Inheritance (Primary) & AWS IAM Policy Evaluation Counterpart
 
 Identity architecture diverges significantly between Azure and AWS:
 
-```text
-AZURE RBAC INHERITANCE:
-[Management Group] ──(Inherits)──> [Subscription] ──(Inherits)──> [Resource Group] ──(Inherits)──> [Resource]
-Rule: Allow grants are additive; Deny assignments strictly override all Allows.
+```mermaid
+flowchart LR
+    MG["Management Group"] --> Sub["Subscription"]
+    Sub --> RG["Resource Group"]
+    RG --> Res["Resource"]
 
-AWS IAM EVALUATION FLOW:
-Explicit Deny? ──[YES]──> DENY
-       │
-      [NO]
-       ▼
-Explicit Allow in Identity/Resource/SCP? ──[YES]──> ALLOW
-       │
-      [NO]
-       ▼
-Default Deny ──────────> DENY
+    classDef scope fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    class MG,Sub,RG,Res scope;
+```
+
+> **Azure RBAC Inheritance Invariant:** Allow grants are additive across parent scopes; Deny assignments strictly override all Allows.
+
+```mermaid
+flowchart TD
+    Start["Evaluation Ingress"] --> Q1{"Explicit Deny?"}
+    Q1 -- "Yes" --> Deny1["DENY"]
+    Q1 -- "No" --> Q2{"Explicit Allow in Policy / SCP?"}
+    Q2 -- "Yes" --> Allow["ALLOW"]
+    Q2 -- "No" --> Deny2["Default Deny: DENY"]
+
+    classDef startNode fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef decision fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef allow fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef deny fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
+
+    class Start startNode;
+    class Q1,Q2 decision;
+    class Allow allow;
+    class Deny1,Deny2 deny;
 ```
 
 - **Azure Role-Based Access Control (RBAC):** Assigns a **Security Principal** (User, Group, Service Principal, Managed Identity) a **Role Definition** (e.g. `Contributor`, `Reader`, or Custom JSON Role) at a specific **Scope**. All children at that scope inherit the role.
@@ -223,7 +237,7 @@ A Cloud WAF inspects HTTP/HTTPS traffic at Layer 7 before reaching application p
 
 ---
 
-### 4.2 Layer 3/4 DDoS Mitigation: Azure DDoS Protection vs. AWS Shield
+### 4.2 Layer 3/4 Distributed Denial-of-Service Defense (Azure DDoS Protection Primary & AWS Shield Counterpart)
 
 - **AWS Shield Standard & Azure DDoS Infrastructure:** Always-on automated packet filtering protecting cloud edge routers from SYN floods and UDP reflection attacks.
 - **Advanced Protection (Azure DDoS Network Protection / AWS Shield Advanced):** Provides dedicated DDoS incident response teams, automated per-VNet adaptive traffic profiling, and financial cost protection (credit reimbursements for auto-scaled resources during attacks).
@@ -298,7 +312,7 @@ Enforce cryptographic container verification at admission control:
 
 # 7. Threat Detection, CSPM, and Incident Response
 
-### 7.1 Microsoft Defender for Cloud vs. Amazon GuardDuty
+### 7.1 Cloud Security Posture Management & Threat Intelligence (Microsoft Defender for Cloud Primary & Amazon GuardDuty Counterpart)
 
 - **Cloud Security Posture Management (CSPM):** Continuously compares live cloud infrastructure configurations against compliance frameworks (CIS, SOC 2 Type II, ISO 27001), scoring security hygiene via a Secure Score.
 - **Cloud Workload Protection (CWPP):** Uses machine learning and threat intelligence feeds to detect active attacks:

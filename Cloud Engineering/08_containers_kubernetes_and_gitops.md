@@ -100,8 +100,29 @@ flowchart TD
 
 The `kube-apiserver` is the single point of entry for all cluster mutations. Requests pass through a strictly ordered pipeline:
 
-```text
-[HTTP Request] ──> [1. Authentication] ──> [2. Authorization] ──> [3. Mutating Webhooks] ──> [4. Object Schema Validation] ──> [5. Validating Webhooks] ──> [6. etcd Write]
+```mermaid
+flowchart TD
+    subgraph Stage1 ["Stage 1: Authentication & Access Control (AuthN / AuthZ)"]
+        direction LR
+        Req["HTTP Client Request"] --> AuthN["1. Authentication<br/>(OIDC Bearer / X.509 certs)"] --> AuthZ["2. Authorization<br/>(RBAC Roles & Bindings)"]
+    end
+
+    subgraph Stage2 ["Stage 2: Admission Control & Storage"]
+        direction LR
+        MutWebhook["3. Mutating Webhooks<br/>(Sidecar injection)"] --> SchemaVal["4. Schema Validation<br/>(OpenAPI structural checks)"] --> ValWebhook["5. Validating Webhooks<br/>(OPA / Kyverno policy)"] --> ETCD["6. etcd Commit<br/>(Raft distributed log)"]
+    end
+
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Req fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style AuthN fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style AuthZ fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style MutWebhook fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style SchemaVal fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ValWebhook fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style ETCD fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 1. **Authentication (AuthN):** Validates client identity using X.509 client certificates, Bearer OpenID Connect (OIDC) JWT tokens, or Webhook tokens.
@@ -130,8 +151,28 @@ The `kube-apiserver` is the single point of entry for all cluster mutations. Req
 
 The `kube-scheduler` assigns unscheduled pods (`spec.nodeName == ""`) to appropriate nodes across two phases:
 
-```text
-Unscheduled Pod ──> [Phase 1: Filter Phase] ──> Candidate Nodes ──> [Phase 2: Score Phase] ──> Best Scored Node ──> Binding Cycle
+```mermaid
+flowchart TD
+    subgraph Stage1 ["Stage 1: Filtering Candidates (Predicates)"]
+        direction LR
+        Pod["Unscheduled Pod<br/>(spec.nodeName == '')"] --> Filter["Filter Phase<br/>(Resources, Taints, Ports)"] --> Candidates["Filtered Candidate Nodes"]
+    end
+
+    subgraph Stage2 ["Stage 2: Scoring & Binding (Priorities)"]
+        direction LR
+        Score["Score Phase<br/>(Affinity & Topology Ranking)"] --> Best["Best Scored Node"] --> Bind["Binding Cycle<br/>(Write nodeName to API server)"]
+    end
+
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Pod fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Filter fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Candidates fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style Score fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Best fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Bind fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 1. **Filter Phase (Predicates):** Filters out nodes incapable of hosting the Pod (checks `NodeResourcesFit`, `NodeName`, `NodePorts`, `PodFitsHostPorts`, `TaintToleration`).
@@ -290,8 +331,28 @@ spec:
 
 ### 5.1 Container Storage Interface (CSI) Dynamic Provisioning
 
-```text
-[StorageClass] ──> [PersistentVolumeClaim (PVC)] ──> [CSI Controller Plugin] ──> [Provisions Azure Disk / AWS EBS] ──> [PersistentVolume (PV)] ──> [Mounted into Pod /var/data]
+```mermaid
+flowchart TD
+    subgraph Stage1 ["Stage 1: Storage Declaration & Provisioning Trigger"]
+        direction LR
+        SC["StorageClass<br/>(Defines provisioner & params)"] --> PVC["PersistentVolumeClaim<br/>(PVC claim request)"] --> CSI["CSI Controller Plugin<br/>(Invokes Cloud Volume API)"]
+    end
+
+    subgraph Stage2 ["Stage 2: Volume Creation & Pod Attachment"]
+        direction LR
+        Disk["Provisions Cloud Disk<br/>(Azure Disk / AWS EBS)"] --> PV["PersistentVolume (PV)<br/>(Binds to PVC)"] --> Pod["Mounts into Pod<br/>(Filesystem at /var/data)"]
+    end
+
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style SC fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style PVC fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style CSI fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Disk fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style PV fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Pod fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 - **Reclaim Policies:** `Delete` (destroys backing disk when PVC is deleted) vs. `Retain` (preserves physical volume for manual recovery).
@@ -362,8 +423,20 @@ kubectl label --overwrite ns production \
 
 Argo CD operates as an in-cluster controller continuously reconciling desired Git state against live cluster state:
 
-```text
-Git Commit ──> Argo CD Controller ──> Computes Manifest Delta ──> Live Kubernetes API (Self-Healing Apply)
+```mermaid
+flowchart LR
+    subgraph GitOpsReconcile ["Argo CD GitOps Reconciliation Loop"]
+        direction LR
+        Git["Git Commit<br/>(Desired State)"] --> Argo["Argo CD Controller"]
+        Argo --> Delta["Computes Manifest Delta<br/>(Drift Detection)"]
+        Delta --> K8sAPI["Live Kubernetes API<br/>(Self-Healing Apply)"]
+    end
+
+    style GitOpsReconcile fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Git fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Argo fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Delta fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style K8sAPI fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 - **Automated Drift Correction:** If an operator manually edits a deployment (`kubectl scale --replicas=10`), Argo CD detects the divergence and overwrites the live state back to the Git source of truth within seconds.

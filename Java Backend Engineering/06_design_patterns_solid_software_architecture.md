@@ -107,19 +107,38 @@ flowchart TD
 > **Definition**: A class should have one, and only one, reason to change. It must encapsulate a single, well-defined business responsibility.
 
 ```mermaid
-flowchart LR
-    GodClass["OrderService (Violation)<br/>• Web Validation<br/>• DB SQL Persistence<br/>• Stripe Payment<br/>• SMTP Email"]
-    
-    GodClass -.->|Refactored into SRP| S1["OrderValidator (Validation)"]
-    GodClass -.->|Refactored into SRP| S2["OrderRepository (Persistence)"]
-    GodClass -.->|Refactored into SRP| S3["PaymentGatewayClient (Stripe)"]
-    GodClass -.->|Refactored into SRP| S4["EmailNotificationService (SMTP)"]
+classDiagram
+    direction LR
+    class OrderProcessor {
+        -OrderValidator validator
+        -OrderRepository orderRepository
+        -PaymentGatewayClient paymentGatewayClient
+        -NotificationService notificationService
+        +processOrder(OrderRequest request) OrderResponse
+    }
+    class OrderValidator {
+        +validate(OrderRequest request) void
+    }
+    class OrderRepository {
+        +save(OrderEntity entity) OrderEntity
+    }
+    class PaymentGatewayClient {
+        +charge(String token, BigDecimal amount) PaymentReceipt
+    }
+    class NotificationService {
+        +sendReceipt(String email, PaymentReceipt receipt) void
+    }
 
-    style GodClass fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style S2 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style S3 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style S4 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    OrderProcessor --> OrderValidator : validates
+    OrderProcessor --> OrderRepository : persists
+    OrderProcessor --> PaymentGatewayClient : charges
+    OrderProcessor --> NotificationService : notifies
+
+    style OrderProcessor fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    style OrderValidator fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style OrderRepository fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style PaymentGatewayClient fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    style NotificationService fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#ffffff
 ```
 
 #### Anti-Pattern: The "God Class"
@@ -176,17 +195,36 @@ public class OrderProcessor {
 > **Definition**: Software artifacts should be **open for extension**, but **closed for modification**. You should be able to introduce new functionality without altering existing, tested code.
 
 ```mermaid
-flowchart TD
-    Client["PaymentExecutionService"] --> Interface["PaymentStrategy Interface"]
-    Interface -.->|implements| C1["CreditCardPaymentStrategy"]
-    Interface -.->|implements| C2["UpiPaymentStrategy"]
-    Interface -.->|implements| C3["CryptoPaymentStrategy (Added without modifying client!)"]
+classDiagram
+    direction TB
+    class PaymentExecutionService {
+        -Map~String, PaymentStrategy~ strategies
+        +executePayment(String type, BigDecimal amount) PaymentReceipt
+    }
+    class PaymentStrategy {
+        <<interface>>
+        +pay(BigDecimal amount) PaymentReceipt
+    }
+    class CreditCardPaymentStrategy {
+        +pay(BigDecimal amount) PaymentReceipt
+    }
+    class UpiPaymentStrategy {
+        +pay(BigDecimal amount) PaymentReceipt
+    }
+    class CryptoPaymentStrategy {
+        +pay(BigDecimal amount) PaymentReceipt
+    }
 
-    style Client fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Interface fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style C1 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style C2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style C3 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    PaymentExecutionService --> PaymentStrategy : delegates to
+    PaymentStrategy <|.. CreditCardPaymentStrategy : implements
+    PaymentStrategy <|.. UpiPaymentStrategy : implements
+    PaymentStrategy <|.. CryptoPaymentStrategy : implements (extended without modifying client)
+
+    style PaymentExecutionService fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    style PaymentStrategy fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style CreditCardPaymentStrategy fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style UpiPaymentStrategy fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style CryptoPaymentStrategy fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#ffffff
 ```
 
 #### Anti-Pattern: Fragile `switch` Statements
@@ -299,24 +337,40 @@ public class AuditLogRepository implements ReadOnlyRepository<AuditLog> {
 > **Definition**: Clients should not be forced to depend upon interfaces that they do not use. Prefer small, highly cohesive interfaces over large "fat" interfaces.
 
 ```mermaid
-flowchart TD
-    subgraph Fat_Interface["Fat Interface (Violation)"]
-        Worker["WorkerOperations<br/>• handleHttp()<br/>• onKafkaMessage()<br/>• generateBatchReport()"]
-    end
-    
-    subgraph Segregated_Interfaces["Role Interfaces (ISP Compliant)"]
-        R1["HttpRequestHandler<br/>handleHttp()"]
-        R2["KafkaMessageListener<br/>onKafkaMessage()"]
-        R3["BatchReportGenerator<br/>generateBatchReport()"]
-    end
+classDiagram
+    direction TB
+    class HttpRequestHandler {
+        <<interface>>
+        +handleRequest(HttpServletRequest req) void
+    }
+    class KafkaMessageListener {
+        <<interface>>
+        +onMessage(ConsumerRecord record) void
+    }
+    class BatchReportGenerator {
+        <<interface>>
+        +generateReport() void
+    }
+    class WebApiController {
+        +handleRequest(HttpServletRequest req) void
+    }
+    class StreamEventConsumer {
+        +onMessage(ConsumerRecord record) void
+    }
+    class NightlyReportingJob {
+        +generateReport() void
+    }
 
-    style Fat_Interface fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Segregated_Interfaces fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    HttpRequestHandler <|.. WebApiController : implements
+    KafkaMessageListener <|.. StreamEventConsumer : implements
+    BatchReportGenerator <|.. NightlyReportingJob : implements
 
-    style Worker fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style R1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style R2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style R3 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style HttpRequestHandler fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style KafkaMessageListener fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style BatchReportGenerator fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style WebApiController fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style StreamEventConsumer fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style NightlyReportingJob fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
 ```
 
 #### Production Solution: Cohesive Role Interfaces
@@ -340,24 +394,29 @@ public interface BatchReportGenerator {
 > **Definition**: High-level modules should not depend on low-level modules. Both should depend on abstractions. Abstractions should not depend on details; details should depend on abstractions.
 
 ```mermaid
-flowchart TD
-    subgraph Traditional_Tightly_Coupled["Direct Dependency (Violation)"]
-        HighLevel1["OrderService (High-Level Business Logic)"] --> LowLevel1["PostgreSqlOrderRepository (Low-Level Persistence Detail)"]
-    end
+classDiagram
+    direction TB
+    class AccountService {
+        -AccountPersistencePort persistencePort
+        +transfer(AccountId from, AccountId to, Money amount) void
+    }
+    class AccountPersistencePort {
+        <<interface>>
+        +load(AccountId id) Account
+        +save(Account account) void
+    }
+    class JpaAccountAdapter {
+        -SpringDataJpaAccountRepository springDataRepo
+        +load(AccountId id) Account
+        +save(Account account) void
+    }
 
-    subgraph Dependency_Inversion["Inverted Dependency (DIP Compliant)"]
-        HighLevel2["OrderService (High-Level)"] --> Abstraction["OrderRepository Interface (Domain Port)"]
-        LowLevel2["PostgreSqlOrderAdapter (Infrastructure Detail)"] -.->|implements| Abstraction
-    end
+    AccountService --> AccountPersistencePort : depends on domain port abstraction
+    AccountPersistencePort <|.. JpaAccountAdapter : implements (infrastructure adapter depends on port)
 
-    style Traditional_Tightly_Coupled fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Dependency_Inversion fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-
-    style HighLevel1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style LowLevel1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style HighLevel2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Abstraction fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style LowLevel2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style AccountService fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    style AccountPersistencePort fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style JpaAccountAdapter fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
 ```
 
 #### Production Implementation in Spring Boot:
@@ -410,26 +469,32 @@ public class JpaAccountAdapter implements AccountPersistencePort {
 > **The Fragile Base Class Problem**: Deep inheritance hierarchies couple subclasses intimately to the private implementation details of parent classes. When a parent class changes, subclasses break unexpectedly.
 
 ```mermaid
-flowchart TD
-    subgraph FragileInheritance ["Fragile Inheritance (Anti-Pattern)"]
-        SubclassNode["InstrumentedHashSet<br/>(Extends HashSet: overrides add & addAll)"]
-        BaseClassNode["java.util.HashSet<br/>(super.addAll invokes add internally -> Double Counting Bug!)"]
-        SubclassNode -->|"Extends base class implementation"| BaseClassNode
-    end
+classDiagram
+    direction TB
+    class Set~E~ {
+        <<interface>>
+        +add(E e) boolean
+        +addAll(Collection~E~ c) boolean
+    }
+    class InstrumentedSet~E~ {
+        -Set~E~ delegate
+        -int addCount
+        +add(E e) boolean
+        +addAll(Collection~E~ c) boolean
+        +getAddCount() int
+    }
+    class HashSet~E~ {
+        +add(E e) boolean
+        +addAll(Collection~E~ c) boolean
+    }
 
-    subgraph RobustComposition ["Robust Composition (Paved Road)"]
-        DecoratorNode["InstrumentedSet&lt;E&gt;<br/>(Implements Set, decorates delegate, tracks addCount)"]
-        InterfaceNode["java.util.Set&lt;E&gt;<br/>(Decoupled interface, explicit method delegation)"]
-        DecoratorNode -->|"Composes and forwards calls"| InterfaceNode
-    end
+    Set <|.. InstrumentedSet : implements interface
+    InstrumentedSet o-- Set : composes delegate (forwards calls)
+    Set <|.. HashSet : implements interface
 
-    style FragileInheritance fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
-    style RobustComposition fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-
-    style SubclassNode fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style BaseClassNode fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style DecoratorNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style InterfaceNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Set fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style InstrumentedSet fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    style HashSet fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
 ```
 
 #### Production Code: The Forwarding / Decorator Idiom
@@ -691,9 +756,9 @@ public enum ConnectionPoolManager {
 * **Spring Usage**: Spring Bean Prototype Scope (`@Scope("prototype")`).
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph PrototypeFlow ["Prototype Pattern Architecture"]
-        direction TB
+        direction LR
         ProtoInterface["Prototype&lt;T&gt;<br/>(Defines copy() contract)"]
         ConcreteProto["ReportConfiguration<br/>(Implements copy(): deep/defensive clone)"]
         ClientApp["Report Engine Client<br/>(Clones baseline config for tenants)"]
@@ -799,7 +864,7 @@ public class LegacyBankingAdapter implements PaymentGateway {
 * **JDK / Spring Usage**: `BufferedReader(new InputStreamReader(System.in))`, Spring `HttpServletRequestWrapper`.
 
 ```mermaid
-flowchart TD
+flowchart LR
     Client["MessageService"] --> Interface["MessagePublisher Interface"]
     Interface -.-> Base["KafkaMessagePublisher (Core Impl)"]
     Interface -.-> Dec["EncryptedMessagePublisherDecorator (Adds AES-256)"]
@@ -979,17 +1044,40 @@ public class CompositeRole implements PermissionComponent {
 * **Spring Idiom**: Injecting `Map<String, StrategyInterface>` directly into services for dynamic algorithmic dispatch.
 
 ```mermaid
-flowchart TD
-    Client["TaxCalculationService"] --> StrategyChooser{"Strategy Map Lookup<br/>Map&lt;String, TaxStrategy&gt;"}
-    StrategyChooser -->|"US"| US["UsSalesTaxStrategy"]
-    StrategyChooser -->|"EU"| EU["EuVatTaxStrategy"]
-    StrategyChooser -->|"IN"| IN["IndiaGstTaxStrategy"]
+classDiagram
+    direction TB
+    class TaxCalculationService {
+        -Map~String, TaxStrategy~ strategyMap
+        +calculate(String country, BigDecimal subtotal) BigDecimal
+    }
+    class TaxStrategy {
+        <<interface>>
+        +getCountryCode() String
+        +calculateTax(BigDecimal subtotal) BigDecimal
+    }
+    class UsSalesTaxStrategy {
+        +getCountryCode() String
+        +calculateTax(BigDecimal subtotal) BigDecimal
+    }
+    class EuVatTaxStrategy {
+        +getCountryCode() String
+        +calculateTax(BigDecimal subtotal) BigDecimal
+    }
+    class IndiaGstTaxStrategy {
+        +getCountryCode() String
+        +calculateTax(BigDecimal subtotal) BigDecimal
+    }
 
-    style Client fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style StrategyChooser fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style US fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style EU fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style IN fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    TaxCalculationService --> TaxStrategy : dynamic map dispatch
+    TaxStrategy <|.. UsSalesTaxStrategy : implements
+    TaxStrategy <|.. EuVatTaxStrategy : implements
+    TaxStrategy <|.. IndiaGstTaxStrategy : implements
+
+    style TaxCalculationService fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    style TaxStrategy fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style UsSalesTaxStrategy fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style EuVatTaxStrategy fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style IndiaGstTaxStrategy fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
 ```
 
 ```java
@@ -1034,18 +1122,28 @@ public class TaxCalculationEngine {
 
 ```mermaid
 flowchart TD
-    Template["DataIngestionPipeline (Template Base)"]
-    Template --> Step1["1. readData() [abstract]"]
-    Step1 --> Step2["2. validateData() [abstract]"]
-    Step2 --> Step3["3. transform() [abstract]"]
-    Step3 --> Step4["4. persist() [abstract]"]
-    Step4 --> Step5["5. afterIngestionHook() [hook]"]
+    Template["DataIngestionPipeline (Template Base Class)"]
 
+    subgraph Stage1 ["Stage 1: Read, Validate & Transform"]
+        direction LR
+        Step1["1. readData()<br/>[abstract method]"] --> Step2["2. validateData()<br/>[abstract method]"] --> Step3["3. transform()<br/>[abstract method]"]
+    end
+
+    subgraph Stage2 ["Stage 2: Persistence & Lifecycle Hooks"]
+        direction LR
+        Step4["4. persist()<br/>[abstract method]"] --> Step5["5. afterIngestionHook()<br/>[optional concrete hook]"]
+    end
+
+    Template --> Stage1
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Template fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Step1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Step2 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Step3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Step4 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style Step1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Step2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Step3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Step4 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style Step5 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 

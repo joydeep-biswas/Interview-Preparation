@@ -93,12 +93,28 @@ flowchart TD
 
 LLMs do not process raw Unicode strings directly. A tokenizer converts text into a sequence of discrete integer token IDs. **Byte-Pair Encoding (BPE)** is a compression algorithm that iteratively merges the most frequent pairs of bytes/characters in a training corpus:
 
-```text
-BPE MERGE ITERATION PROTOCOL:
-Initial Vocabulary: 256 individual byte tokens (0x00 to 0xFF).
-Pass 1: Count co-occurrence of adjacent token pairs across corpus.
-Pass 2: Merge most frequent pair (e.g., 't' + 'h' -> 'th'). Add 'th' to vocabulary.
-Pass 3: Repeat until target vocabulary size V is reached (e.g., 32,000 to 128,000 tokens).
+```mermaid
+flowchart TD
+    subgraph BPE ["Byte-Pair Encoding (BPE) Iteration Protocol"]
+        Init["Initial Vocabulary<br/>(256 raw byte tokens: 0x00 to 0xFF)"]
+        Pass1["Pass 1: Count Co-occurrence<br/>(Scan corpus for frequent adjacent token pairs)"]
+        Pass2["Pass 2: Merge Most Frequent Pair<br/>(e.g., 't' + 'h' → 'th' added to vocabulary)"]
+        Pass3{"Target Vocabulary Size V Reached?<br/>(e.g., 32,000 to 128,000 tokens)"}
+        Done["Final Tokenizer Vocabulary Ready"]
+
+        Init --> Pass1
+        Pass1 --> Pass2
+        Pass2 --> Pass3
+        Pass3 -- No --> Pass1
+        Pass3 -- Yes --> Done
+    end
+
+    style BPE fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Init fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Pass1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Pass2 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Pass3 fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style Done fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 In modern tokenizers (`tiktoken`, Hugging Face `tokenizers`), **Byte-Fallback** ensures that any unknown Unicode character or emoji decomposes gracefully into UTF-8 constituent bytes, completely eliminating out-of-vocabulary (`<unk>`) token exceptions.
@@ -157,7 +173,7 @@ To extend context horizons (e.g., from 8k to 128k tokens):
 ### 2.2 The U-Shaped Attention Curve & Retrieval Placement Strategies
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph ContextDistribution ["The U-Shaped Retrieval Accuracy Distribution"]
         Start["Beginning of Prompt (System Instructions)<br/>Accuracy: ~90% (High Primacy Effect)"]
         Middle["Middle of Context (Document Chunks 5-15)<br/>Accuracy: ~45% ('Lost in the Middle')"]
@@ -203,18 +219,11 @@ A model with $\text{PPL} = 15$ predicts next tokens as accurately as if it were 
 
 # 4. Training & Alignment Continuum: Pretraining vs. SFT vs. RLHF/DPO
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| STAGE                 | DATASET TYPE & VOLUME       | PRIMARY OBJECTIVE             |
-+-----------------------+-----------------------------+-------------------------------+
-| 1. Pretraining        | 10T - 20T tokens of web     | World knowledge acquisition,  |
-|                       | text, code, books, papers.  | grammatical syntax, reasoning.|
-| 2. Supervised         | 50k - 500k curated (prompt, | Instruction-following, chat   |
-|    Fine-Tuning (SFT)  | golden_response) dialogues. | formatting, tool calling syntax.|
-| 3. Preference Tuning  | 50k - 200k pairwise samples | Safety alignment, helpfulness,|
-|    (DPO / RLHF)       | (prompt, chosen, rejected). | tone calibration, anti-refusal.|
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Stage | Dataset Type & Volume | Primary Objective |
+| :--- | :--- | :--- |
+| **1. Pretraining** | 10T – 20T tokens of web text, code, books, papers. | World knowledge acquisition, grammatical syntax, next-token reasoning. |
+| **2. Supervised Fine-Tuning (SFT)** | 50k – 500k curated (prompt, golden response) dialogues. | Instruction-following, chat formatting, tool calling syntax. |
+| **3. Preference Tuning (DPO / RLHF)** | 50k – 200k pairwise samples (prompt, chosen, rejected). | Safety alignment, helpfulness, tone calibration, anti-refusal behavior. |
 
 ### 4.3 Direct Preference Optimization (DPO) vs. PPO (RLHF)
 
@@ -232,18 +241,26 @@ where $y_w$ is the preferred response and $y_l$ is the dispreferred response.
 
 ```mermaid
 flowchart TD
-    Logits["Raw Output Logits z in R^V"] --> Temp["Temperature Scaling:<br/>z_scaled = z / T"]
-    Temp --> TopK["Top-k Filtering:<br/>Keep highest k logits; set others to -inf"]
-    TopK --> Softmax["Softmax Normalization:<br/>p_i = exp(z_i) / sum(exp(z_j))"]
-    Softmax --> TopP["Top-p (Nucleus) Filtering:<br/>Sort p descending; retain smallest subset with sum >= p"]
-    TopP --> Sample["Categorical Sampling:<br/>Draw token from filtered distribution"]
+    subgraph Stage1 ["Stage 1: Logit Scaling & Candidate Pruning"]
+        direction LR
+        Logits["Raw Output Logits<br/>(z ∈ ℝ^V from transformer LM head)"] --> Temp["Temperature Scaling<br/>(z_scaled = z / T)"] --> TopK["Top-k Filtering<br/>(Retain top k logits, set rest to -∞)"]
+    end
 
+    subgraph Stage2 ["Stage 2: Probability Distribution & Sampling"]
+        direction LR
+        Softmax["Softmax Normalization<br/>(p_i = exp(z_i) / Σ exp(z_j))"] --> TopP["Top-p Nucleus Filtering<br/>(Smallest subset with Σ p_i ≥ p)"] --> Sample["Categorical Sampling<br/>(Sample next token id)"]
+    end
+
+    Stage1 --> Stage2
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Logits fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Temp fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style TopK fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Softmax fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style TopP fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Sample fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Temp fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style TopK fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Softmax fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style TopP fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Sample fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ### 5.1 Temperature Scaling, Top-k, Top-p (Nucleus Sampling)
@@ -346,25 +363,14 @@ TACTICAL MITIGATION PROTOCOLS:
 
 ### 7.1 Architectural Decision Matrix
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| DIMENSION             | HOSTED FRONTIER APIS        | OPEN-WEIGHT MODELS            |
-|                       | (GPT-4o, Claude 3.5, Gemini)| (Llama 3.1/3.3, Mistral, Qwen)|
-+-----------------------+-----------------------------+-------------------------------+
-| Reasoning / Benchmark | Highest zero-shot reasoning | Matches frontier on domain-   |
-| Capability            | and complex coding scores.  | fine-tuned or targeted tasks. |
-| Time to Market        | Instant setup (API call).   | Requires infrastructure,      |
-|                       | Zero infrastructure to run. | serving engine, GPU cluster.  |
-| Data Privacy & IP     | Third-party API transit;    | Air-gapped on-premise or      |
-|                       | governed by enterprise DPA. | private VPC; zero data leaks. |
-| Latency Predictability| Prone to internet jitter &  | Predictable, SLA-controlled   |
-|                       | provider peak-hour queues.  | dedicated GPU hardware.       |
-| Cost at Scale         | High per-token costs at     | Substantially lower marginal  |
-|                       | high concurrency ($>100M/mo)| cost per token at saturation. |
-| Customization         | Limited to prompt/few-shot  | Full parameter fine-tuning,   |
-|                       | or API fine-tuning.         | custom vocabularies, LoRA.    |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Dimension | Hosted Frontier APIs (GPT-4o, Claude 3.5, Gemini) | Open-Weight Models (Llama 3.1/3.3, Mistral, Qwen) |
+| :--- | :--- | :--- |
+| **Reasoning / Benchmark Capability** | Highest zero-shot reasoning and complex coding scores. | Matches frontier on domain-fine-tuned or targeted tasks. |
+| **Time to Market** | Instant setup (API call). Zero infrastructure to run. | Requires infrastructure, serving engine, GPU cluster. |
+| **Data Privacy & IP** | Third-party API transit; governed by enterprise DPA. | Air-gapped on-premise or private VPC; zero data leaks. |
+| **Latency Predictability** | Prone to internet jitter & provider peak-hour queues. | Predictable, SLA-controlled dedicated GPU hardware. |
+| **Cost at Scale** | High per-token costs at high concurrency (\$ >100M/mo). | Substantially lower marginal cost per token at saturation. |
+| **Customization** | Limited to prompt/few-shot or API fine-tuning. | Full parameter fine-tuning, custom vocabularies, LoRA. |
 
 ---
 
@@ -384,20 +390,12 @@ Quantization converts high-precision floating-point weights (FP16/BF16: 2 bytes 
 
 ### 8.2 Quantization Schemes: AWQ, GPTQ, GGUF, FP8
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| METHOD                | WEIGHT / ACTIVATION FORMAT  | ADVANTAGES & SERVING ENGINES  |
-+-----------------------+-----------------------------+-------------------------------+
-| GPTQ                  | INT4 Weights / FP16 Acts    | Layer-by-layer second-order   |
-|                       | (W4A16)                     | Hessian optimization. Fast.   |
-| AWQ (Activation-aware)| INT4 Weights / FP16 Acts    | Protects top 1% salient       |
-|                       | (W4A16)                     | channels; superior perplexity.|
-| FP8 (E4M3 / E5M2)     | FP8 Weights / FP8 Acts      | Supported natively on Hopper  |
-|                       | (W8A8)                      | H100; zero perplexity drop.   |
-| GGUF (llama.cpp)      | INT2 to INT8 Mixed (k-quants)| Designed for CPU & Apple      |
-|                       |                             | Silicon unified memory inference|
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Method | Weight / Activation Format | Advantages & Serving Engines |
+| :--- | :--- | :--- |
+| **GPTQ** | INT4 Weights / FP16 Activations (W4A16) | Layer-by-layer second-order Hessian optimization. High throughput on vLLM/TGI. |
+| **AWQ** (Activation-aware) | INT4 Weights / FP16 Activations (W4A16) | Protects top 1% salient channels; superior perplexity retention on LLMs. |
+| **FP8** (E4M3 / E5M2) | FP8 Weights / FP8 Activations (W8A8) | Supported natively on Hopper H100; zero perplexity drop with 2x speedup. |
+| **GGUF** (llama.cpp) | INT2 to INT8 Mixed (k-quants) | Designed for CPU & Apple Silicon unified memory inference. |
 
 > [!CAUTION]
 > Naive INT4 quantization across all weights without activation-awareness (such as AWQ) breaks model coherence on complex math and multi-step reasoning. Always evaluate perplexity on Wikitext-2 and domain benchmarks before deploying quantized models to production.

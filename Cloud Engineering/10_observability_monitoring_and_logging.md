@@ -107,23 +107,11 @@ flowchart TD
 
 ### 1.2 Diagnostic Frameworks: RED, USE, and the 4 Golden Signals
 
-```text
-1. GOOGLE SRE 4 GOLDEN SIGNALS:
-   - Latency: Time taken to service a request (differentiating successful requests from failed requests).
-   - Traffic: Demand placed on the system (e.g. HTTP requests/sec, concurrent transactions).
-   - Errors: Rate of requests that fail explicitly (HTTP 500) or implicitly (wrong content returned).
-   - Saturation: How "full" the service is (CPU %, memory usage, database connection pool limits).
-
-2. THE RED METHOD (Focuses on Request-Driven Microservices):
-   - Rate: Requests processed per second.
-   - Errors: Number of failed requests per second.
-   - Duration: Time taken for requests to complete.
-
-3. THE USE METHOD (Focuses on Infrastructure & Hardware Resources):
-   - Utilization: Percentage of time that the resource was busy (e.g. Disk active time).
-   - Saturation: The degree to which extra work is queued waiting for the resource.
-   - Errors: Count of physical or hardware errors (e.g. NIC packet drops, disk I/O errors).
-```
+| Framework | Primary Target Scope | Metric Pillars | Diagnostic Focus & Intent |
+| :--- | :--- | :--- | :--- |
+| **Google SRE 4 Golden Signals** | User-Facing Distributed Services | • **Latency:** Time taken to service a request (differentiating success vs. failure).<br/>• **Traffic:** Demand placed on system (HTTP req/sec, concurrent transactions).<br/>• **Errors:** Rate of explicitly (HTTP 500) or implicitly failed requests.<br/>• **Saturation:** System fullness (CPU %, memory, DB connection pool depth). | Complete end-to-end user experience and capacity degradation visibility. |
+| **The RED Method** | Request-Driven Microservices | • **Rate:** Number of incoming requests processed per second.<br/>• **Errors:** Number of failed requests per second.<br/>• **Duration:** Latency distribution and time taken for requests to complete. | Standardized per-service dashboards and SLO monitoring for APIs. |
+| **The USE Method** | Infrastructure & Hardware Resources | • **Utilization:** Percentage of time the resource was busy (e.g. disk busy %).<br/>• **Saturation:** Degree to which extra work is queued waiting for hardware.<br/>• **Errors:** Count of physical hardware errors (NIC packet drops, ECC faults). | Node-level, disk, kernel, and OS bottleneck root-cause isolation. |
 
 ---
 
@@ -165,14 +153,16 @@ AppRequests
 
 The Prometheus TSDB stores floating-point sample values compressed via Facebook's **Gorilla** algorithm:
 
-```text
-[Incoming Samples] ──> [Write-Ahead Log (WAL) on Disk]
-                             │
-                             ▼
-                    [In-Memory Head Chunk (2 Hours)]
-                             │ (Compaction / Gorilla Bit-Packing)
-                             ▼
-                    [Immutable Persistent Block (Chunk Directory)]
+```mermaid
+flowchart LR
+    Samples["Incoming Metric Samples"] --> WAL["Write-Ahead Log (WAL) on Disk"]
+    WAL --> Head["In-Memory Head Chunk (2 Hours)"]
+    Head -- "Compaction & Gorilla Bit-Packing" --> Block["Immutable Persistent Block (Chunk Directory)"]
+
+    classDef proc fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef store fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+    class Samples proc;
+    class WAL,Head,Block store;
 ```
 
 - **Delta-of-Deltas Timestamp Compression:** Timestamps arrive at regular intervals (e.g. every 15s). Prometheus stores the difference between consecutive time deltas, reducing 64-bit timestamps to ~1.37 bytes.
@@ -275,11 +265,14 @@ service:
 
 Distributed tracing correlates operations across asynchronous microservice boundaries by propagating HTTP headers defined by the **W3C Trace Context** standard:
 
-```text
-HTTP Header: traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-                          │  └───────────────┬────────────────┘ └───────┬────────┘ └─┬┘
-                       Version            Trace ID                  Parent Span ID Flags
-```
+`traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01`
+
+| Field | Value | Length | Description |
+| :--- | :--- | :--- | :--- |
+| **Version** | `00` | 2 hex characters (1 byte) | Current W3C specification version. |
+| **Trace ID** | `4bf92f3577b34da6a3ce929d0e0e4736` | 32 hex characters (16 bytes) | Globally unique identifier shared across all services in the transaction call graph. |
+| **Parent Span ID** | `00f067aa0ba902b7` | 16 hex characters (8 bytes) | Unique identifier for the specific unit of work executed by the caller service. |
+| **Trace Flags** | `01` | 2 hex characters (1 byte / 8-bit bitmap) | `01` signals that the trace was sampled and must be recorded by downstream telemetry receivers. |
 
 - **Trace ID (16 bytes / 32 hex chars):** Unique identifier shared across all services in the call graph.
 - **Span ID (8 bytes / 16 hex chars):** Unique identifier for the specific unit of work executed by a single service.

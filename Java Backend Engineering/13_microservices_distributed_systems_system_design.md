@@ -130,15 +130,15 @@ flowchart TD
 A Monolithic architecture unifies the entire application codebase, data models, and business logic into a single deployable artifact (JAR/WAR). A Microservices architecture decomposes the enterprise domain into a distributed collection of independently deployable, loosely coupled, polyglot services organized around business capabilities.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Monolith["Monolithic Architecture"]
-        direction TB
+        direction LR
         M_UI["Web Client / UI"] --> M_App["Unified Monolithic Process (User, Order, Payment, Catalog)"]
         M_App --> M_DB[("Single Monolithic Central Database")]
     end
 
     subgraph Microservices["Microservices Architecture"]
-        direction TB
+        direction LR
         MS_UI["Web Client / UI"] --> MS_GW["API Gateway (L7 Router)"]
         MS_GW --> S1["User Service"] --> DB1[("User DB")]
         MS_GW --> S2["Order Service"] --> DB2[("Order DB")]
@@ -346,6 +346,7 @@ flowchart LR
 In a distributed microservices call chain, a single incoming user transaction touches dozens of services. Without distributed tracing, isolating the root cause of high latency or failures is impossible.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor User as User Browser
@@ -445,31 +446,35 @@ flowchart TD
 The Circuit Breaker pattern prevents an application from repeatedly executing an operation that is failing, preventing cascading thread pool exhaustion across microservices:
 
 ```mermaid
-flowchart TD
-    subgraph OperationalState ["Normal Operation"]
-        Closed["CLOSED State (Healthy)<br/>(Traffic routed to remote service, failure rate monitored)"]
-    end
+stateDiagram-v2
+    classDef operational fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef tripped fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef trial fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
 
-    subgraph ProtectiveCutoff ["Failure Isolation"]
-        Open["OPEN State (Circuit Tripped)<br/>(Immediate fail-fast without network call, returns fallback)"]
-    end
+    [*] --> CLOSED
+    
+    CLOSED --> OPEN: Failure rate exceeds threshold (e.g. > 50% in sliding window)
+    note right of CLOSED
+        Normal operation. Remote calls allowed.
+        Metrics recorded in sliding window.
+    end note
 
-    subgraph RecoveryTrial ["Probing Recovery"]
-        HalfOpen["HALF_OPEN State (Trial Cooldown)<br/>(Permits limited probe calls to test remote dependency health)"]
-    end
+    OPEN --> HALF_OPEN: Cooldown duration expires (e.g. wait 15s)
+    note right of OPEN
+        Tripped state. Immediate fail-fast.
+        No network call; returns fallback response.
+    end note
 
-    Closed -->|"Failure rate exceeds threshold (e.g. >50% in window)"| Open
-    Open -->|"Cooldown duration expires (e.g. 15s wait)"| HalfOpen
-    HalfOpen -->|"Probe calls succeed >= threshold"| Closed
-    HalfOpen -->|"Probe call fails"| Open
+    HALF_OPEN --> CLOSED: Trial calls succeed >= threshold
+    HALF_OPEN --> OPEN: Trial call fails
+    note right of HALF_OPEN
+        Probing state. Permits limited trial requests
+        to test remote dependency health.
+    end note
 
-    style OperationalState fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style ProtectiveCutoff fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
-    style RecoveryTrial fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-
-    style Closed fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Open fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style HalfOpen fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    class CLOSED operational
+    class OPEN tripped
+    class HALF_OPEN trial
 ```
 
 1. **`CLOSED`**: Requests flow normally. The circuit tracks call outcomes in a sliding window (e.g., last 100 calls). If the failure rate exceeds the configured threshold (e.g., 50%), the circuit transitions to `OPEN`.
@@ -549,12 +554,21 @@ The Bulkhead pattern isolates computing resources into independent compartments 
 In distributed networks, timeouts can leave callers uncertain whether a request succeeded. An **Idempotency Key** ensures that repeating an API call produces the exact same result without executing the business logic twice:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
-    actor Client
-    participant GW as API Gateway / App
-    participant Redis as Redis Cluster
-    participant DB as PostgreSQL Database
+    box rgba(15, 23, 42, 0.8) Client Perimeter
+        actor Client
+    end
+    box rgba(30, 41, 59, 0.8) Ingress Tier
+        participant GW as API Gateway / App
+    end
+    box rgba(6, 78, 59, 0.5) State & Cache
+        participant Redis as Redis Cluster
+    end
+    box rgba(30, 58, 138, 0.5) Persistence Tier
+        participant DB as PostgreSQL Database
+    end
 
     Client->>GW: POST /api/v1/payments (Header: Idempotency-Key: pay-9281)
     GW->>Redis: Check key "idempotency:pay-9281"
@@ -594,37 +608,43 @@ sequenceDiagram
 ### 3.2 Saga Choreography vs Saga Orchestration
 
 ```mermaid
-flowchart TD
-    subgraph SagaChoreography["Saga Choreography: Decentralized Event Flow"]
-        direction LR
-        O1["Order Service"] -->|Event: OrderCreated| P1["Payment Service"]
-        P1 -->|Event: PaymentSuccess| I1["Inventory Service"]
-        I1 -.->|"Event: OutOfStock (Compensate)"| P1
-        NoteChor["Services listen to events and decide next action autonomously;<br/>simple for 2-3 services; nightmare to debug at scale"]
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    box rgba(15, 23, 42, 0.8) Client Perimeter
+        actor Client
+    end
+    box rgba(30, 41, 59, 0.8) Coordination Tier
+        participant Orch as Order Saga Orchestrator
+    end
+    box rgba(49, 46, 129, 0.5) Microservices
+        participant Pay as Payment Service
+        participant Inv as Inventory Service
     end
 
-    subgraph SagaOrchestration["Saga Orchestration: Centralized Workflow Coordinator"]
-        direction TB
-        Orchestrator["Saga Orchestrator Service<br/>(State Machine Engine)"]
-        Orchestrator -->|1. Command: ProcessPayment| P2["Payment Service"]
-        P2 -->|Result: Success| Orchestrator
-        Orchestrator -->|2. Command: ReserveInventory| I2["Inventory Service"]
-        I2 -->|Result: OutOfStock Failure| Orchestrator
-        Orchestrator -->|3. Compensation: RefundPayment| P2
-        NoteOrch["Single coordinator manages state machine and explicit compensations;<br/>standard for enterprise workflows"]
+    Client->>Orch: Submit Order (items, payment)
+    activate Orch
+    Orch->>Pay: 1. Command: ProcessPayment(amount)
+    activate Pay
+    Pay-->>Orch: PaymentAuthorized(txId)
+    deactivate Pay
+
+    Orch->>Inv: 2. Command: ReserveInventory(items)
+    activate Inv
+    alt Inventory Available (Happy Path)
+        Inv-->>Orch: InventoryReserved()
+        deactivate Inv
+        Orch-->>Client: 201 Created (Order Complete)
+    else Out of Stock (Failure Branch)
+        Inv-->>Orch: OutOfStockError()
+        Note over Orch,Pay: Trigger Compensating Transaction
+        Orch->>Pay: 3. Compensate: RefundPayment(txId)
+        activate Pay
+        Pay-->>Orch: PaymentRefunded()
+        deactivate Pay
+        Orch-->>Client: 409 Conflict (Order Cancelled & Refunded)
     end
-
-    style SagaChoreography fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style SagaOrchestration fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-
-    style O1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style P1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style I1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style NoteChor fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Orchestrator fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style P2 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style I2 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style NoteOrch fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    deactivate Orch
 ```
 
 ---
@@ -802,14 +822,22 @@ The Strangler Fig pattern migrates legacy monoliths safely without risky "big ba
 ### 4.1 The CAP Theorem & PACELC Theorem Deep-Dive
 
 ```mermaid
-flowchart TD
-    CAP["CAP Theorem (Under Network Partition P)"]
-    CAP --> CP["CP: Consistency + Partition Tolerance<br/>(Sacrifices Availability: Reject writes if partition occurs)<br/>Examples: etcd, Spanner, ZooKeeper, CockroachDB"]
-    CAP --> AP["AP: Availability + Partition Tolerance<br/>(Sacrifices Strong Consistency: Accepts writes on all sides)<br/>Examples: Apache Cassandra, DynamoDB, CouchDB"]
-
-    style CAP fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style CP fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
-    style AP fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+%%{init: {'theme': 'dark', 'themeVariables': { 'quadrant1Fill': '#1e293b', 'quadrant2Fill': '#0f172a', 'quadrant3Fill': '#1e293b', 'quadrant4Fill': '#0f172a', 'quadrantPointFill': '#3b82f6', 'quadrantPointTextFill': '#ffffff', 'quadrantTitleFill': '#ffffff', 'quadrantAxisTextFill': '#93c5fd', 'quadrantInternalBorderStrokeFill': '#334155', 'quadrantExternalBorderStrokeFill': '#475569' }}}%%
+quadrantChart
+    title CAP & PACELC Trade-Off Landscape Under Network Partition
+    x-axis "Low Consistency (Eventual)" --> "Strong Consistency (Linearizable)"
+    y-axis "High Latency (Pessimistic Quorum)" --> "Ultra-Low Latency (Local AP Reads)"
+    quadrant-1 "AP Systems (High Availability & Speed)"
+    quadrant-2 "Rare Theoretical Island"
+    quadrant-3 "CP Systems (Strict Consistency & Linearizable)"
+    quadrant-4 "Tunable Quorum Datastores"
+    "Apache Cassandra": [0.22, 0.88]
+    "AWS DynamoDB (Eventual)": [0.25, 0.84]
+    "Apache Kafka (acks=1)": [0.35, 0.78]
+    "Google Cloud Spanner": [0.92, 0.22]
+    "PostgreSQL (2PC Multi-Master)": [0.88, 0.28]
+    "etcd / Raft Consensus": [0.90, 0.35]
+    "MongoDB (Primary Read)": [0.75, 0.45]
 ```
 
 #### PACELC Real-World Database Classification Matrix

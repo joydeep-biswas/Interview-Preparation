@@ -11,39 +11,44 @@ Every guide includes formal architectural definitions, Mermaid topological diagr
 ```mermaid
 flowchart TD
     subgraph FoundationTier ["Tier 1: Core Languages & Relational Foundations"]
-        M1["01. SQL Fundamentals<br/>(Logical execution order, set operations, aggregates, joins, NULL traps)"]
-        --> M2["02. Advanced SQL<br/>(Window functions, recursive CTEs, query planning, indexing, MERGE / UPSERT)"]
-        --> M3["03. Python for Data Engineering<br/>(Memory management, generators, chunked I/O, Pydantic, concurrency, zoneinfo UTC)"]
+        direction LR
+        M1["01. SQL Fundamentals<br/>(Logical execution, joins, NULL traps)"]
+        --> M2["02. Advanced SQL<br/>(Window funcs, CTEs, query planning, MERGE)"]
+        --> M3["03. Python for DE<br/>(Memory, streaming I/O, Pydantic, concurrency)"]
     end
 
     subgraph StorageSystemsTier ["Tier 2: Storage Engines & Distributed Foundations"]
-        M4["04. Database Internals & Performance<br/>(B+ Trees, LSM Trees, WAL, buffer pools, MVCC, row vs columnar)"]
-        --> M5["05. Distributed Systems & APIs<br/>(CAP / PACELC, Raft / Paxos, 2PC, consistent hashing, backoff with jitter)"]
-        --> M6["06. Data Architecture & Modeling<br/>(Kimball Star/Snowflake, Fact/Dim taxonomy, SCD 0–6, Data Vault, Semantic Layer)"]
-        --> M7["07. File Formats & Storage<br/>(Parquet, ORC, Avro, Snappy / ZSTD codecs, small files, object lifecycle)"]
+        direction LR
+        M4["04. Database Internals<br/>(B+ Trees, LSM, WAL, buffer pools, MVCC)"]
+        --> M5["05. Distributed Systems<br/>(CAP / PACELC, Raft, 2PC, consistent hashing)"]
+        --> M6["06. Data Architecture<br/>(Kimball Star/Snowflake, SCD 0-6, Data Vault)"]
+        --> M7["07. File Formats<br/>(Parquet, ORC, Avro, codecs, small files)"]
     end
 
     subgraph DistributedLakehouseTier ["Tier 3: Distributed Computing & Modern Lakehouse"]
-        M8["08. Apache Spark & PySpark<br/>(Catalyst, Tungsten, joins, data skew salting, AQE, memory tuning, bucketing, OOM)"]
-        --> M9["09. Databricks & Delta Lake<br/>(ACID log, OPTIMIZE/Z-ORDER, Liquid Clustering, VACUUM, Unity Catalog, Instance Pools)"]
+        direction LR
+        M8["08. Apache Spark & PySpark<br/>(Catalyst, Tungsten, joins, skew salting, AQE, OOM)"]
+        --> M9["09. Databricks & Delta Lake<br/>(ACID log, OPTIMIZE/Z-ORDER, Liquid, VACUUM, Unity)"]
     end
 
     subgraph PipelineStreamingTier ["Tier 4: Resilient Ingestion, Streaming & Orchestration"]
-        M10["10. Data Pipeline Design & Ingestion<br/>(Batch vs streaming, idempotency, watermarks, DLQ, CDC Debezium, Auto Loader)"]
-        --> M11["11. Streaming & Kafka Event Streaming<br/>(Kafka internals, consumer groups, watermarks, event-time windowing, Trigger.AvailableNow)"]
-        --> M12["12. Orchestration: Airflow & dbt<br/>(DAG design, sensors, Celery/K8s, dbt models, incremental merge, MetricFlow)"]
+        direction LR
+        M10["10. Pipeline Design & Ingestion<br/>(Batch vs stream, idempotency, DLQ, CDC)"]
+        --> M11["11. Streaming & Kafka<br/>(Internals, consumer groups, watermarks)"]
+        --> M12["12. Orchestration: Airflow & dbt<br/>(DAGs, sensors, Celery/K8s, dbt models)"]
     end
 
     subgraph EnterpriseArchitectureTier ["Tier 5: Enterprise Cloud, Governance & System Design"]
-        M13["13. Azure Data Engineering & DevOps<br/>(ADF metadata pipelines, Synapse, Databricks, Key Vault, Terraform, CI/CD DataOps)"]
-        --> M14["14. Data Governance, Security & Observability<br/>(RBAC/ABAC, row/column security, OpenLineage, Great Expectations, 5 pillars)"]
-        --> M15["15. System Design for Data Engineering<br/>(End-to-end lakehouses, real-time CDC, ClickHouse OLAP, 4-step interview method)"]
+        direction LR
+        M13["13. Azure Data Engineering<br/>(ADF, Synapse, Databricks, Terraform, CI/CD)"]
+        --> M14["14. Governance & Observability<br/>(RBAC/ABAC, OpenLineage, Great Expectations)"]
+        --> M15["15. System Design for DE<br/>(End-to-end lakehouses, real-time CDC, OLAP)"]
     end
 
-    FoundationTier --> StorageSystemsTier
-    StorageSystemsTier --> DistributedLakehouseTier
-    DistributedLakehouseTier --> PipelineStreamingTier
-    PipelineStreamingTier --> EnterpriseArchitectureTier
+    M3 --> M4
+    M7 --> M8
+    M9 --> M10
+    M12 --> M13
 
     style FoundationTier fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style StorageSystemsTier fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7

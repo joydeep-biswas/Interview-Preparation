@@ -138,11 +138,23 @@ stream_df = (
 
 #### Checkpoint Directory Architecture (Q3)
 Inside the `checkpointLocation`, Structured Streaming maintains three critical directories:
-```
-/checkpointLocation/
-├── offsets/      # Monotonic micro-batch IDs with exact start/end offsets (WAL)
-├── commits/      # Logs completed micro-batches (written ONLY after output sinks commit)
-└── state/        # RocksDB / HDFS state stores for streaming aggregations and watermarks
+```mermaid
+flowchart TD
+    subgraph CheckpointDir ["📁 /checkpointLocation/ (Fault-Tolerant Root)"]
+        direction TB
+        Offsets["📁 offsets/<br/><b>Write-Ahead Log (WAL)</b><br/>• Monotonic micro-batch IDs (0, 1, 2...)<br/>• Exact start/end source offset ranges"]
+        Commits["📁 commits/<br/><b>Completion Manifests</b><br/>• Logs completed micro-batches<br/>• Written ONLY after sink commits idempotently"]
+        StateStore["📁 state/<br/><b>State Stores (RocksDB / HDFS)</b><br/>• Stateful streaming aggregations<br/>• Watermark thresholds & session keys"]
+    end
+
+    CheckpointDir --> Offsets
+    CheckpointDir --> Commits
+    CheckpointDir --> StateStore
+
+    style CheckpointDir fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Offsets fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Commits fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style StateStore fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
 ```
 
 ---

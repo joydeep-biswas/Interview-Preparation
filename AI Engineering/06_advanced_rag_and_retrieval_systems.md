@@ -103,14 +103,36 @@ $$\text{BM25}(D, Q) = \sum_{i=1}^n \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (
 
 An Inverted Index maps each discrete vocabulary token to a sorted **posting list** containing document IDs and term positions:
 
-```text
-INVERTED INDEX POSTINGS LIST:
-"kubernetes" -> [Doc 12: pos 4, 18], [Doc 45: pos 92], [Doc 99: pos 3]
-"ingress"    -> [Doc 12: pos 19], [Doc 99: pos 4]
+```mermaid
+flowchart TD
+    subgraph InvertedIndex ["Inverted Index Postings List"]
+        T1["Token: 'kubernetes'"] --> P1["Doc 12: pos [4, 18]"]
+        T1 --> P2["Doc 45: pos [92]"]
+        T1 --> P3["Doc 99: pos [3]"]
 
-INTERSECTION QUERY ("kubernetes" AND "ingress"):
-Doc 12: [Match! Adjacent terms: positions 18 and 19 form exact phrase]
-Doc 99: [Match! Adjacent terms: positions 3 and 4]
+        T2["Token: 'ingress'"] --> P4["Doc 12: pos [19]"]
+        T2 --> P5["Doc 99: pos [4]"]
+    end
+    subgraph Intersection ["Intersection Query ('kubernetes' AND 'ingress')"]
+        M1["Doc 12: Exact Phrase Match (pos 18 + 19)"]
+        M2["Doc 99: Adjacent Match (pos 3 + 4)"]
+    end
+    P1 -.-> M1
+    P4 -.-> M1
+    P3 -.-> M2
+    P5 -.-> M2
+
+    style InvertedIndex fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Intersection fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style T1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style T2 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style P1 fill:#1f2937,stroke:#06b6d4,stroke-width:1px,color:#fff
+    style P2 fill:#1f2937,stroke:#06b6d4,stroke-width:1px,color:#fff
+    style P3 fill:#1f2937,stroke:#06b6d4,stroke-width:1px,color:#fff
+    style P4 fill:#1f2937,stroke:#06b6d4,stroke-width:1px,color:#fff
+    style P5 fill:#1f2937,stroke:#06b6d4,stroke-width:1px,color:#fff
+    style M1 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style M2 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 ---
@@ -119,18 +141,11 @@ Doc 99: [Match! Adjacent terms: positions 3 and 4]
 
 ### 2.1 The Failure Modes of Pure Dense Search
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| QUERY TYPE            | PURE DENSE VECTOR SEARCH    | SPARSE BM25 SEARCH            |
-+-----------------------+-----------------------------+-------------------------------+
-| Conceptual / Semantic | SUCCESS: Captures synonyms  | FAILS: Misses documents       |
-| ("heart disease risk")| ("cardiac infarction").     | lacking verbatim words.       |
-| Exact Part Number     | FAILS: Returns semantically | SUCCESS: Inverted index       |
-| ("C5-X9802-Rev4")     | similar chips, wrong part!  | matches exact alphanumeric ID.|
-| Uncommon Acronym      | FAILS: Out-of-vocabulary    | SUCCESS: Matches exact tokens |
-| ("HIPAA 45 CFR 164")  | representation distortion.  | directly.                     |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Query Type | Pure Dense Vector Search | Sparse BM25 Search |
+| :--- | :--- | :--- |
+| **Conceptual / Semantic**<br/>(*"heart disease risk"*) | **SUCCESS:** Captures conceptual synonyms (*"cardiac infarction"*, *"coronary artery syndrome"*). | **FAILS:** Misses relevant documents lacking verbatim matching keywords. |
+| **Exact Part Number**<br/>(*"C5-X9802-Rev4"*) | **FAILS:** Returns semantically similar hardware descriptions but completely incorrect model number. | **SUCCESS:** Inverted index matches exact alphanumeric identifier with 100% precision. |
+| **Uncommon Acronym**<br/>(*"HIPAA 45 CFR 164"*) | **FAILS:** Out-of-vocabulary representation distortion across dense vector space. | **SUCCESS:** Matches rare exact tokens directly across posting lists. |
 
 ---
 
@@ -184,14 +199,16 @@ for doc, score in fused_results:
 ### 3.1 Bi-Encoder vs. Cross-Encoder Computational Mechanics
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph BiEncoderStage ["Stage 1: Bi-Encoder (Dense Vector Search)"]
+        direction LR
         Query1["Query q"] --> EncQ["Query Encoder"] --> VecQ["Vector v_q in R^d"]
         Doc1["Candidate d"] --> EncD["Doc Encoder (Precomputed)"] --> VecD["Vector v_d in R^d"]
         VecQ --- Dot["Dot Product / Cosine Distance<br/>Latency: <5ms via HNSW Index"] --- VecD
     end
 
     subgraph CrossEncoderStage ["Stage 2: Cross-Encoder (Reranker)"]
+        direction LR
         Concat["Concatenated Input: [CLS] Query [SEP] Candidate Document [SEP]"]
         CrossAttn["Full Bidirectional Cross-Attention across all Query and Doc tokens<br/>(Every query word attends to every document word)"]
         RelevanceScore["Scalar Relevance Score in [0, 1]<br/>High Accuracy, ~50ms per 50 docs"]
@@ -356,22 +373,13 @@ Users must only retrieve documents they are authorized to view (e.g., HR compens
 
 # 7. RAG vs. Fine-Tuning vs. Long-Context Prompting
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| CRITERION             | RAG (RETRIEVAL-AUGMENTED)   | MODEL FINE-TUNING             |
-+-----------------------+-----------------------------+-------------------------------+
-| Knowledge Dynamism    | REAL-TIME: New documents    | STATIC: Requires retraining   |
-|                       | searchable in <1 second.    | pipeline to ingest updates.   |
-| Hallucination Defense | HIGH: Responses grounded    | MODERATE: Models may still    |
-|                       | directly with citations.    | hallucinate learned facts.    |
-| Style & Tone Control  | MODERATE: Dictated by       | SUPERIOR: Learns specialized  |
-|                       | prompt instructions.        | syntax, dialect, format.      |
-| Compute Sizing        | Ingestion embedding calls + | GPU training cluster required |
-|                       | standard LLM inference.     | (LoRA, QLoRA, full weights).  |
-| Cost at Scale         | Higher input token costs    | Minimal input prompt tokens   |
-|                       | due to retrieved context.   | once model is fine-tuned.     |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Criterion | RAG (Retrieval-Augmented) | Model Fine-Tuning |
+| :--- | :--- | :--- |
+| **Knowledge Dynamism** | **REAL-TIME:** New documents searchable in $<1$ second upon ingestion into vector store. | **STATIC:** Requires re-running training pipelines to ingest updated information. |
+| **Hallucination Defense** | **HIGH:** Responses grounded directly with verifiable citations and retrieved context. | **MODERATE:** Models can still hallucinate memorized facts or blend conflicting data. |
+| **Style & Tone Control** | **MODERATE:** Dictated by system prompt instructions and few-shot examples. | **SUPERIOR:** Deeply learns specialized enterprise vocabulary, dialect, and schema syntax. |
+| **Compute Sizing** | Ingestion embedding calls + standard LLM inference serving. | Dedicated GPU training cluster required (LoRA, QLoRA, or full-parameter tuning). |
+| **Cost at Scale** | Higher input token costs due to injected context chunks on every request. | Minimal input prompt tokens once the model has internalized domain knowledge. |
 
 ---
 
@@ -426,7 +434,7 @@ for p in discovered_paths:
 | Strategy / Technique | Retrieval Recall Gain | Latency Impact | Production Cost Overhead |
 | :--- | :--- | :--- | :--- |
 | **Hybrid Dense + Sparse (BM25)** | $+15\%\text{--}25\%$ | $+5\text{ms}$ | Minimal (inverted index storage) |
-| **Reciprocal Rank Fusion (RRF)** | $+10\%$ | $<1\text{ms}$ (CPU calculation) | $0.00$ |
+| **Reciprocal Rank Fusion (RRF)** | $+10\%$ | $<1\text{ms}$ (CPU calculation) | \$0.00 |
 | **Cross-Encoder Reranking** | $+20\%\text{--}30\%$ | $+30\text{--}70\text{ms}$ | Requires local CPU/GPU reranker model |
 | **HyDE Query Transformation** | $+10\%\text{--}15\%$ | $+400\text{--}800\text{ms}$ | 1 additional LLM generation call |
 | **Graph RAG Multi-Hop** | $+40\%$ on global queries | $+50\text{--}150\text{ms}$ | Graph database storage & ingestion compute |

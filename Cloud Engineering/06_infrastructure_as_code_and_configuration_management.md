@@ -95,8 +95,22 @@ flowchart TD
 
 Terraform is a declarative, graph-based infrastructure orchestration engine. When executing commands, Terraform processes configurations through three core phases:
 
-```text
-[Parse HCL] ──> [Build Dependency Graph (DAG)] ──> [Refresh State] ──> [Generate Plan] ──> [Apply DAG Nodes]
+```mermaid
+flowchart LR
+    subgraph TFStages ["Terraform Core Execution Pipeline"]
+        direction LR
+        P["Parse HCL"] --> G["Build Dependency Graph<br/>(DAG)"]
+        G --> R["Refresh State<br/>(Query APIs)"]
+        R --> Plan["Generate Plan<br/>(Diff Calculation)"]
+        Plan --> Apply["Apply DAG Nodes<br/>(Execute Providers)"]
+    end
+
+    style TFStages fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style P fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style G fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style R fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Plan fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style Apply fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 1. **Graph Construction:** Terraform analyzes implicit references (e.g. `subnet_id = azurerm_subnet.app.id`) and explicit dependencies (`depends_on = [...]`) to construct a **Directed Acyclic Graph (DAG)** of all resources.
@@ -255,18 +269,21 @@ Terraform reconciles three distinct representations of reality during every life
 2. **Recorded State:** The JSON records stored in the `terraform.tfstate` backend file.
 3. **Actual State:** The live cloud resources actively running in AWS or Azure.
 
-```text
-+-----------------------+     terraform plan     +-----------------------+
-| Desired Configuration | <────────────────────> |   Recorded State      |
-|     (HCL Files)       |                        | (terraform.tfstate)   |
-+-----------------------+                        +-----------------------+
-                                                             ▲
-                                                             │ terraform refresh
-                                                             ▼
-                                                 +-----------------------+
-                                                 |   Live Infrastructure |
-                                                 |   (Cloud REST APIs)   |
-                                                 +-----------------------+
+```mermaid
+flowchart TD
+    subgraph Reconciliation ["Terraform Three-Way State Reconciliation"]
+        Desired["Desired Configuration<br/>(HCL Code Files: .tf)"]
+        Recorded["Recorded State<br/>(terraform.tfstate backend)"]
+        Live["Live Infrastructure<br/>(Actual Cloud REST APIs)"]
+
+        Desired <-->|"terraform plan (Diff Engine)"| Recorded
+        Recorded <-->|"terraform refresh (State Sync)"| Live
+    end
+
+    style Reconciliation fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Desired fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Recorded fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Live fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 > [!CAUTION]
@@ -310,16 +327,58 @@ To prevent concurrent applies from corrupting state:
 
 ### 4.1 Terraform Workspaces vs. Directory-Based Isolation (Terragrunt)
 
-```text
-WORKSPACE-BASED ISOLATION:              DIRECTORY-BASED ISOLATION:
-repo/                                   repo/
-├── main.tf (Shares code)               ├── environments/
-└── terraform.tfstate.d/                │   ├── dev/
-    ├── dev/terraform.tfstate           │   │   ├── backend.tf (Dev Backend)
-    └── prod/terraform.tfstate          │   │   └── main.tf
-                                        │   └── prod/
-                                        │       ├── backend.tf (Prod Backend - Separate Sub/Account)
-                                        │       └── main.tf
+```mermaid
+flowchart TD
+    subgraph Workspaces ["⚠️ Workspace-Based Isolation (Anti-Pattern)"]
+        direction TB
+        W_Repo["📁 repo/"]
+        W_Main["📄 main.tf (Shared code & providers)"]
+        W_State["📁 terraform.tfstate.d/"]
+        W_DevState["📄 dev/terraform.tfstate"]
+        W_ProdState["📄 prod/terraform.tfstate (Accidental blast radius!)"]
+
+        W_Repo --> W_Main
+        W_Repo --> W_State
+        W_State --> W_DevState
+        W_State --> W_ProdState
+    end
+
+    subgraph Directory ["✅ Directory-Based Isolation (Production Paved Road)"]
+        direction TB
+        D_Repo["📁 repo/"]
+        D_Envs["📁 environments/"]
+        
+        subgraph DevEnv ["📁 dev/ (Isolated Sub/Account)"]
+            D_DevBack["📄 backend.tf (Dev State Storage)"]
+            D_DevMain["📄 main.tf"]
+        end
+        
+        subgraph ProdEnv ["📁 prod/ (Locked Prod Sub/Account)"]
+            D_ProdBack["📄 backend.tf (Prod State Storage)"]
+            D_ProdMain["📄 main.tf"]
+        end
+
+        D_Repo --> D_Envs
+        D_Envs --> DevEnv
+        D_Envs --> ProdEnv
+    end
+
+    style Workspaces fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style W_Repo fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style W_Main fill:#1f2937,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style W_State fill:#1e293b,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style W_DevState fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style W_ProdState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+
+    style Directory fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style D_Repo fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style D_Envs fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style DevEnv fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ProdEnv fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style D_DevBack fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style D_DevMain fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style D_ProdBack fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style D_ProdMain fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 - **Terraform Workspaces:** Useful for short-lived ephemeral feature testing. **Anti-pattern for enterprise Dev vs. Prod isolation**, because a single misconfigured CLI command (`terraform workspace select prod`) can destroy production, and all workspaces share the same provider authentication credentials.

@@ -160,18 +160,40 @@ Concurrent modification on `HashMap` causes lost updates, data corruption, and (
 
 ```mermaid
 flowchart TD
-    Task["Incoming Task"] --> CoreCheck{"Workers < corePoolSize?"}
-    CoreCheck -->|Yes| SpawnCore["Spawn Core Thread"]
-    CoreCheck -->|No| QueueCheck{"workQueue full?"}
-    QueueCheck -->|No| Enqueue["Enqueue in BlockingQueue"]
-    QueueCheck -->|Yes| MaxCheck{"Workers < maxPoolSize?"}
-    MaxCheck -->|Yes| SpawnMax["Spawn Max Worker Thread"]
-    MaxCheck -->|No| Reject["Trigger RejectedExecutionHandler"]
+    subgraph Stage1 ["Stage 1: Core Worker Allocation"]
+        direction LR
+        Task["Incoming Task"] --> CoreCheck{"Workers < corePoolSize?"}
+        CoreCheck -->|Yes| SpawnCore["Spawn Core Thread<br/>(Execute Immediately)"]
+    end
 
-    style Task fill:#0f172a,stroke:#3b82f6,stroke-width:1px,color:#93c5fd
+    subgraph Stage2 ["Stage 2: Queue Buffering"]
+        direction LR
+        QueueCheck{"workQueue Full?"}
+        QueueCheck -->|No| Enqueue["Enqueue in BlockingQueue<br/>(Wait for Idle Core)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Max Worker Overflow & Rejection"]
+        direction LR
+        MaxCheck{"Workers < maxPoolSize?"}
+        MaxCheck -->|Yes| SpawnMax["Spawn Max Worker<br/>(Handle Surge)"]
+        MaxCheck -->|No| Reject["Trigger RejectedExecutionHandler<br/>(Abort / CallerRuns)"]
+    end
+
+    CoreCheck -->|No| QueueCheck
+    QueueCheck -->|Yes| MaxCheck
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+
+    style Task fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style CoreCheck fill:#1e293b,stroke:#8b5cf6,stroke-width:1px,color:#c4b5fd
-    style QueueCheck fill:#1e293b,stroke:#8b5cf6,stroke-width:1px,color:#c4b5fd
-    style Reject fill:#3b0764,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style SpawnCore fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style QueueCheck fill:#1e293b,stroke:#f59e0b,stroke-width:1px,color:#fde68a
+    style Enqueue fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style MaxCheck fill:#1e293b,stroke:#8b5cf6,stroke-width:1px,color:#c4b5fd
+    style SpawnMax fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style Reject fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
 ```
 
 - **Requests waiting unexpectedly:** `Executors.newFixedThreadPool()` uses an unbounded `LinkedBlockingQueue`. The pool never scales beyond `corePoolSize`; tasks accumulate in memory while threads block on external I/O. Use a bounded queue with `CallerRunsPolicy`.

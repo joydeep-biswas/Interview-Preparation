@@ -112,10 +112,14 @@ In cloud computing, spending is variable **Operational Expenditure (OpEx)**: any
 
 ### 1.2 The Three FinOps Phases
 
-```text
-[INFORM] ──(Visibility & Allocation)──> [OPTIMIZE] ──(Rate & Usage Reduction)──> [OPERATE] ──(Unit Economics KPIs)
-   ▲                                                                                                    │
-   └─────────────────────────────── Continuous Iterative Feedback ──────────────────────────────────────┘
+```mermaid
+flowchart LR
+    Inform["INFORM<br/>(Visibility, Allocation & Showback)"] -->|"Cost Allocation"| Optimize["OPTIMIZE<br/>(Rate & Usage Reduction)"]
+    Optimize -->|"Commitments & Rightsizing"| Operate["OPERATE<br/>(Unit Economics KPIs & Automation)"]
+    Operate -->|"Continuous Feedback Loop"| Inform
+
+    classDef phase fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    class Inform,Optimize,Operate phase;
 ```
 
 1. **Inform:** Provides visibility into where every dollar is spent. Tagging, showback, chargeback, and real-time anomaly detection.
@@ -198,12 +202,18 @@ Studies show over 40% of cloud IaaS virtual machines are provisioned with less t
 
 Cloud providers offer deep discounts ($30\% - 72\%$) in exchange for a 1-year or 3-year financial commitment:
 
-```text
-FLEXIBILITY SPECTRUM:
-Low Flexibility ───────────────────────────────────────────────────────────────────► High Flexibility
-[Standard Reserved Instance]  -->  [EC2 Instance Savings Plan]  -->  [Compute Savings Plan]
-(Locked to instance type,          (Locked to instance family        (Applies flexibly across EC2,
-AZ, and region. Highest discount)  in a specific region)             Fargate, and Lambda anywhere)
+```mermaid
+flowchart LR
+    RI["Standard Reserved Instance<br/>(Locked to instance type, AZ, & region.<br/>Highest discount: up to ~72%)"] --> ESP["EC2 Instance Savings Plan<br/>(Locked to instance family in a specific region.<br/>Discount: up to ~66%)"]
+    ESP --> CSP["Compute Savings Plan<br/>(Applies across EC2, Fargate, & Lambda anywhere.<br/>Highest flexibility: discount up to ~60%)"]
+
+    classDef low fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#f8fafc;
+    classDef mid fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef high fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+
+    class RI low;
+    class ESP mid;
+    class CSP high;
 ```
 
 - **Commitment Sizing Invariant:** Only commit to baseline steady-state utilization (typically 60-70% of total fleet capacity). Spiky, elastic peaks must run on On-Demand or Spot instances to avoid committing to unused capacity.
@@ -223,8 +233,31 @@ Cloud providers sell surplus, unused data center capacity at a **60% to 90% disc
 
 Object storage costs grow exponentially if older logs and backups sit in Hot storage indefinitely:
 
-```text
-Hot Storage ($0.018/GB/mo) ──(30 Days)──> Cool ($0.010/GB/mo) ──(90 Days)──> Cold ($0.003/GB/mo) ──(180 Days)──> Archive ($0.00099/GB/mo)
+```mermaid
+stateDiagram-v2
+    classDef hot fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef cool fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    classDef cold fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#ffffff
+    classDef archive fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#ffffff
+    classDef deleted fill:#0f172a,stroke:#64748b,stroke-width:2px,color:#ffffff
+
+    [*] --> Hot: Object created (\$0.018 / GB / mo)
+    Hot --> Cool: 30 days unaccessed (\$0.010 / GB / mo)
+    Cool --> Cold: 90 days unaccessed (\$0.003 / GB / mo)
+    Cold --> Archive: 180 days unaccessed (\$0.00099 / GB / mo)
+    Archive --> Deleted: 365+ days retention expired
+    Deleted --> [*]
+
+    note right of Archive
+        Ultra-low resting cost (< \$1/TB/mo).
+        Heavy retrieval fees & 3-15h rehydration delay.
+    end note
+
+    class Hot hot
+    class Cool cool
+    class Cold cold
+    class Archive archive
+    class Deleted deleted
 ```
 
 > [!CAUTION]
@@ -238,13 +271,12 @@ Hot Storage ($0.018/GB/mo) ──(30 Days)──> Cool ($0.010/GB/mo) ──(90 
 
 Inbound data transfer into cloud environments is almost always **free**. However, **outbound data transfer (Network Egress) is charged aggressively**:
 
-```text
-NETWORK TRAFFIC PRICING MATRIX:
-1. Intra-AZ Traffic (Same Subnet / AZ):            $0.00 / GB (Free)
-2. Inter-AZ Traffic (Cross-AZ within same Region):  $0.01 / GB each way ($0.02 / GB total roundtrip)
-3. Inter-Region Traffic (East US to West US):       $0.02 / GB
-4. Internet Egress (Cloud to Public Internet):      $0.08 - $0.12 / GB
-```
+| Traffic Scope | Route Path | Typical Cost Rate | Architectural Cost Mitigation |
+| :--- | :--- | :--- | :--- |
+| **Intra-AZ Traffic** | Same Subnet / Availability Zone | **Free** (\$0.00 / GB) | Co-locate latency-sensitive microservices in the same Availability Zone. |
+| **Inter-AZ Traffic** | Cross-AZ within same Region | **\$0.01 / GB each way** (\$0.02 / GB roundtrip) | Implement zone-aware routing in Kubernetes; leverage local node caching. |
+| **Inter-Region Traffic** | Cross-Region (e.g. East US to West US) | **\$0.02 / GB** | Replicate only deduplicated and compressed change streams across regions. |
+| **Internet Egress** | Cloud to Public Internet | **\$0.08 – \$0.12 / GB** | Front services with CloudFront or Cloudflare CDN to cache edge responses. |
 
 ---
 

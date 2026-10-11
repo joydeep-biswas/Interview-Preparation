@@ -103,14 +103,8 @@ Apache Spark operates on a **Master-Worker architecture** coordinated by a centr
 ```mermaid
 flowchart TD
     subgraph ClientDriver ["Driver Node (Coordinator)"]
-        App["Spark Application Code"]
-        SC["SparkSession / SparkContext"]
-        DAGScheduler["DAG Scheduler (Splits into Stages)"]
-        TaskScheduler["Task Scheduler (Launches Tasks)"]
-        
-        App --> SC
-        SC --> DAGScheduler
-        DAGScheduler --> TaskScheduler
+        direction LR
+        App["Spark Application Code"] --> SC["SparkSession / SparkContext"] --> DAGScheduler["DAG Scheduler (Stages)"] --> TaskScheduler["Task Scheduler (Tasks)"]
     end
 
     subgraph ClusterMgr ["Cluster Manager (Kubernetes / YARN / Standalone)"]
@@ -119,22 +113,20 @@ flowchart TD
 
     subgraph Worker1 ["Worker Node 1"]
         subgraph Exec1 ["Executor 1 (JVM Container)"]
-            Slot1["Task Slot 1 (Core)"]
-            Slot2["Task Slot 2 (Core)"]
-            BlockMgr1["Block Manager (RAM / Cache)"]
+            direction LR
+            Slot1["Task Slot 1 (Core)"] --- Slot2["Task Slot 2 (Core)"] --- BlockMgr1["Block Manager (RAM)"]
         end
     end
 
     subgraph Worker2 ["Worker Node 2"]
         subgraph Exec2 ["Executor 2 (JVM Container)"]
-            Slot3["Task Slot 3 (Core)"]
-            Slot4["Task Slot 4 (Core)"]
-            BlockMgr2["Block Manager (RAM / Cache)"]
+            direction LR
+            Slot3["Task Slot 3 (Core)"] --- Slot4["Task Slot 4 (Core)"] --- BlockMgr2["Block Manager (RAM)"]
         end
     end
 
-    ClientDriver <-->|Request & Allocate Containers| ClusterMgr
-    ClusterMgr -->|Launch Executors| Worker1 & Worker2
+    SC <-->|Request & Allocate Containers| CM
+    CM -->|Launch Containers| BlockMgr1 & BlockMgr2
     TaskScheduler -->|Distribute Tasks| Slot1 & Slot2 & Slot3 & Slot4
 
     style ClientDriver fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -343,23 +335,36 @@ flowchart TD
 The Catalyst Optimizer is the core optimization engine powering Spark SQL, DataFrames, and Datasets. It applies rule-based and cost-based optimizations across four distinct phases:
 
 ```mermaid
-flowchart TD
-    Unresolved["1. Unresolved Logical Plan (Code Syntax Tree)"] --> Catalog["Catalog / Metastore (Check Table & Column Names)"]
-    Catalog --> Logical["2. Resolved Logical Plan"]
-    Logical --> OptLogical["3. Optimized Logical Plan (Filter Pushdown, Projection Pruning)"]
-    OptLogical --> CBO["4. Cost-Based Optimizer (Evaluate Physical Join Strategies)"]
-    CBO --> Phys["5. Selected Physical Plan"]
-    Phys --> CodeGen["6. Whole-Stage Code Generation (Generate Java Bytecode via Janino)"]
-    CodeGen --> Exec["Execute on Cluster Workers (Tungsten Off-Heap)"]
+flowchart LR
+    subgraph Stage1 ["Stage 1: Analysis & Catalog Resolution"]
+        direction LR
+        Unresolved["1. Unresolved Logical Plan<br/>(Code Syntax Tree)"] --> Catalog["Catalog / Metastore<br/>(Resolve Tables & Columns)"] --> Logical["2. Resolved Logical Plan<br/>(Valid Attributes)"]
+    end
 
+    subgraph Stage2 ["Stage 2: Logical & Cost Optimization"]
+        direction LR
+        OptLogical["3. Optimized Logical Plan<br/>(Predicate Pushdown & Projection Pruning)"] --> CBO["4. Cost-Based Optimizer (CBO)<br/>(Evaluate Join Reordering & Stats)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Physical Planning & Code Generation"]
+        direction LR
+        Phys["5. Selected Physical Plan<br/>(SparkPlan Strategy Selection)"] --> CodeGen["6. Whole-Stage CodeGen<br/>(Janino Bytecode Generation)"] --> Exec["7. Execution on Workers<br/>(Tungsten Off-Heap Engine)"]
+    end
+
+    Logical --> OptLogical
+    CBO --> Phys
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Stage3 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Unresolved fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Catalog fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Logical fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style OptLogical fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style CBO fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Phys fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style CodeGen fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Exec fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style OptLogical fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style CBO fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Phys fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style CodeGen fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Exec fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### Key Optimization Techniques
@@ -380,7 +385,7 @@ flowchart TD
 Project Tungsten is the underlying CPU and memory performance engine of Apache Spark, designed to eliminate JVM memory overhead and maximize modern hardware efficiency.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph TungstenPillars ["The Three Pillars of Project Tungsten"]
         OffHeap["1. Off-Heap Memory Management<br/>(Bypasses JVM GC; Manages Raw Bytes via sun.misc.Unsafe)"]
         CacheAware["2. Cache-Aware Computation<br/>(L1/L2/L3 CPU Cache Prefetching & Cache Locality)"]
@@ -1527,24 +1532,29 @@ Each Spark executor JVM allocates its available memory (`spark.executor.memory`)
 ```mermaid
 flowchart TD
     subgraph TotalJVM ["Total Executor JVM Memory (e.g., 16 GB)"]
-        Reserved["Reserved Memory (300 MB fixed for Spark internals)"]
-        UserMem["User Memory (25%: Custom data structures, UDFs, non-DataFrame maps)"]
+        subgraph SystemMemory ["Base Memory Allocations"]
+            direction LR
+            Reserved["Reserved Memory<br/>(300 MB fixed for Spark internals)"]
+            UserMem["User Memory (25%)<br/>(Custom structures, UDFs, maps)"]
+        end
         
         subgraph SparkPool ["Spark Memory Pool (75% of remaining RAM)"]
-            StoragePool["Storage Memory (50%)<br/>(Cached DataFrames & Broadcast Variables)"]
-            ExecPool["Execution Memory (50%)<br/>(Shuffle, Join, Sort, & Aggregation Buffers)"]
+            direction LR
+            StoragePool["Storage Memory (50%)<br/>(Cached DataFrames & Broadcasts)"]
+            ExecPool["Execution Memory (50%)<br/>(Shuffle, Join & Aggregation Buffers)"]
             
-            StoragePool <-->|Dynamic Borrowing Boundary| ExecPool
+            StoragePool <-->|"Dynamic Borrowing Boundary"| ExecPool
         end
     end
 
     style TotalJVM fill:#0f172a,stroke:#334155,stroke-width:1.5px,color:#94a3b8
+    style SystemMemory fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
     style SparkPool fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
 
-    style Reserved fill:#182234,stroke:#94a3b8,stroke-width:1.5px,color:#fff
-    style UserMem fill:#182234,stroke:#f59e0b,stroke-width:1.5px,color:#fff
-    style StoragePool fill:#182234,stroke:#10b981,stroke-width:1.5px,color:#fff
-    style ExecPool fill:#182234,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Reserved fill:#0f172a,stroke:#94a3b8,stroke-width:1.5px,color:#fff
+    style UserMem fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style StoragePool fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style ExecPool fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#fff
 ```
 
 #### Spill to Disk Explained

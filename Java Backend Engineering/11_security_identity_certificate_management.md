@@ -82,6 +82,7 @@ flowchart TD
 In Spring Boot 3, all HTTP traffic is intercepted by standard servlet filters orchestrated by `DelegatingFilterProxy` and `FilterChainProxy`:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor Client as HTTP Client
@@ -218,6 +219,7 @@ flowchart TD
 ### 1.5 OAuth 2.0 & OpenID Connect (PKCE & Client Credentials Flow)
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor User as End User (Browser)
@@ -333,6 +335,7 @@ flowchart TD
 TLS 1.3 significantly enhances both security and performance over TLS 1.2, reducing handshake latency from 2 Round Trips (2-RTT) down to **1 Round Trip (1-RTT)**:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor Client as Java Client / Browser
@@ -363,6 +366,7 @@ sequenceDiagram
 In standard One-Way TLS, only the server proves its identity to the client. In **Mutual TLS (mTLS)**, both the client and the server cryptographically authenticate each other:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant Client as Order Microservice (Client)
@@ -390,7 +394,7 @@ Understanding the distinction between Keystore and Truststore is essential for e
 ```mermaid
 flowchart LR
     subgraph KeyStoreContainer["Java KeyStore (keystore.p12)"]
-        direction TB
+        direction LR
         PrivKey["Private Key (Secret!)"]
         CertChain["Public Certificate Chain"]
         PurposeKS["Answers: 'WHO AM I?'<br/>Used by Server to present its identity to clients,<br/>or by Client in mTLS to prove identity to server."]
@@ -398,7 +402,7 @@ flowchart LR
     end
 
     subgraph TrustStoreContainer["Java TrustStore (cacerts / truststore.p12)"]
-        direction TB
+        direction LR
         RootCAs["Trusted Root CA Certificates"]
         InterCAs["Trusted Intermediate CA Certificates"]
         PurposeTS["Answers: 'WHOM DO I TRUST?'<br/>Used by Client/Server to verify certificates<br/>presented by the remote party."]

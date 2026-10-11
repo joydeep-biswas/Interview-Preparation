@@ -126,19 +126,39 @@ Given two vectors $\mathbf{u}, \mathbf{v} \in \mathbb{R}^d$:
 - **Flat Exact Search:** Compares the query vector against every single vector in the database. Guaranteed 100% recall, but search latency scales linearly: $O(N \cdot d)$. Scanning 10 million 1536-dimensional vectors takes $>800\text{ms}$.
 - **Approximate Nearest Neighbor (ANN):** Trades a tiny fraction of recall ($1\%\text{--}3\%$) for logarithmic or sub-linear query latency ($O(\log N)$ or $O(\sqrt{N})$), returning results in $<5\text{ms}$.
 
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'quadrant1Fill': '#1e293b', 'quadrant2Fill': '#0f172a', 'quadrant3Fill': '#1e293b', 'quadrant4Fill': '#0f172a', 'quadrantPointFill': '#3b82f6', 'quadrantPointTextFill': '#ffffff', 'quadrantTitleFill': '#ffffff', 'quadrantAxisTextFill': '#93c5fd', 'quadrantInternalBorderStrokeFill': '#334155', 'quadrantExternalBorderStrokeFill': '#475569' }}}%%
+quadrantChart
+    title Vector Index Trade-Off Matrix: Latency vs Recall
+    x-axis "Low Recall (Approximate ANN)" --> "100% Exact Recall (Zero Loss)"
+    y-axis "High Query Latency (Seconds)" --> "Sub-5ms Query Latency (Fast)"
+    quadrant-1 "Ideal In-Memory RAG Sweet Spot"
+    quadrant-2 "High Memory / Slow Linear Search"
+    quadrant-3 "Compressed Massive Scale (>100M)"
+    quadrant-4 "Sub-optimal Search Zone"
+    "Exact Flat Search (L2/Cosine)": [0.95, 0.15]
+    "HNSW (Default Production RAG)": [0.88, 0.90]
+    "SCaNN (Anisotropic VQ)": [0.84, 0.92]
+    "IVF-Flat (nprobe=16)": [0.72, 0.65]
+    "IVF-PQ (90% Memory Compression)": [0.55, 0.75]
+    "DiskANN (SSD-Backed Vectors)": [0.82, 0.55]
+```
+
 ---
 
 ### 2.2 Inverted File Index with Product Quantization (IVF-PQ)
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph IVFPartitioning ["Inverted File (IVF) Clustering"]
+        direction LR
         Centroids["K-Means Centroid Partitioning (nlist = 1024)<br/>Voronoi Cells partition vector space"]
         QueryVec["Query Vector q"] --> MatchCentroids["Find nprobe = 16 Nearest Centroids"]
         MatchCentroids --> ScanCells["Scan only vectors assigned to matching cells"]
     end
 
     subgraph PQCompression ["Product Quantization (PQ) Memory Compression"]
+        direction LR
         Vec1024["1024-dim FP32 Vector (4096 bytes)"] --> SplitM["Split into M = 64 sub-vectors (16 dims each)"]
         SplitM --> Quantize["Quantize each sub-vector to 256 codebook centroids"]
         Quantize --> CompactVec["Stored as 64 bytes (64x Compression Ratio!)"]
@@ -162,15 +182,48 @@ flowchart TD
 
 HNSW is the gold standard for high-accuracy in-memory vector search. It constructs a multi-layer hierarchical graph analogous to a skip list:
 
-```text
-HNSW MULTI-LAYER GRAPH STRUCTURE:
-Layer 3 (Sparse Top Layer):   (Node A) --------------> (Node Z)      [Long-range skips]
-                                  |                       |
-Layer 2:                      (Node A) ------> (Node M) -> (Node Z)
-                                  |               |       |
-Layer 1:                      (Node A) -> (F) -> (Node M) -> (Node Z)
-                                  |        |      |          |
-Layer 0 (Dense Bottom Layer): All N vectors interconnected locally    [Short-range greedy search]
+```mermaid
+flowchart TD
+    subgraph HNSW ["HNSW Multi-Layer Hierarchical Graph"]
+        direction TB
+        subgraph L3 ["Layer 3: Top Sparse Layer (Long-Range Skips)"]
+            L3_A["Node A"] -->|"Skip Link"| L3_Z["Node Z"]
+        end
+        subgraph L2 ["Layer 2: Intermediate Layer"]
+            L2_A["Node A"] --> L2_M["Node M"] --> L2_Z["Node Z"]
+        end
+        subgraph L1 ["Layer 1: Denser Intermediate Layer"]
+            L1_A["Node A"] --> L1_F["Node F"] --> L1_M["Node M"] --> L1_Z["Node Z"]
+        end
+        subgraph L0 ["Layer 0: Dense Bottom Layer (All N Vectors)"]
+            L0_All["All N Vectors Interconnected Locally<br/>(Short-Range Greedy Graph Search)"]
+        end
+        L3_A -.-> L2_A
+        L3_Z -.-> L2_Z
+        L2_A -.-> L1_A
+        L2_M -.-> L1_M
+        L2_Z -.-> L1_Z
+        L1_A -.-> L0_All
+        L1_F -.-> L0_All
+        L1_M -.-> L0_All
+        L1_Z -.-> L0_All
+    end
+
+    style HNSW fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style L3 fill:#1e293b,stroke:#8b5cf6,stroke-width:1px,color:#c084fc
+    style L2 fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#93c5fd
+    style L1 fill:#1e293b,stroke:#06b6d4,stroke-width:1px,color:#67e8f9
+    style L0 fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#6ee7b7
+    style L3_A fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style L3_Z fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style L2_A fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style L2_M fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style L2_Z fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style L1_A fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style L1_F fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style L1_M fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style L1_Z fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style L0_All fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 **Key Hyperparameters:**
@@ -182,18 +235,11 @@ Layer 0 (Dense Bottom Layer): All N vectors interconnected locally    [Short-ran
 
 # 3. Production Vector Databases: Architecture & Comparison
 
-```text
-+---------------------+-------------------+------------------+------------------------------------+
-| DATABASE            | CORE ENGINE / LANG| INDEXING TYPES   | ARCHITECTURAL ADVANTAGES           |
-+---------------------+-------------------+------------------+------------------------------------+
-| PostgreSQL pgvector | C (Postgres Ext)  | HNSW, IVFFlat    | Native ACID joins with enterprise  |
-|                     |                   |                  | relational tables; zero new infra. |
-| Qdrant              | Rust              | HNSW + Quantized | Blazing fast single-stage payload  |
-|                     |                   | in-graph filter  | filtering; low memory footprint.   |
-| Milvus              | Go / C++ / K8s    | HNSW, IVF-PQ,    | Cloud-native distributed sharding; |
-|                     |                   | SCANN, DiskANN   | scales to billions of vectors.     |
-+---------------------+-------------------+------------------+------------------------------------+
-```
+| Database | Core Engine / Language | Indexing Types | Architectural Advantages |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL pgvector** | C (Postgres Extension) | HNSW, IVFFlat | Native ACID joins with enterprise relational tables; zero additional infrastructure to manage. |
+| **Qdrant** | Rust | HNSW + Quantized in-graph filter | Blazing fast single-stage payload filtering; low memory footprint with disk-backed payloads. |
+| **Milvus** | Go / C++ / Kubernetes | HNSW, IVF-PQ, SCANN, DiskANN | Cloud-native distributed sharding; horizontal scale-out architecture supporting billions of vectors. |
 
 ---
 
@@ -239,10 +285,21 @@ LIMIT 5;
 
 PDFs do not store natural sentences or paragraphs; they store raw character drawing commands at physical Cartesian coordinates `(x, y)` on a page. Naive string extraction destroys reading order in multi-column documents:
 
-```text
-NAIVE EXTRACTION HAZARD (Multi-column PDF):
-Column 1 Line 1 ---> Column 2 Line 1 ---> Column 1 Line 2 ---> Column 2 Line 2
-(Interleaves completely unrelated sentences, destroying embedding coherence)
+```mermaid
+flowchart LR
+    subgraph Hazard ["Naive Text Extraction Hazard (Multi-Column PDF)"]
+        direction LR
+        C1L1["Col 1: Line 1"] --> C2L1["Col 2: Line 1"] --> C1L2["Col 1: Line 2"] --> C2L2["Col 2: Line 2"]
+    end
+    note["Hazard: Interleaves completely unrelated sentences,<br/>destroying semantic coherence and embedding quality."]
+    Hazard -.-> note
+
+    style Hazard fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style C1L1 fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fff
+    style C2L1 fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fff
+    style C1L2 fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fff
+    style C2L2 fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fff
+    style note fill:#1f2937,stroke:#f59e0b,stroke-width:1px,color:#fde68a
 ```
 
 **Production Ingestion Protocol:**
@@ -254,19 +311,28 @@ Column 1 Line 1 ---> Column 2 Line 1 ---> Column 1 Line 2 ---> Column 2 Line 2
 # 5. Document Chunking Strategies & Trade-offs
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph ChunkingComparison ["Chunking Strategies Comparison"]
-        Fixed["1. Fixed-Size Chunking (500 chars, 50 overlap)<br/>Fast, naive. Cuts sentences in half."]
-        Recursive["2. Recursive Character Chunking<br/>Splits on \n\n, \n, period. Preserves paragraphs."]
-        Semantic["3. Semantic Similarity Chunking<br/>Embeds sentences; splits when cosine distance spikes."]
-        ParentChild["4. Parent-Child Hierarchical<br/>Index small chunks (128t); retrieve parent doc (1024t)."]
+        subgraph Row1 ["Static Rule-Based Strategies"]
+            direction LR
+            Fixed["1. Fixed-Size Chunking<br/>(500 chars, 50 overlap: fast, cuts sentences)"]
+            Recursive["2. Recursive Character Chunking<br/>(Splits on \n\n, \n, period: preserves syntax)"]
+        end
+        subgraph Row2 ["Dynamic & Context-Aware Strategies"]
+            direction LR
+            Semantic["3. Semantic Similarity Chunking<br/>(Splits when cosine distance spikes)"]
+            ParentChild["4. Parent-Child Hierarchical<br/>(Index small 128t, fetch parent 1024t)"]
+        end
     end
 
     style ChunkingComparison fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Fixed fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Recursive fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Semantic fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style ParentChild fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Row1 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Row2 fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
+    style Fixed fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Recursive fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style Semantic fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style ParentChild fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
 ### 5.2 Recursive Character Chunking Implementation
@@ -342,21 +408,11 @@ for i, c in enumerate(chunks):
 
 ### 6.1 Pre-Filtering vs. Post-Filtering vs. Single-Stage In-Graph Filtering
 
-```text
-+----------------------+---------------------------------------------------------------+
-| FILTERING STRATEGY   | RUNTIME MECHANICS & CRITICAL HAZARDS                          |
-+----------------------+---------------------------------------------------------------+
-| Post-Filtering       | Perform ANN search for Top-100 vectors; filter by metadata.   |
-|                      | HAZARD: If target tenant owns only 2% of vectors, Top-100     |
-|                      | returns 0 matching results! Recall collapses to 0%.          |
-| Pre-Filtering        | Query metadata index first (B-Tree); perform flat search.    |
-|                      | HAZARD: Bypasses HNSW index entirely, collapsing to slow      |
-|                      | O(N_filtered) brute-force scan.                               |
-| Single-Stage In-Graph| Evaluates metadata predicates DURING the HNSW greedy graph    |
-| (Qdrant / Milvus)    | traversal. Non-matching nodes are skipped during neighbor     |
-|                      | expansion. Guarantees top-k matches with sub-5ms latency.    |
-+----------------------+---------------------------------------------------------------+
-```
+| Filtering Strategy | Runtime Mechanics & Critical Hazards |
+| :--- | :--- |
+| **Post-Filtering** | Performs ANN search for Top-100 vectors, then filters candidates by metadata.<br/>**HAZARD:** If target tenant owns only 2% of vectors, Top-100 search returns 0 matching results! Recall collapses to 0%. |
+| **Pre-Filtering** | Queries metadata index first (B-Tree), then executes brute-force search over subset.<br/>**HAZARD:** Bypasses HNSW index entirely, collapsing performance to a slow $O(N_{\text{filtered}})$ scan. |
+| **Single-Stage In-Graph**<br/>(Qdrant / Milvus) | Evaluates metadata predicates **during** the HNSW greedy graph traversal. Non-matching nodes are skipped during neighbor expansion.<br/>**ADVANTAGE:** Guarantees top-$k$ matches with sub-5ms latency and full recall. |
 
 ---
 

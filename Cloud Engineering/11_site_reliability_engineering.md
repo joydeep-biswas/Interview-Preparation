@@ -138,24 +138,12 @@ The Error Budget serves as the objective neutral arbiter balancing **feature vel
 
 High-pressure production outages require strict hierarchical command structures to eliminate chaos:
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                               INCIDENT COMMAND STRUCTURE                                |
-+------------------------------------+----------------------------------------------------+
-| INCIDENT COMMANDER (IC)            | Holds ultimate operational authority. Decides      |
-|                                    | rollbacks, coordinates resources, assigns tasks.   |
-|                                    | DOES NOT write code or execute debug commands.      |
-+------------------------------------+----------------------------------------------------+
-| OPERATIONS LEAD / TRIAGE           | Technical investigator executing diagnostic runs,  |
-|                                    | checking logs, applying mitigations.               |
-+------------------------------------+----------------------------------------------------+
-| COMMUNICATIONS LEAD                | Manages internal stakeholder updates (Executive,   |
-|                                    | Legal, Support) and public StatusPage notices.    |
-+------------------------------------+----------------------------------------------------+
-| SCRIBE                             | Records real-time timeline, actions, hypothesis,   |
-|                                    | and outputs in the incident document.             |
-+------------------------------------+----------------------------------------------------+
-```
+| Role | Primary Responsibility | Operational Scope |
+| :--- | :--- | :--- |
+| **Incident Commander (IC)** | Holds ultimate operational authority. Decides rollbacks, coordinates resources, assigns tasks. | **DOES NOT** write code or execute debug commands. Focuses on strategy and delegation. |
+| **Operations Lead / Triage** | Technical investigator executing diagnostic runs, checking telemetry, applying mitigations. | Hands-on investigative lead directly inspecting system state and applying fixes. |
+| **Communications Lead** | Manages internal stakeholder updates (Executive, Legal, Support) and public StatusPage notices. | Shields technical responders from external noise and maintains stakeholder communication. |
+| **Scribe** | Records real-time timeline, actions, hypotheses, and outputs in the incident document. | Maintains a forensic audit trail for root cause analysis and blameless post-mortem. |
 
 ---
 
@@ -248,12 +236,36 @@ $$\text{Sleep Time} = \text{random\_between}(0, \, \min(\text{cap}, \, \text{bas
 
 ### 5.2 Circuit Breakers: Closed, Open, and Half-Open States
 
-```text
-[CLOSED State] ────(Consecutive Failures > Threshold)────> [OPEN State]
-      ▲                                                           │
-      │                                                           │ (Sleep Duration Elapsed)
-      │                                                           ▼
-      └─────────(Probe Request Succeeded)─────────────── [HALF-OPEN State]
+```mermaid
+stateDiagram-v2
+    classDef operational fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef tripped fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef trial fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+
+    [*] --> CLOSED
+    
+    CLOSED --> OPEN: Consecutive failures > threshold
+    note right of CLOSED
+        Normal operation.
+        Errors tracked in sliding window.
+    end note
+
+    OPEN --> HALF_OPEN: Sleep window elapsed
+    note right of OPEN
+        Tripped state.
+        Fail fast locally with instant fallback.
+    end note
+
+    HALF_OPEN --> CLOSED: Canary probe succeeded
+    HALF_OPEN --> OPEN: Canary probe failed
+    note right of HALF_OPEN
+        Canary trial state.
+        Evaluating dependency health.
+    end note
+
+    class CLOSED operational
+    class OPEN tripped
+    class HALF_OPEN trial
 ```
 
 - **Closed:** Normal traffic flows. Errors are counted.

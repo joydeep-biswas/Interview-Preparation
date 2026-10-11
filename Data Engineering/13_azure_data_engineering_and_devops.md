@@ -702,34 +702,39 @@ Dedicated SQL Pools utilize a **Massively Parallel Processing (MPP)** architectu
 
 ```mermaid
 flowchart TD
-    Client[Client Query: PowerBI / SSMS] --> ControlNode["Control Node (Brain: Parses SQL, Generates Distributed MPP Plan)"]
-    
-    subgraph ComputeNodes ["Compute Nodes Layer (Scales with DWUs)"]
-        C1["Compute Node 1"]
-        C2["Compute Node 2"]
-        C3["... Compute Node N"]
+    subgraph ClientControl ["1. Client & Coordination Layer (The Brain)"]
+        direction LR
+        Client["Client Applications<br/>(Power BI, SSMS, Synapse Studio)"] -->|"T-SQL Query Connection"| ControlNode["Control Node<br/>• Distributed Query Engine (DQE)<br/>• Parses SQL & generates parallel MPP execution plan"]
     end
 
-    subgraph StorageLayer ["Azure Premium Storage (60 Discrete Distributions)"]
-        D1["Distribution 1"]
-        D2["Distribution 2"]
-        D60["... Distribution 60"]
+    subgraph ComputeTier ["2. MPP Compute Layer (The Muscle — Scales with DWUs)"]
+        direction LR
+        C1["Compute Node 1<br/>(Processes assigned distributions)"] <-->|"DMS: Data Movement Service<br/>(High-speed shuffle & broadcast)"| C2["Compute Node 2<br/>(Processes assigned distributions)"]
+        C2 <-->|"DMS Interconnect"| CN["Compute Node N<br/>(Up to 60 nodes at DW30000c)"]
     end
 
-    ControlNode --> ComputeNodes
-    ComputeNodes <-->|DMS: Data Movement Service| StorageLayer
+    subgraph StorageTier ["3. Decoupled Storage Layer (Exactly 60 Fixed Distributions)"]
+        direction LR
+        D1["Distributions 1..20<br/>(Azure Storage buckets)"] ~~~ D2["Distributions 21..40<br/>(Azure Storage buckets)"] ~~~ D3["Distributions 41..60<br/>(Azure Storage buckets)"]
+    end
 
-    style ComputeNodes fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style StorageLayer fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    ControlNode -->|"Dispatches parallel sub-queries"| C1 & C2 & CN
+    C1 -->|"Direct Remote I/O"| D1
+    C2 -->|"Direct Remote I/O"| D2
+    CN -->|"Direct Remote I/O"| D3
+
+    style ClientControl fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ComputeTier fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style StorageTier fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
 
     style Client fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style ControlNode fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style C1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style C2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style C3 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style CN fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style D1 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
     style D2 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style D60 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style D3 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
 ```
 
 #### How Dedicated SQL Works
@@ -750,29 +755,27 @@ Every table created in a Dedicated SQL Pool must declare its physical distributi
 
 ```mermaid
 flowchart TD
-    subgraph HashDist ["Hash Distribution: Large Fact Table"]
-        InFact["Fact Sales Rows"] --> HashFn["Hash(order_id) % 60"]
-        HashFn --> B1["Dist 1"] & B2["Dist 2"] & B60["Dist 60"]
+    subgraph HashDist ["Hash Distribution: Large Fact Tables (>2GB)"]
+        direction LR
+        InFact["Fact Sales Rows"] --> HashFn["Deterministic Hash<br/>(order_id % 60)"] --> Buckets["60 Storage Buckets<br/>(Dist 1, Dist 2, ..., Dist 60)"]
     end
 
-    subgraph ReplDist ["Replicated Distribution: Small Dimension"]
-        Dim["dim_date (10MB)"] --> RNode1["Node 1 Full Copy"]
-        Dim --> RNode2["Node 2 Full Copy"]
-        Dim --> RNodeN["Node N Full Copy"]
+    subgraph ReplDist ["Replicated Distribution: Small Dimension Tables (<2GB)"]
+        direction LR
+        Dim["dim_date (10 MB)"] --> Distribute["Broadcast Replicate<br/>(Full cached copy)"] --> Compute["Every Compute Node<br/>(Zero network DMS joins)"]
     end
+
+    HashDist ~~~ ReplDist
 
     style HashDist fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style ReplDist fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
     style InFact fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style HashFn fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style B1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style B2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style B60 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Buckets fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
     style Dim fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style RNode1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style RNode2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style RNodeN fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Distribute fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Compute fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 #### Code Example (Synapse Table Creation)
@@ -861,18 +864,26 @@ DataOps applies DevOps practices (automated testing, continuous integration, ver
 
 ```mermaid
 flowchart LR
-    Dev["1. Developer Commit"] --> Lint["2. Lint & Format (sqlfluff, black)"]
-    Lint --> Unit["3. Run Unit Tests (pytest)"]
-    Unit --> Build["4. Build Docker Container / DAB Bundle"]
-    Build --> TestInt["5. Integration Test on Ephemeral DB"]
-    TestInt --> Deploy["6. Deploy to Production via Service Principal"]
+    subgraph Stage1 ["Stage 1: Continuous Integration (CI & Validation)"]
+        direction LR
+        Dev["1. Developer Commit<br/>(Feature branch pull request)"] --> Lint["2. Lint & Format<br/>(sqlfluff, black, ruff)"] --> Unit["3. Unit Testing<br/>(pytest with mocked schemas)"]
+    end
 
+    subgraph Stage2 ["Stage 2: Continuous Deployment (CD & Release)"]
+        direction LR
+        Build["4. Package & Build<br/>(Docker image / Databricks asset bundle)"] --> TestInt["5. Integration Tests<br/>(Ephemeral database validation)"] --> Deploy["6. Deploy to Production<br/>(Automated Service Principal pipeline)"]
+    end
+
+    Unit --> Build
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Dev fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Lint fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Unit fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Build fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style TestInt fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Deploy fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Build fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style TestInt fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Deploy fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### References
@@ -955,20 +966,31 @@ ENTRYPOINT ["python", "src/main_pipeline.py"]
 Replaces legacy YARN clusters. The `Spark-on-K8s` operator listens for `SparkApplication` custom resources (CRDs), spinning up an ephemeral Driver Pod which dynamically requests Worker Executor Pods. When the job finishes, pods terminate immediately (true scale-to-zero).
 
 ```mermaid
-flowchart TD
-    Submit["User: kubectl apply -f spark_job.yaml"] --> K8sAPI["Kubernetes Control Plane"]
-    K8sAPI --> SparkOperator["Spark K8s Operator"]
-    SparkOperator --> DriverPod["Driver Pod (Orchestrator)"]
-    DriverPod -->|Request Compute| K8sAPI
-    K8sAPI --> ExecPod1["Executor Pod 1"]
-    K8sAPI --> ExecPod2["Executor Pod 2"]
+flowchart LR
+    subgraph ControlPlane ["Control Plane & CRD Controller"]
+        direction LR
+        Submit["User: kubectl apply -f spark_app.yaml"] --> K8sAPI["Kubernetes API Server"]
+        K8sAPI --> SparkOperator["Spark K8s Operator<br/>(Watches SparkApplication CRD)"]
+    end
 
+    subgraph PodFleet ["Workload Pod Orchestration"]
+        direction LR
+        DriverPod["Driver Pod<br/>(Job Master & SparkContext)"]
+        ExecPod1["Executor Pod 1<br/>(Core Worker)"]
+        ExecPod2["Executor Pod 2<br/>(Core Worker)"]
+        DriverPod -->|Dynamic Task Allocation| ExecPod1 & ExecPod2
+    end
+
+    SparkOperator -->|Provisions Pod| DriverPod
+
+    style ControlPlane fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style PodFleet fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Submit fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style K8sAPI fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style SparkOperator fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style DriverPod fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ExecPod1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ExecPod2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DriverPod fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style ExecPod1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style ExecPod2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### 2. Apache Airflow on Kubernetes (`KubernetesExecutor`)
@@ -1095,8 +1117,9 @@ Blue-Green deployments eliminate downtime and prevent publishing broken data to 
 - Once data quality tests pass on Green, a single atomic view swap or pointer change routes all user queries to Green.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph ActiveState ["1. Active Blue State"]
+        direction LR
         BI1[PowerBI Dashboard] --> View1["Public View: 'v_orders'"]
         View1 --> BlueTable[(Table: orders_v1 - Blue)]
     end

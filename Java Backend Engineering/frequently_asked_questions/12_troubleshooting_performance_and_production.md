@@ -8,27 +8,54 @@ A comprehensive production troubleshooting guide answering all 17 questions on J
 
 ```mermaid
 flowchart TD
-    Symptom["Production Incident: Service Degraded / Slow"] --> MetricCheck{"Inspect CPU Utilization"}
+    subgraph TriagePhase ["Phase 1: Incident Ingress & Metric Triage"]
+        direction LR
+        Symptom["Production Incident Alert<br/>(Service Degraded / High p99)"]
+        MetricCheck{"System Metric Triage<br/>CPU Utilization Check"}
+        NetworkErr{"HTTP Gateway Egress<br/>Status Code Check"}
+        Symptom --> MetricCheck
+        Symptom --> NetworkErr
+    end
 
-    MetricCheck -->|CPU is LOW (< 20%)| LowCPU["Investigate Thread Blocking / I/O Wait"]
-    LowCPU --> CheckPools["Check DB Hikari Pool, Thread Dumps (jstack) for BLOCKED/WAITING"]
-    
-    MetricCheck -->|CPU is HIGH (> 90%)| HighCPU["Investigate CPU Consumers"]
-    HighCPU --> ThreadProfiling["Run 'top -H -p PID' + 'printf %x TID' -> Match jstack nid"]
-    ThreadProfiling --> RootCauseHigh{"High CPU Source"}
-    RootCauseHigh -->|JVM GC Threads (VM Thread)| GCThrash["GC Thrashing / Heap Exhaustion"]
-    RootCauseHigh -->|App Thread| InfiniteLoop["Infinite Loop / Regex ReDoS / Spin-Wait"]
+    subgraph LowCPUTier ["Phase 2A: Low CPU Path (< 20% Utilization)"]
+        direction LR
+        LowCPU["Investigate Thread Contention<br/>& External I/O Wait"] --> CheckPools["Diagnose HikariCP Pool Depletion<br/>& jstack BLOCKED/WAITING Monitors"]
+    end
 
-    Symptom --> NetworkErr{"HTTP Status Code"}
-    NetworkErr -->|504 Gateway Timeout| DownstreamSlow["Upstream Gateway timed out waiting for backend"]
-    NetworkErr -->|503 Service Unavailable| BackendExhaust["Tomcat thread pool full / K8s pod crash / ingress failure"]
+    subgraph HighCPUTier ["Phase 2B: High CPU Path (> 90% Utilization)"]
+        direction LR
+        HighCPU["Profile Hot Native Threads<br/>(top -H -p PID & printf %x TID)"] --> RootCauseHigh{"Thread Identity<br/>VM vs App Thread"}
+        RootCauseHigh -->|VM Thread| GCThrash["GC Thrashing / Heap Exhaustion<br/>(Analyze jstat -gcutil & Heap Dump)"]
+        RootCauseHigh -->|App Thread| InfiniteLoop["CPU Spin-Wait / Regex ReDoS<br/>(Analyze Method Flamegraph)"]
+    end
 
-    style Symptom fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    subgraph GatewayTier ["Phase 2C: Gateway & Upstream Saturation"]
+        direction LR
+        DownstreamSlow["HTTP 504 Gateway Timeout<br/>(Downstream Dependency Latency)"]
+        BackendExhaust["HTTP 503 Service Unavailable<br/>(Tomcat Thread Exhaustion / CrashLoop)"]
+    end
+
+    MetricCheck -->|CPU < 20%| LowCPU
+    MetricCheck -->|CPU > 90%| HighCPU
+    NetworkErr -->|504 Timeout| DownstreamSlow
+    NetworkErr -->|503 Unavailable| BackendExhaust
+
+    style TriagePhase fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style LowCPUTier fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style HighCPUTier fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style GatewayTier fill:#0f172a,stroke:#ec4899,stroke-width:1.5px,color:#f472b6
+
+    style Symptom fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
     style MetricCheck fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
+    style NetworkErr fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
     style LowCPU fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style HighCPU fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
     style CheckPools fill:#1f2937,stroke:#3b82f6,stroke-width:1px,color:#fff
-    style ThreadProfiling fill:#1f2937,stroke:#f59e0b,stroke-width:1px,color:#fff
+    style HighCPU fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style RootCauseHigh fill:#1e293b,stroke:#f59e0b,stroke-width:1px,color:#fff
+    style GCThrash fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
+    style InfiniteLoop fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
+    style DownstreamSlow fill:#1e293b,stroke:#ec4899,stroke-width:1px,color:#fff
+    style BackendExhaust fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
 ```
 
 ---

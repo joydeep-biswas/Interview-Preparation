@@ -19,11 +19,11 @@ Comprehensive guides covering applied machine learning, generative AI, vector re
 ---
 
 ### 2. [Cloud Engineering](Cloud%20Engineering/00_cloud_study_guide_and_index.md)
-Production-grade curriculum spanning Linux OS internals, software-defined networking, multi-cloud architecture (Azure & AWS), Infrastructure as Code (Terraform & Bicep), release engineering, Kubernetes & GitOps, DevSecOps, observability, Site Reliability Engineering, distributed databases, serverless architectures, and FinOps.
+Concept-first, production-grade curriculum spanning Linux OS internals, software-defined networking, core cloud infrastructure paradigms (grounded in Microsoft Azure with equivalent AWS counterparts), Infrastructure as Code (Terraform & Bicep), release engineering, Kubernetes & GitOps, DevSecOps, observability, Site Reliability Engineering, distributed databases, serverless architectures, and FinOps.
 
 - **Core Curriculum ([Study Guide & Index](Cloud%20Engineering/00_cloud_study_guide_and_index.md))**:
   - Foundations & Networking: [Linux & OS](Cloud%20Engineering/01_linux_operating_systems_and_scripting.md) | [Networking Fundamentals](Cloud%20Engineering/02_networking_fundamentals.md) | [Cloud Fundamentals](Cloud%20Engineering/03_cloud_fundamentals_and_architecture.md)
-  - Multi-Cloud, Networks & IaC: [Azure & AWS Equivalents](Cloud%20Engineering/04_azure_core_services_and_aws_equivalents.md) | [Cloud Networking Design](Cloud%20Engineering/05_cloud_networking_and_infrastructure_design.md) | [IaC & Config Management](Cloud%20Engineering/06_infrastructure_as_code_and_configuration_management.md)
+  - Core Infrastructure, Networks & IaC: [Cloud Infrastructure Concepts](Cloud%20Engineering/04_azure_core_services_and_aws_equivalents.md) | [Cloud Networking Design](Cloud%20Engineering/05_cloud_networking_and_infrastructure_design.md) | [IaC & Config Management](Cloud%20Engineering/06_infrastructure_as_code_and_configuration_management.md)
   - Release, Kubernetes & Security: [CI/CD & Release](Cloud%20Engineering/07_cicd_and_release_engineering.md) | [Containers, K8s & GitOps](Cloud%20Engineering/08_containers_kubernetes_and_gitops.md) | [Cloud Security & IAM](Cloud%20Engineering/09_cloud_security_iam_and_devsecops.md)
   - Observability, SRE & Data: [Observability & Monitoring](Cloud%20Engineering/10_observability_monitoring_and_logging.md) | [Site Reliability Engineering](Cloud%20Engineering/11_site_reliability_engineering.md) | [Databases & Distributed Systems](Cloud%20Engineering/12_databases_storage_and_distributed_systems.md)
   - Cloud-Native, Platforms & FinOps: [Serverless Architecture](Cloud%20Engineering/13_serverless_and_cloud_native_architecture.md) | [Platform Engineering & IDP](Cloud%20Engineering/14_platform_engineering_and_developer_experience.md) | [FinOps & Governance](Cloud%20Engineering/15_finops_governance_and_enterprise_operations.md)
@@ -55,15 +55,54 @@ Deep architectural exploration of JVM mechanics, core Java, modern functional fe
 
 ## Directory Structure
 
-```text
-.
-├── AI Engineering/                 # Machine learning, RAG, agents & LLMOps
-├── Cloud Engineering/              # Multi-cloud, Linux, K8s, networking, SRE & FinOps
-├── Data Engineering/               # Distributed data systems, Spark, SQL & Lakehouse
-│   └── frequently_asked_questions/ # Real-world data engineering interview scenarios
-├── Java Backend Engineering/        # Core Java, Spring Boot, microservices & JVM
-│   └── frequently_asked_questions/ # Real-world Java backend interview scenarios
-└── README.md                       # Repository introduction and index
+```mermaid
+flowchart TD
+    subgraph RepoRoot ["📁 Interview Preparation (Repository Root)"]
+        direction TB
+        Readme["📄 README.md<br/>(Master Curriculum Index & Entry Point)"]
+        
+        subgraph AI_Track ["📁 AI Engineering/"]
+            direction TB
+            AI_Core["📄 00_ai_study_guide_and_index.md<br/>📄 01–15 Core Modules (ML, LLMs, RAG, Agents, vLLM)"]
+        end
+
+        subgraph Cloud_Track ["📁 Cloud Engineering/"]
+            direction TB
+            Cloud_Core["📄 00_cloud_study_guide_and_index.md<br/>📄 01–15 Core Modules (Linux, K8s, Azure/AWS, SRE, FinOps)"]
+        end
+
+        subgraph Data_Track ["📁 Data Engineering/"]
+            direction TB
+            Data_Core["📄 00_de_study_guide_and_index.md<br/>📄 01–15 Core Modules (Spark, Delta, SQL, Airflow, Kafka)"]
+            Data_FAQ["📁 frequently_asked_questions/<br/>(10 Scenario-Based Deep Dives)"]
+            Data_Core --- Data_FAQ
+        end
+
+        subgraph Java_Track ["📁 Java Backend Engineering/"]
+            direction TB
+            Java_Core["📄 00_java_study_guide_and_index.md<br/>📄 01–15 Core Modules (Core Java, Concurrency, Spring Boot, K8s)"]
+            Java_FAQ["📁 frequently_asked_questions/<br/>(12 Scenario-Based Deep Dives)"]
+            Java_Core --- Java_FAQ
+        end
+    end
+
+    Readme --- AI_Track
+    Readme --- Cloud_Track
+    Readme --- Data_Track
+    Readme --- Java_Track
+
+    style RepoRoot fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#f8fafc
+    style Readme fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#ffffff
+    style AI_Track fill:#0f172a,stroke:#ec4899,stroke-width:1.5px,color:#f472b6
+    style AI_Core fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#ffffff
+    style Cloud_Track fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    style Cloud_Core fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#ffffff
+    style Data_Track fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Data_Core fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    style Data_FAQ fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Java_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Java_Core fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    style Java_FAQ fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
 ```
 
 ---

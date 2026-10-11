@@ -7,7 +7,7 @@ A comprehensive, production-grade guide covering enterprise distributed caching 
 ## Architectural Overview: Enterprise Caching, Messaging & Event Mesh Architecture
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph App_And_Cache["1. Application Tier & Distributed Caching"]
         RestAPI["Spring Boot 3 Application Services"] <--> CacheService["Cache-Aside Layer (@Cacheable)"]
         CacheService <--> RedisCluster[("Redis Enterprise Cluster (Master-Replica + Sentinel)<br/>Distributed Locks (Redlock) & Sliding Window Rate Limiting")]
@@ -136,18 +136,21 @@ flowchart TD
 ### 1.3 Cache Hazards & Production Mitigations (Stampede, Penetration, Avalanche)
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Stampede["1. Cache Stampede (Dog-Piling)"]
+        direction LR
         HotKey["Hot Key Expires<br/>(e.g. Flash Sale Item)"] --> Concurrent["10,000 Concurrent Requests Miss"]
         Concurrent --> CrashDB["Database Overloaded & Crashes!"]
     end
 
     subgraph Penetration["2. Cache Penetration"]
+        direction LR
         Attacker["Attacker Queries Non-Existent IDs<br/>(id = -9999)"] --> CacheMiss["Cache Miss"]
         CacheMiss --> QueryDB["DB Queries Non-Existent Record (Repeatedly)"]
     end
 
     subgraph Avalanche["3. Cache Avalanche"]
+        direction LR
         BulkExpire["Mass TTL Expiration at Exact Same Second<br/>(e.g. Midnight)"] --> MassDB["All Traffic Hits Database Simultaneously"]
     end
 
@@ -316,9 +319,9 @@ public class ProductCacheService {
 ### 3.1 Point-to-Point Queues vs Publish-Subscribe (Pub/Sub)
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph PointToPoint["Point-to-Point Queue (Work Queue / Competing Consumers)"]
-        direction TB
+        direction LR
         Producer1["Producer"] --> Queue["FIFO Task Queue"]
         Queue -->|Item 1| Worker1["Worker A"]
         Queue -->|Item 2| Worker2["Worker B"]
@@ -326,7 +329,7 @@ flowchart TD
     end
 
     subgraph PubSubModel["Publish-Subscribe (Pub/Sub Broadcast)"]
-        direction TB
+        direction LR
         Producer2["Producer"] --> Topic["Broadcast Topic"]
         Topic --> Sub1["Subscriber 1: Analytics Service"]
         Topic --> Sub2["Subscriber 2: Email Service"]

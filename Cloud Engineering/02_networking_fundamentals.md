@@ -94,12 +94,32 @@ flowchart TD
 
 When application data descends the protocol stack, each layer prepends a protocol header:
 
-```text
-+-----------------------------------------------------------------------------------------+
-| [Ethernet Frame Header] [IPv4 Header] [TCP Header] [TLS Payload / HTTP Data] [FCS CRC]   |
-|       14 Bytes             20 Bytes     20 Bytes       Variable (MSS <= 1460B)   4 Bytes  |
-+-----------------------------------------------------------------------------------------+
-|<─────────────────────────── Maximum Transmission Unit (MTU: 1500 Bytes)─────────────────>|
+```mermaid
+flowchart LR
+    subgraph Frame ["Ethernet Frame (MTU: 1500 Bytes payload + 18 Bytes Ethernet overhead)"]
+        direction LR
+        Eth["Ethernet Header<br/>(14 Bytes)"]
+        subgraph IPPacket ["IP Packet (MTU: 1500 Bytes)"]
+            direction LR
+            IPv4["IPv4 Header<br/>(20 Bytes)"]
+            subgraph TCPPacket ["TCP Segment"]
+                direction LR
+                TCP["TCP Header<br/>(20 Bytes)"]
+                Payload["TLS Payload / HTTP Data<br/>(MSS &le; 1460 Bytes)"]
+            end
+        end
+        FCS["FCS CRC<br/>(4 Bytes)"]
+        Eth --> IPv4 --> TCP --> Payload --> FCS
+    end
+
+    style Frame fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style IPPacket fill:#1e293b,stroke:#06b6d4,stroke-width:1px,color:#67e8f9
+    style TCPPacket fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#6ee7b7
+    style Eth fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style IPv4 fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style TCP fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Payload fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style FCS fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
 ```
 
 - **OSI 7-Layer Model:** Conceptual reference: Physical (L1), Data Link (L2), Network (L3), Transport (L4), Session (L5), Presentation (L6), Application (L7).
@@ -114,6 +134,7 @@ When application data descends the protocol stack, each layer prepends a protoco
 TCP is a connection-oriented, full-duplex stream protocol providing reliable, ordered delivery through sequence numbers, acknowledgments, sliding windows, and congestion control algorithms (CUBIC, BBR).
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant Client
@@ -178,6 +199,7 @@ IPv6 solves IPv4 address exhaustion using 128-bit addresses represented as 8 gro
 ### 3.1 Recursive vs. Authoritative Resolution Flow
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant App as Client Stub Resolver
@@ -220,6 +242,7 @@ sequenceDiagram
 TLS 1.3 optimizes security and latency by reducing the handshake to a single round-trip time (1-RTT) and mandating Ephemeral Diffie-Hellman (PFS - Perfect Forward Secrecy):
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant Client
@@ -242,10 +265,18 @@ sequenceDiagram
 
 ### 4.2 Public Key Infrastructure (PKI) and Mutual TLS (mTLS)
 
-```text
-[Root CA] (Self-signed, offline HSM)
-    └── [Intermediate CA] (Signs operational certificates)
-            └── [Leaf / Server Certificate] (Issued to api.example.com)
+```mermaid
+flowchart LR
+    Root["Root Certificate Authority (CA)<br/>(Self-signed, root of trust, offline HSM)"] --> Inter["Intermediate CA<br/>(Signs operational certificates, online)"]
+    Inter --> Leaf["Leaf / Server Certificate<br/>(Issued to api.example.com, 90-day expiry)"]
+
+    classDef root fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
+    classDef inter fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef leaf fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+
+    class Root root;
+    class Inter inter;
+    class Leaf leaf;
 ```
 
 In standard TLS, only the server proves its identity. In **Mutual TLS (mTLS)**, both client and server present X.509 certificates, authenticating both identity and encrypting data in-flight (the cornerstone of Zero-Trust service mesh architectures).
@@ -258,14 +289,13 @@ In standard TLS, only the server proves its identity. In **Mutual TLS (mTLS)**, 
 
 Routers forward IP packets using the **Longest Prefix Match (LPM)** algorithm. More specific subnet prefixes override broader CIDR blocks:
 
-```text
-Destination IP: 10.0.2.45
+> **Packet Destination IP:** `10.0.2.45`
 
-Routing Table:
-1. 0.0.0.0/0       via 192.168.1.1 dev eth0 (Prefix length: 0)
-2. 10.0.0.0/16     via 10.0.0.1    dev eth1 (Prefix length: 16)
-3. 10.0.2.0/24     via 10.0.2.1    dev eth2 (Prefix length: 24) <-- MATCHED (Most Specific)
-```
+| Route Preference | Destination CIDR | Gateway Next Hop | Egress Interface | Prefix Length | Evaluation Status |
+| :---: | :--- | :--- | :---: | :---: | :--- |
+| **1** | `0.0.0.0/0` | `192.168.1.1` | `eth0` | `/0` | Default catch-all; least specific. |
+| **2** | `10.0.0.0/16` | `10.0.0.1` | `eth1` | `/16` | Matches subnet; superseded by longer prefix. |
+| **3** | `10.0.2.0/24` | `10.0.2.1` | `eth2` | `/24` | **MATCHED (Longest Prefix Match):** Packet routes to `eth2`. |
 
 ---
 
@@ -291,9 +321,25 @@ sudo iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 443 -j DNAT --to-desti
 
 ### 6.1 Forward Proxies vs. Reverse Proxies
 
-```text
-Forward Proxy: [Client] ──> [Proxy (egress control/caching)] ──> [Public Internet]
-Reverse Proxy: [Public Client] ──> [Reverse Proxy (TLS/routing/WAF)] ──> [Private Upstream Cluster]
+```mermaid
+flowchart LR
+    subgraph ForwardProxyFlow ["Forward Proxy (Egress Control & Caching)"]
+        direction LR
+        C1["Internal Client"] -->|"Egress Request"| FP["Forward Proxy<br/>(Policy / Filtering)"] -->|"Outbound"| Internet["Public Internet"]
+    end
+    subgraph ReverseProxyFlow ["Reverse Proxy (Ingress Protection & Load Balancing)"]
+        direction LR
+        C2["Public Client"] -->|"Inbound Request"| RP["Reverse Proxy<br/>(TLS Term / WAF / ALB)"] -->|"Route"| Cluster["Private Upstream Cluster"]
+    end
+
+    style ForwardProxyFlow fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ReverseProxyFlow fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style C1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style FP fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Internet fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style C2 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style RP fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Cluster fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
 ```
 
 - **Forward Proxy:** Sits in front of clients to enforce egress filtering, inspect outgoing enterprise traffic, and prevent data exfiltration.
@@ -306,11 +352,13 @@ Reverse Proxy: [Public Client] ──> [Reverse Proxy (TLS/routing/WAF)] ──>
 ```mermaid
 flowchart LR
     subgraph L4 ["Layer 4 Balancing (NLB / IPVS)"]
+        direction LR
         PacketIn["TCP Syn (IP:Port)"] --> Hash["Consistent Hash (5-tuple)"]
         Hash --> Forward["Forward TCP stream directly (No TLS inspection)"]
     end
 
     subgraph L7 ["Layer 7 Balancing (ALB / Envoy / NGINX)"]
+        direction LR
         ReqIn["HTTP/2 Request"] --> TLS["Terminate TLS"]
         TLS --> HeaderParse["Inspect Path / Host / Cookies"]
         HeaderParse --> Upstream["Route to target microservice"]
@@ -347,10 +395,25 @@ flowchart LR
 
 ### 7.2 Linux Netfilter & iptables / nftables Processing Order
 
-```text
-Inbound Packet ──> PREROUTING ──> [Routing Decision] ──┬──> INPUT ──> Local Process
-                                                       │
-                                                       └──> FORWARD ──> POSTROUTING ──> Outbound NIC
+```mermaid
+flowchart LR
+    subgraph Netfilter ["Linux Netfilter Packet Traversal Flow"]
+        direction LR
+        In["Inbound Packet"] --> Pre["PREROUTING<br/>(DNAT / Mangle)"]
+        Pre --> Decision{"Routing Decision"}
+        Decision -->|"Local Destination"| Input["INPUT<br/>(Filter)"] --> Local["Local Process"]
+        Decision -->|"Forwarded"| Fwd["FORWARD<br/>(Filter)"] --> Post["POSTROUTING<br/>(SNAT)"] --> Out["Outbound NIC"]
+    end
+
+    style Netfilter fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style In fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Pre fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style Decision fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Input fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Local fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Fwd fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style Post fill:#1f2937,stroke:#ec4899,stroke-width:1.5px,color:#fff
+    style Out fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
 ```
 
 - **Mangle Table:** Alters packet headers (TOS, TTL).

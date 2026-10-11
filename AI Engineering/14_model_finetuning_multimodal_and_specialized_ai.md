@@ -7,7 +7,7 @@ A comprehensive, production-grade guide to model fine-tuning theory, Parameter-E
 ## Architectural Overview: Parameter-Efficient Fine-Tuning & Multimodal Pipeline
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph LoRAMechanics ["1. LoRA Low-Rank Decomposition Mechanics"]
         FrozenWeight["Frozen Pretrained Weight W_0 in R^(d x k)<br/>(Kept in INT4/FP16; zero gradient updates)"]
         MatrixA["Down-Projection Matrix A in R^(r x k)<br/>(Initialized with Gaussian random N(0, sigma^2))"]
@@ -19,6 +19,7 @@ flowchart TD
     end
 
     subgraph DistributedTraining ["2. Distributed Scaling (FSDP / ZeRO-3)"]
+        direction LR
         Sharding["ZeRO-3 Memory Sharding Across GPUs:<br/>1. Optimizer States (1/N)<br/>2. Gradients (1/N)<br/>3. Model Parameters (1/N)"]
         AllGather["All-Gather Collective Communication<br/>Dynamic weight gather per layer via NVLink"]
         Sharding --> AllGather
@@ -93,16 +94,14 @@ flowchart TD
 
 In Full Fine-Tuning, every parameter $\mathbf{W}$ in the model is updated. The VRAM required is far greater than just the model weights:
 
-```text
-FULL PARAMETER FINE-TUNING MEMORY BREAKDOWN (per parameter in FP16/BF16):
-1. Model Weights (FP16):           2 bytes
-2. Gradients (FP16):               2 bytes
-3. Optimizer States (AdamW):
-   - FP32 Master Weights:          4 bytes
-   - First Moment (Mean, FP32):    4 bytes
-   - Second Moment (Var, FP32):    4 bytes
-TOTAL MINIMUM VRAM:                16 bytes per parameter!
-```
+| State Component | Precision | VRAM Footprint per Parameter | Description / Role in Backpropagation |
+| :--- | :---: | :---: | :--- |
+| **Model Weights** | FP16 / BF16 | 2 Bytes | Current parameter values loaded onto GPU. |
+| **Gradients** | FP16 / BF16 | 2 Bytes | First-order partial derivatives computed during backward pass. |
+| **FP32 Master Weights** | FP32 | 4 Bytes | High-precision weights used by AdamW to accumulate small steps. |
+| **AdamW First Moment ($m_t$)** | FP32 | 4 Bytes | Running exponential moving average of gradients (momentum). |
+| **AdamW Second Moment ($v_t$)** | FP32 | 4 Bytes | Running exponential moving average of squared gradients (RMSProp). |
+| **Total Baseline VRAM** | — | **16 Bytes / parameter** | Minimum VRAM needed before allocating activation memory. |
 
 **Sizing 70B Model Full Fine-Tuning:**
 $70 \times 10^9 \times 16 \text{ bytes} \approx 1,120 \text{ GB}$ of VRAM (requires 16x NVIDIA H100 80GB GPUs just for weights and optimizer state, before activation memory).
@@ -239,18 +238,11 @@ where $T > 1$ is the distillation temperature. Higher $T$ softens the output dis
 
 # 5. Distributed Training Frameworks: FSDP & DeepSpeed ZeRO-1/2/3
 
-```text
-+-----------------------+-----------------------------+-------------------------------+
-| STAGE                 | SHARDED MEMORY COMPONENTS   | COMMUNICATION COLLECTIVES     |
-+-----------------------+-----------------------------+-------------------------------+
-| ZeRO-1                | Shards Optimizer States (4x)| Reduce-Scatter gradients,     |
-|                       | memory reduction.           | All-Gather updated params.    |
-| ZeRO-2                | Shards Optimizer States +   | Reduce-Scatter gradients      |
-|                       | Gradients (8x reduction).   | directly during backward pass.|
-| ZeRO-3 / PyTorch FSDP | Shards Optimizer States +   | All-Gather weights dynamically|
-|                       | Gradients + Model Weights.  | forward and backward pass.    |
-+-----------------------+-----------------------------+-------------------------------+
-```
+| Stage | Sharded Memory Components | Communication Collectives |
+| :--- | :--- | :--- |
+| **ZeRO-1** | Shards Optimizer States across GPUs (4x memory reduction). | **Reduce-Scatter** gradients, **All-Gather** updated parameters. |
+| **ZeRO-2** | Shards Optimizer States + Gradients (8x memory reduction). | **Reduce-Scatter** gradients directly during the backward pass. |
+| **ZeRO-3 / PyTorch FSDP** | Shards Optimizer States + Gradients + Model Weights (Linear memory reduction with GPU count). | **All-Gather** layer weights dynamically on-the-fly during forward and backward passes. |
 
 ---
 

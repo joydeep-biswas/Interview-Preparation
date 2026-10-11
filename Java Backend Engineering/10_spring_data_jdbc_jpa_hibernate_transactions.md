@@ -160,42 +160,41 @@ spring.datasource.hikari.leak-detection-threshold=5000
 The **Persistence Context** is an in-memory storage area managed by `EntityManager` where managed entity instances are held. It acts as an **Identity Map** (ensuring only one Java object instance exists per database primary key within a session).
 
 ```mermaid
-flowchart TD
-    subgraph TransientPool ["Unmanaged Memory"]
-        TransientState["TRANSIENT State<br/>(Instantiated via new, no DB identity, untracked)"]
-    end
+stateDiagram-v2
+    classDef transient fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff
+    classDef managed fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#ffffff
+    classDef detached fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    classDef removed fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    classDef persisted fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#ffffff
+    classDef deleted fill:#0f172a,stroke:#64748b,stroke-width:2px,color:#ffffff
 
-    subgraph PersistenceContext ["JPA Persistence Context (First-Level Cache)"]
-        ManagedState["MANAGED State<br/>(Tracked by EntityManager, automatic dirty checking)"]
-        RemovedState["REMOVED State<br/>(Scheduled for DELETE SQL upon commit/flush)"]
-    end
+    [*] --> TRANSIENT: new Entity() (no DB ID, untracked)
+    
+    TRANSIENT --> MANAGED: em.persist(entity)
+    
+    state MANAGED {
+        [*] --> InContext: 1st-level cache identity map
+        InContext --> DirtyChecked: Field mutated (automatic change tracking)
+        DirtyChecked --> InContext: Flushed
+    }
 
-    subgraph DetachedPool ["Detached Scope"]
-        DetachedState["DETACHED State<br/>(Has database primary key, session closed or detached)"]
-    end
+    MANAGED --> DETACHED: em.detach() / em.clear() / session closed
+    DETACHED --> MANAGED: em.merge(entity)
+    
+    MANAGED --> REMOVED: em.remove(entity)
+    REMOVED --> MANAGED: em.persist(entity)
 
-    subgraph DatabaseTier ["RDBMS Physical Storage"]
-        DbRecord["DATABASE ROW<br/>(Persistent table record in PostgreSQL / MySQL)"]
-    end
+    MANAGED --> PersistentDBRow: Transaction commit() / flush() [INSERT / UPDATE SQL]
+    REMOVED --> DBRowDeleted: Transaction commit() / flush() [DELETE SQL]
+    
+    DBRowDeleted --> [*]
 
-    TransientState -->|"em.persist(entity)"| ManagedState
-    ManagedState -->|"em.detach(), em.clear(), em.close()"| DetachedState
-    DetachedState -->|"em.merge(entity)"| ManagedState
-    ManagedState -->|"em.remove(entity)"| RemovedState
-    RemovedState -->|"em.persist(entity)"| ManagedState
-    ManagedState -->|"Transaction flush() / commit() (INSERT / UPDATE SQL)"| DbRecord
-    RemovedState -->|"Transaction flush() / commit() (DELETE SQL)"| DbRecord
-
-    style TransientPool fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style PersistenceContext fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style DetachedPool fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style DatabaseTier fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-
-    style TransientState fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ManagedState fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style RemovedState fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style DetachedState fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style DbRecord fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    class TRANSIENT transient
+    class MANAGED managed
+    class DETACHED detached
+    class REMOVED removed
+    class PersistentDBRow persisted
+    class DBRowDeleted deleted
 ```
 
 1. **Transient / New**: Instantiated via `new Product()`; not associated with any Persistence Context; has no primary key ID in the database.
@@ -220,7 +219,7 @@ flowchart TD
 ### 3.1 First-Level (L1) Cache vs Second-Level (L2) Cache
 
 ```mermaid
-flowchart TD
+flowchart LR
     App["Application Service Method"] --> L1["First-Level (L1) Cache (Session-Scoped, Built-in)"]
     L1 -->|Cache Miss| L2["Second-Level (L2) Cache (SessionFactory-Scoped, Redis/Ehcache)"]
     L2 -->|Cache Miss| DB[("Relational Database")]
@@ -303,6 +302,7 @@ public class Order {
 The N+1 problem occurs when an application executes 1 initial query to fetch $N$ parent records, and subsequently fires $N$ individual separate queries to fetch lazy associations for each parent row:
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant App as Application Service

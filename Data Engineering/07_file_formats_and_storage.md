@@ -8,20 +8,23 @@ A comprehensive, production-grade guide to big data file serialization formats (
 
 ```mermaid
 flowchart TD
-    subgraph FileFormats ["Big Data Storage Formats"]
-        Parquet["Apache Parquet (Columnar OLAP)<br/>(Row Groups -> Column Chunks -> Pages + Footer Metadata)"]
-        Avro["Apache Avro (Row-based Streaming)<br/>(Schema embedded in file header, efficient serialization)"]
-        ORC["Apache ORC (Optimized Columnar)<br/>(Stripe architecture, lightweight indexes, ACID support)"]
-    end
-    subgraph CompressionAndLayout ["Storage Encoding & Partition Layout"]
-        Codecs["Compression Codecs<br/>(Snappy: low CPU / fast; ZSTD: optimal compression ratio)"]
-        HivePartition["Hive-Style Directory Partitioning<br/>(year=YYYY/month=MM/ - avoids full bucket scans)"]
-    end
-    subgraph CompactionMgmt ["Small File Mitigation"]
-        BinPacking["Bin-Packing & Compaction<br/>(Merge small 1MB files into optimal 128MB-512MB chunks)"]
+    subgraph FileFormats ["Big Data Serialization Formats"]
+        direction LR
+        Parquet["Apache Parquet<br/>(Columnar OLAP, Page Encodings)"] --- Avro["Apache Avro<br/>(Row-based Streaming, Schema Evolution)"] --- ORC["Apache ORC<br/>(Optimized Stripes, Light Indexes)"]
     end
 
-    FileFormats --> CompressionAndLayout --> CompactionMgmt
+    subgraph CompressionAndLayout ["Storage Encoding & Partition Layout"]
+        direction LR
+        Codecs["Compression Codecs<br/>(Snappy: Low CPU; ZSTD: High Ratio)"] --- HivePartition["Directory Partitioning<br/>(year=YYYY/month=MM/ Directory Pruning)"]
+    end
+
+    subgraph CompactionMgmt ["Small File Mitigation & Physical Lifecycle"]
+        direction LR
+        BinPacking["Bin-Packing & Compaction Engine<br/>(Merge small 1MB-5MB files into 128MB-512MB Parquet blocks)"]
+    end
+
+    Parquet & Avro & ORC --> Codecs & HivePartition
+    Codecs & HivePartition --> BinPacking
 
     style FileFormats fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style CompressionAndLayout fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
@@ -31,7 +34,7 @@ flowchart TD
     style ORC fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Codecs fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style HivePartition fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style BinPacking fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style BinPacking fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 ---
@@ -165,24 +168,23 @@ flowchart TD
         H["File Header: PAR1 (Magic Bytes)"]
         
         subgraph RG1 ["Row Group 1 (e.g., 256MB)"]
-            CC1["Column Chunk A (User_ID Pages)"]
-            CC2["Column Chunk B (Timestamp Pages)"]
-            CC3["Column Chunk C (Amount Pages)"]
+            direction LR
+            CC1["Column Chunk A<br/>(User_ID Pages)"] --- CC2["Column Chunk B<br/>(Timestamp Pages)"] --- CC3["Column Chunk C<br/>(Amount Pages)"]
         end
 
         subgraph RG2 ["Row Group 2"]
-            CC4["Column Chunk A"]
-            CC5["Column Chunk B"]
-            CC6["Column Chunk C"]
+            direction LR
+            CC4["Column Chunk A"] --- CC5["Column Chunk B"] --- CC6["Column Chunk C"]
         end
 
         subgraph Footer ["File Metadata Footer (Read First via HTTP Range Request)"]
-            Meta["Schema Definition<br/>Row Group Pointers<br/>Column Statistics (Min, Max, Null Count)"]
-            FLength["Footer Length (4 Bytes)"]
-            MagicEnd["Magic End Bytes: PAR1"]
+            direction LR
+            Meta["Schema & Stats<br/>(Min, Max, Null Count)"] --- FLength["Footer Length<br/>(4 Bytes)"] --- MagicEnd["Magic End Bytes<br/>PAR1"]
         end
 
-        H --> RG1 --> RG2 --> Footer
+        H --> CC2
+        CC2 --> CC5
+        CC5 --> Meta
     end
 
     style ParquetFile fill:#0f172a,stroke:#334155,stroke-width:1.5px,color:#94a3b8
@@ -382,7 +384,7 @@ Cloud storage provides virtually infinite scalability at commodity pricing. Howe
 - **Object Storage (AWS S3, Azure Blob/ADLS, GCS):** Flat storage namespace where files (objects) are stored alongside rich metadata and addressed via unique URIs over HTTP/HTTPS REST APIs. Virtually unlimited capacity, but files are immutable (cannot edit in place).
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph StorageTaxonomy ["Storage Architectures"]
         BS["Block Storage (EBS / SAN)<br/>Fixed 4KB Blocks<br/>Highest IOPS<br/>Single VM Mount (DB Engine)"]
         FS["File Storage (EFS / NFS)<br/>Hierarchical Tree Directories<br/>POSIX Shared Mounts<br/>Shared Web Servers"]
@@ -420,7 +422,6 @@ flowchart LR
     style Cool fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style Cold fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Archive fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Rate fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
 ```
 
 #### References
@@ -747,6 +748,7 @@ ADLS Gen2 inherits Azure Blob access tiers to minimize long-term storage spend:
 A Shared Access Signature (SAS) is a secure signed URI that grants restricted, delegated access to Azure Storage resources without exposing your master account storage keys.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant Client as External Ingestion Partner
     participant Auth as Secure Auth Service

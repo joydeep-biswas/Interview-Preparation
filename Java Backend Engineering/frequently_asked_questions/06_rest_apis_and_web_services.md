@@ -8,24 +8,45 @@ A comprehensive guide answering all 19 questions on REST architectural constrain
 
 ```mermaid
 flowchart TD
-    Client["HTTP Client / Browser"] -->|"HTTP Request"| Dispatcher["DispatcherServlet (Front Controller)"]
-    Dispatcher -->|"HandlerMapping"| Handler["Target Handler Execution Chain"]
-    Handler -->|"HandlerAdapter"| Controller["@RestController"]
-    Controller -->|"DTO Object"| ServiceLayer["Service Layer (@Transactional)"]
-    ServiceLayer --> RepositoryLayer["Spring Data JPA Repository"]
-    RepositoryLayer --> DB[("Database")]
+    subgraph Stage1 ["Stage 1: Ingress Routing & Dispatching"]
+        direction LR
+        Client["HTTP Client / Browser"] -->|"HTTP Request"| Dispatcher["DispatcherServlet<br/>(Front Controller)"]
+        Dispatcher -->|"HandlerMapping"| Handler["Target Handler Chain<br/>(Interceptors & Filters)"]
+        Handler -->|"HandlerAdapter"| Controller["@RestController<br/>(Request Deserialization)"]
+    end
 
-    Controller -.->|"Throws Exception"| Advice["@RestControllerAdvice (@ExceptionHandler)"]
-    Advice -->|"ProblemDetail (RFC 7807)"| Client
-    Controller -->|"Response DTO"| Jackson["HttpMessageConverter (Jackson JSON)"]
-    Jackson -->|"HTTP Response JSON"| Client
+    subgraph Stage2 ["Stage 2: Core Domain Execution & Persistence"]
+        direction LR
+        ServiceLayer["Service Layer<br/>(@Transactional Boundaries)"] --> RepositoryLayer["Spring Data JPA Repository<br/>(CRUD & Criteria APIs)"]
+        RepositoryLayer --> DB[("Database<br/>(ACID Relational Store)")]
+    end
+
+    subgraph Stage3 ["Stage 3: Serialization & Exceptional Egress"]
+        direction LR
+        Jackson["HttpMessageConverter<br/>(Jackson JSON Serialization)"] -->|"200/201 Success JSON"| ClientSuccess["Client Response Delivered"]
+        Advice["@RestControllerAdvice<br/>(@ExceptionHandler RFC 7807)"] -->|"4xx/5xx ProblemDetail"| ClientError["Error Response Delivered"]
+    end
+
+    Controller -->|"Validated DTO"| ServiceLayer
+    ServiceLayer -->|"Response Entity / DTO"| Jackson
+    Controller -.->|"Throws Exception"| Advice
+    ServiceLayer -.->|"Throws Persistence / Domain Exception"| Advice
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Stage3 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
 
     style Client fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Dispatcher fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    style Handler fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
     style Controller fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
-    style ServiceLayer fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
+    style ServiceLayer fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style RepositoryLayer fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#fff
+    style DB fill:#1e293b,stroke:#10b981,stroke-width:1px,color:#fff
+    style Jackson fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#fff
     style Advice fill:#3b0764,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
-    style Jackson fill:#0f172a,stroke:#10b981,stroke-width:1px,color:#fff
+    style ClientSuccess fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style ClientError fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fecaca
 ```
 
 ---
@@ -118,6 +139,7 @@ Clients supply a unique UUID `Idempotency-Key` header. The server checks Redis v
 DTOs decouple public API contracts from internal database entity schemas, preventing mass-assignment vulnerabilities and eliminating Jackson circular reference errors in bidirectional JPA relationships.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     Client->>Controller: POST /orders (CreateOrderRequest DTO)

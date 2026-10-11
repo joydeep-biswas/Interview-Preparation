@@ -103,24 +103,32 @@ flowchart TD
 ### 1.1 Comprehensive JOIN Taxonomy & Anti-Joins
 
 ```mermaid
-flowchart TD
-    subgraph Joins["Relational Join Taxonomy"]
-        Inner["INNER JOIN: Intersection of both tables"]
-        Left["LEFT OUTER JOIN: All left rows + matching right rows"]
-        Right["RIGHT OUTER JOIN: All right rows + matching left rows"]
-        Full["FULL OUTER JOIN: Union of all rows from both tables"]
-        Cross["CROSS JOIN: Cartesian product (N * M rows)"]
-        Anti["ANTI-JOIN: Left rows with NO corresponding right rows"]
+flowchart LR
+    subgraph Joins ["Relational Join Taxonomy"]
+        subgraph StandardJoins ["Matching & Directed Joins"]
+            direction LR
+            Inner["INNER JOIN<br/>Intersection of both tables"]
+            Left["LEFT OUTER JOIN<br/>All left + matched right"]
+            Right["RIGHT OUTER JOIN<br/>All right + matched left"]
+        end
+        subgraph SpecializedJoins ["Full, Cartesian & Anti Joins"]
+            direction LR
+            Full["FULL OUTER JOIN<br/>Union of rows from both tables"]
+            Cross["CROSS JOIN<br/>Cartesian product (N * M rows)"]
+            Anti["ANTI-JOIN<br/>Left rows with NO matching right"]
+        end
     end
 
     style Joins fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style StandardJoins fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style SpecializedJoins fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 
-    style Inner fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Left fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Right fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Full fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Cross fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Anti fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Inner fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Left fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Right fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Full fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style Cross fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style Anti fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### Production SQL Anti-Join Patterns (Finding Customers with Zero Orders)
@@ -252,7 +260,7 @@ FROM orders;
 ### 2.2 Transaction Isolation Levels & Concurrency Anomalies
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Isolation_Spectrum["SQL Standard Isolation Levels"]
         RU["Read Uncommitted<br/>(Fastest, Lowest Isolation)"]
         RC["Read Committed<br/>(Standard Default)"]
@@ -347,6 +355,7 @@ public InvoiceReport generateAuditInvoice(Long accountId) {
 * **Result**: `countOnCallDoctors()` is now **0**. System invariant violated!
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     participant AppAlice as Thread 1 (Alice)
@@ -652,12 +661,26 @@ When `io.micrometer:micrometer-registry-prometheus` is on the classpath, HikariC
 Flyway provides version-controlled, immutable database migrations managed directly alongside application code in `src/main/resources/db/migration`.
 
 #### 1. Script Naming Taxonomy & Execution Order
-```text
-src/main/resources/db/migration/
-├── V1_0__init_schema.sql             <-- Versioned: executed once, immutable
-├── V1_1__add_customer_indices.sql     <-- Versioned: executed after V1.0
-├── V2_0__repartition_orders.sql       <-- Major version increment
-└── R__create_customer_spend_view.sql  <-- Repeatable: re-runs whenever checksum changes
+```mermaid
+flowchart LR
+    subgraph FlywayDir ["📁 src/main/resources/db/migration/"]
+        direction TB
+        V1_0["📄 V1_0__init_schema.sql<br/><b>[Versioned 1.0]</b> Baseline DDL tables, executed once"]
+        V1_1["📄 V1_1__add_customer_indices.sql<br/><b>[Versioned 1.1]</b> Non-blocking index creation, executed after V1.0"]
+        V2_0["📄 V2_0__repartition_orders.sql<br/><b>[Versioned 2.0]</b> Major schema refactoring / migration"]
+        R_View["📄 R__create_customer_spend_view.sql<br/><b>[Repeatable]</b> Idempotent view/proc, re-executed on checksum delta"]
+    end
+
+    FlywayDir --> V1_0
+    V1_0 --> V1_1
+    V1_1 --> V2_0
+    V2_0 -.->|"All versioned completed"| R_View
+
+    style FlywayDir fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style V1_0 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style V1_1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style V2_0 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style R_View fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 - **`V` (Versioned Migration)**: Runs once. Identified by unique version (`1.0`, `1.1`). Any modification to an applied script alters its SHA-256 checksum and **crashes the application at boot**.
@@ -752,7 +775,7 @@ databaseChangeLog:
 Directly renaming a production column (`ALTER TABLE users RENAME COLUMN phone TO mobile_number;`) locks the table and breaks running microservices during a rolling deployment.
 
 ```mermaid
-flowchart TD
+flowchart LR
     Step1["1. Expand Phase<br/>Add new column 'mobile_number'; keep 'phone'"]
     Step2["2. Dual-Write Phase<br/>App writes to both columns; reads from 'mobile_number' if present"]
     Step3["3. Backfill Phase<br/>Background batch script copies old data: UPDATE users SET mobile_number = phone"]

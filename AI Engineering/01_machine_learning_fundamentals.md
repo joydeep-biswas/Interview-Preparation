@@ -106,22 +106,14 @@ In **Unsupervised Learning**, the target $y$ is absent. The algorithm discovers 
 
 ### 1.2 Algorithmic Paradigms
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                                MACHINE LEARNING PARADIGMS                                |
-+------------------------------------+----------------------------------------------------+
-| PARADIGM                           | CANONICAL ALGORITHMS & OBJECTIVES                  |
-+------------------------------------+----------------------------------------------------+
-| Supervised: Classification         | Logistic Regression, XGBoost, LightGBM, Random     |
-|                                    | Forest, Support Vector Machines (SVM).             |
-| Supervised: Regression             | Ridge, Lasso, ElasticNet, Gradient Boosted Trees,   |
-|                                    | Multi-Layer Perceptrons.                           |
-| Unsupervised: Clustering           | K-Means++, HDBSCAN, Agglomerative Hierarchical.    |
-| Unsupervised: Dimension Reduction  | PCA (SVD decomposition), UMAP, t-SNE.              |
-| Semi-Supervised                    | Pseudo-labeling, Consistency Regularization.       |
-| Self-Supervised (Pretraining)      | Masked Language Modeling (BERT), Next-Token (GPT). |
-+------------------------------------+----------------------------------------------------+
-```
+| Paradigm | Canonical Algorithms & Objectives |
+| :--- | :--- |
+| **Supervised: Classification** | Logistic Regression, XGBoost, LightGBM, Random Forest, Support Vector Machines (SVM). |
+| **Supervised: Regression** | Ridge, Lasso, ElasticNet, Gradient Boosted Trees, Multi-Layer Perceptrons. |
+| **Unsupervised: Clustering** | K-Means++, HDBSCAN, Agglomerative Hierarchical. |
+| **Unsupervised: Dimension Reduction** | PCA (SVD decomposition), UMAP, t-SNE. |
+| **Semi-Supervised** | Pseudo-labeling, Consistency Regularization. |
+| **Self-Supervised (Pretraining)** | Masked Language Modeling (BERT), Next-Token Prediction (GPT). |
 
 ---
 
@@ -349,21 +341,11 @@ $$F_\beta = (1 + \beta^2) \frac{\text{Precision} \cdot \text{Recall}}{\beta^2 \t
 
 ### 5.2 Cost-Sensitive Evaluation for Imbalanced Classes
 
-```text
-+---------------------+---------------------------------------------------------------+
-| METRIC              | PRODUCTION INTERPRETATION & USE CASE                          |
-+---------------------+---------------------------------------------------------------+
-| ROC-AUC             | Area under the True Positive Rate vs False Positive Rate      |
-|                     | curve across all thresholds. Measures ranking quality.        |
-|                     | CAUTION: Can be deceitfully high on heavily skewed datasets. |
-| PR-AUC (Avg Prec)   | Area under the Precision-Recall curve. Highly sensitive to    |
-|                     | positive class performance in extreme class imbalance         |
-|                     | (e.g., fraud at 0.1% incidence rate).                         |
-| Expected Cost / Loss| Assigns dollar costs to errors:                               |
-|                     | Cost = (FP * Cost_FP) + (FN * Cost_FN). Optimizes threshold   |
-|                     | directly against business profit.                             |
-+---------------------+---------------------------------------------------------------+
-```
+| Metric | Production Interpretation & Use Case |
+| :--- | :--- |
+| **ROC-AUC** | Area under the True Positive Rate vs False Positive Rate curve across all thresholds. Measures ranking quality.<br/>*CAUTION: Can be deceitfully high on heavily skewed datasets.* |
+| **PR-AUC (Avg Prec)** | Area under the Precision-Recall curve. Highly sensitive to positive class performance in extreme class imbalance (e.g., fraud at 0.1% incidence rate). |
+| **Expected Cost / Loss** | Assigns dollar costs to errors:<br/>$\text{Cost} = (\text{FP} \cdot \text{Cost}_{\text{FP}}) + (\text{FN} \cdot \text{Cost}_{\text{FN}})$. Optimizes threshold directly against business profit. |
 
 > [!CAUTION]
 > In severe class imbalance (e.g., 99.9% negative, 0.1% positive), a dummy model predicting all negatives achieves 99.9% accuracy and an ROC-AUC of ~0.50, but a PR-AUC of 0.001. Always prefer PR-AUC and cost-matrix threshold tuning over standard accuracy or ROC-AUC for fraud, cancer diagnosis, or security intrusion detection.
@@ -377,12 +359,37 @@ $$F_\beta = (1 + \beta^2) \frac{\text{Precision} \cdot \text{Recall}}{\beta^2 \t
 - **Stratified K-Fold:** Partitions data into $K$ equal-sized folds while preserving the percentage of samples for each class across all folds. Used for non-temporal i.i.d. data.
 - **TimeSeriesSplit (Walk-Forward Validation):** Essential for time-series data. Successive training sets are supersets of those that come before them, preserving strict temporal causality.
 
-```text
-TEMPORAL CROSS-VALIDATION (TimeSeriesSplit, 4 Folds):
-Fold 1: [Train: Month 1-3] --------> [Validate: Month 4]
-Fold 2: [Train: Month 1-4] -------------> [Validate: Month 5]
-Fold 3: [Train: Month 1-5] ------------------> [Validate: Month 6]
-Fold 4: [Train: Month 1-6] -----------------------> [Validate: Month 7]
+```mermaid
+flowchart TD
+    subgraph CV ["Temporal Cross-Validation (TimeSeriesSplit: 4 Folds)"]
+        direction TB
+        subgraph F1 ["Fold 1"]
+            F1_T["Train: Month 1-3"] --> F1_V["Validate: Month 4"]
+        end
+        subgraph F2 ["Fold 2"]
+            F2_T["Train: Month 1-4"] --> F2_V["Validate: Month 5"]
+        end
+        subgraph F3 ["Fold 3"]
+            F3_T["Train: Month 1-5"] --> F3_V["Validate: Month 6"]
+        end
+        subgraph F4 ["Fold 4"]
+            F4_T["Train: Month 1-6"] --> F4_V["Validate: Month 7"]
+        end
+    end
+
+    style CV fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style F1 fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
+    style F2 fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
+    style F3 fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
+    style F4 fill:#1e293b,stroke:#3b82f6,stroke-width:1px,color:#fff
+    style F1_T fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style F1_V fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style F2_T fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style F2_V fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style F3_T fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style F3_V fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style F4_T fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style F4_V fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 ---
@@ -445,11 +452,13 @@ for k, v in study.best_params.items():
 ```mermaid
 flowchart LR
     subgraph BatchInference ["Batch Offline Inference"]
+        direction LR
         Sched["Airflow / Cron Trigger"] --> SparkJob["Distributed Spark / Ray Job"]
         SparkJob --> Lakehouse["S3 / Delta Lake / Snowflake Output"]
     end
 
     subgraph OnlineInference ["Real-Time Online Serving"]
+        direction LR
         Request["REST / gRPC Request (<50ms SLA)"] --> APIGW["FastAPI / Triton / ONNX"]
         APIGW --> Cache["Redis Feature Cache (Point-in-time)"]
         Cache --> ModelScore["Sub-millisecond Model Evaluation"]
@@ -514,21 +523,11 @@ print("ONNX Probabilities:", onnx_predictions[1])
 
 ### 8.1 Covariate Shift, Prior Probability Shift, and Concept Drift
 
-```text
-+------------------------+-------------------------------+--------------------------------+
-| DRIFT TYPE             | MATHEMATICAL FORMULATION      | REAL-WORLD PRODUCTION EXAMPLE   |
-+------------------------+-------------------------------+--------------------------------+
-| Covariate Shift        | P(X) changes,                 | Demographic shift: new marketing|
-| (Data Drift)           | P(Y|X) remains constant       | campaign attracts younger users|
-|                        |                               | with different income profiles.|
-| Prior Probability      | P(Y) changes,                 | Global pandemic causes default |
-| Shift                  | P(X|Y) remains constant       | rates to increase across all   |
-|                        |                               | credit brackets simultaneously.|
-| Concept Drift          | P(Y|X) changes,               | Macroeconomic inflation: a     |
-| (Model Decay)          | P(X) remains constant         | $100k salary no longer predicts|
-|                        |                               | luxury car purchase propensity.|
-+------------------------+-------------------------------+--------------------------------+
-```
+| Drift Type | Mathematical Formulation | Real-World Production Example |
+| :--- | :--- | :--- |
+| **Covariate Shift**<br/>(Data Drift) | $P(X)$ changes,<br/>$P(Y \mid X)$ remains constant | Demographic shift: new marketing campaign attracts younger users with different income profiles. |
+| **Prior Probability Shift** | $P(Y)$ changes,<br/>$P(X \mid Y)$ remains constant | Global pandemic causes default rates to increase across all credit brackets simultaneously. |
+| **Concept Drift**<br/>(Model Decay) | $P(Y \mid X)$ changes,<br/>$P(X)$ remains constant | Macroeconomic inflation: a \$100k salary no longer predicts luxury car purchase propensity. |
 
 ---
 

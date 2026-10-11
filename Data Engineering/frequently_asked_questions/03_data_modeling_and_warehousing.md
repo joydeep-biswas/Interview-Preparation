@@ -231,21 +231,20 @@ CREATE TABLE fact_retail_sales (
 **Topic Covered:** Physical Disk Page Layout, I/O Projection Pruning & Vectorized Scans  
 **Question:** Row vs. Columnar Storage
 
-#### Visual Comparison: Physical Layout on Disk
-```
-Logical Table:
-Row 0: [ID: 1, Name: "Alice", Amount: 100]
-Row 1: [ID: 2, Name: "Bob",   Amount: 200]
-Row 2: [ID: 3, Name: "Carol", Amount: 300]
+##### Logical Table Representation
 
-1. Row-Oriented Storage (PostgreSQL Heap, CSV):
-Disk Block 1: [1, "Alice", 100] | [2, "Bob", 200] | [3, "Carol", 300]
+| ID | Name | Amount |
+| :---: | :--- | :---: |
+| 1 | Alice | 100 |
+| 2 | Bob | 200 |
+| 3 | Carol | 300 |
 
-2. Columnar Storage (Parquet, ORC, Delta Lake):
-Disk Block 1 (ID):     [1, 2, 3]
-Disk Block 2 (Name):   ["Alice", "Bob", "Carol"]
-Disk Block 3 (Amount): [100, 200, 300]
-```
+##### Physical Layout Across Disk Blocks
+
+| Storage Format | Disk Block Allocation | Analytical Scan Behavior (`SELECT SUM(Amount)`) |
+| :--- | :--- | :--- |
+| **Row-Oriented**<br/>(PostgreSQL Heap, CSV, MySQL) | `[Block 1]: [1, "Alice", 100] \| [2, "Bob", 200] \| [3, "Carol", 300]` | Reads **every column for all rows** into memory; discards non-aggregated attributes in RAM. |
+| **Columnar**<br/>(Parquet, ORC, Delta Lake, Snowflake) | • `[Block 1 (ID)]`: `[1, 2, 3]`<br/>• `[Block 2 (Name)]`: `["Alice", "Bob", "Carol"]`<br/>• `[Block 3 (Amount)]`: `[100, 200, 300]` | **Projection Pruning:** Reads **strictly Block 3**, eliminating over 90% of disk I/O bandwidth. |
 
 #### Why Columnar Storage Dominates Data Warehousing
 1. **Column Pruning (I/O Elimination):** In analytical queries like `SELECT SUM(amount) FROM sales`, a columnar engine reads **only Disk Block 3**. Row stores must read all columns for every row into RAM, wasting 90% of disk I/O bandwidth.
@@ -398,17 +397,14 @@ CREATE TABLE fact_daily_loan_snapshot (
 - **SCD Type 3 (Add New Column):** Tracks only current and previous value side-by-side using dedicated columns (`current_city`, `previous_city`). Limited historical window.
 
 #### SCD Type 2 Architecture
-```
-Incoming Event: Customer 101 moves from 'Seattle' to 'New York' on 2024-06-01
+> **Incoming Event:** Customer `101` moves from `'Seattle'` to `'New York'` on `2024-06-01`.
 
-Resulting dim_customer Table:
-┌─────────┬─────────────┬──────────┬──────────────┬────────────┬───────────┐
-│ cust_sk │ customer_id │ city     │ start_date   │ end_date   │ is_current│
-├─────────┼─────────────┼──────────┼──────────────┼────────────┼───────────┤
-│ 1001    │ 101         │ Seattle  │ 2021-01-01   │ 2024-05-31 │ FALSE     │
-│ 1002    │ 101         │ New York │ 2024-06-01   │ 9999-12-31 │ TRUE      │
-└─────────┴─────────────┴──────────┴──────────────┴────────────┴───────────┘
-```
+##### Resulting `dim_customer` Table
+
+| `cust_sk` | `customer_id` | `city` | `start_date` | `end_date` | `is_current` |
+| :---: | :---: | :--- | :---: | :---: | :---: |
+| 1001 | 101 | Seattle | 2021-01-01 | 2024-05-31 | `FALSE` |
+| 1002 | 101 | New York | 2024-06-01 | 9999-12-31 | `TRUE` |
 
 #### Production PySpark Delta Lake Implementation: SCD Type 2
 ```python

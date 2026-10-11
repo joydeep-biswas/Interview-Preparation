@@ -104,17 +104,23 @@ Delta Lake stores raw data as standard compressed Apache Parquet files, but wrap
 
 #### Incremental Load Design Architecture (Q1, Q2)
 ```mermaid
-flowchart LR
-    subgraph IncrementalPipeline ["Delta Lake Incremental Ingestion & Idempotent MERGE"]
-        Source[("Source DB / Files<br/>(Delta / CDC Feed)")] --> Filter["Filter: modified_time > last_watermark"]
-        Filter --> Staging["Staging DataFrame"]
-        Staging --> Dedup["Deduplicate by Natural Key<br/>(Guarantees 1:1 Match)"]
-        Dedup --> MergeOp["Delta MERGE INTO Target<br/>• WHEN MATCHED -> UPDATE<br/>• WHEN NOT MATCHED -> INSERT"]
-        MergeOp --> Target[("Target Delta Table<br/>(Gold / Silver)")]
-        MergeOp --> Meta[("Watermark Control Table")]
+flowchart TD
+    subgraph Stage1 ["Stage 1: Incremental Extraction & Staging"]
+        direction LR
+        Source[("Source DB / Files<br/>(Delta / CDC Feed)")] --> Filter["Watermark Filter<br/>(modified_time > last_watermark)"] --> Staging["Staging DataFrame<br/>(Raw Delta batch)"]
     end
 
-    style IncrementalPipeline fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    subgraph Stage2 ["Stage 2: Deduplication & Idempotent Upsert"]
+        direction LR
+        Dedup["Deduplicate by Natural Key<br/>(Window / ROW_NUMBER = 1)"] --> MergeOp["Delta MERGE INTO Target<br/>(WHEN MATCHED UPDATE / NOT MATCHED INSERT)"]
+        MergeOp --> Target[("Target Delta Table<br/>(Silver / Gold)")]
+        MergeOp --> Meta[("Watermark Control Table<br/>(Update high-watermark)")]
+    end
+
+    Staging --> Dedup
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Source fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Filter fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Staging fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
@@ -216,20 +222,34 @@ In Delta Lake, SCD Type 2 is implemented via a **two-pass merge**:
 
 ```mermaid
 flowchart TD
-    subgraph SmallFileProblem ["Before OPTIMIZE: Small Files Bloat"]
-        F1["1MB File"] & F2["2MB File"] & F3["1MB File"] & F4["3MB File"]
+    subgraph Stage1 ["Stage 1: File Compaction (OPTIMIZE)"]
+        direction LR
+        SmallFiles["Fragmented Small Files<br/>(Thousands of 1MB–5MB files from micro-batch ingestion)"] -->|"OPTIMIZE table"| Compacted["Uniform 1 GB Parquet Files<br/>(Eliminates storage API LIST/GET metadata overhead)"]
     end
-    
-    SmallFileProblem -->|OPTIMIZE table_name| Compacted["Compacted 1GB Clean Parquet File"]
-    Compacted -->|Z-ORDER BY customer_id| ZOrdered["Sorted into Min/Max Zone Maps (95% Data Skipping)"]
 
-    style SmallFileProblem fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
-    style F1 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style F2 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style F3 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style F4 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Compacted fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    subgraph Stage2 ["Stage 2: Multidimensional Clustering (Z-ORDER BY)"]
+        direction LR
+        Unclustered["Compacted Parquet Files<br/>(Sequential row distribution)"] -->|"Z-ORDER BY (customer_id, order_date)"| ZOrdered["Clustered Parquet Files<br/>(Min/Max Zone Maps enable 90%+ file skipping)"]
+    end
+
+    subgraph Stage3 ["Stage 3: Tombstone Purging & Storage Reclamation (VACUUM)"]
+        direction LR
+        Tombstones["Tombstoned Parquet Files<br/>(Old files preserved in _delta_log for Time Travel)"] -->|"VACUUM table RETAIN 168 HOURS"| Purged["Purged Storage & Clean Directory<br/>(Frees cloud storage costs; removes files older than 7d)"]
+    end
+
+    Compacted -->|"Produces optimized active files"| Unclustered
+    SmallFiles -.->|"Leaves obsolete historical versions"| Tombstones
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Stage3 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+
+    style SmallFiles fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Compacted fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Unclustered fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style ZOrdered fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Tombstones fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Purged fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 ---
@@ -372,7 +392,7 @@ flowchart TD
 
 #### Designing for Billions of Records (Q11)
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Ingestion ["1. High-Throughput Ingestion"]
         AL["Auto Loader (File Notification Mode)"]
     end
@@ -385,7 +405,7 @@ flowchart TD
         PE["Databricks Photon Engine (C++ Vectorized SIMD)"]
     end
 
-    AL --> LC --> ComputeEngine
+    AL --> LC --> PE
 
     style Ingestion fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style StorageLayout fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc

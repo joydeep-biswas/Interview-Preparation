@@ -361,19 +361,18 @@ The **Split-Brain Problem** occurs when a network partition bisects a cluster in
 flowchart TD
     subgraph NetworkSplit ["Network Partition Severed"]
         subgraph SubClusterA ["Partition A (2 Nodes) - Minority Split"]
-            Node1["Node 1 (Believes it is Leader)"]
-            Node2["Node 2"]
+            direction LR
+            Node1["Node 1 (Believes it is Leader)"] --- Node2["Node 2"]
         end
 
         subgraph SubClusterB ["Partition B (3 Nodes) - HAS QUORUM!"]
-            Node3["Node 3 (Elected New Leader)"]
-            Node4["Node 4"]
-            Node5["Node 5"]
+            direction LR
+            Node3["Node 3 (Elected New Leader)"] --- Node4["Node 4"] --- Node5["Node 5"]
         end
     end
 
-    SubClusterA -.->|Quorum Check Fails (2 < 3)| StepDown["Node 1 MUST Step Down!"]
-    SubClusterB -->|Majority Won (3 > 2.5)| ValidLeader["Node 3 Operates as True Leader"]
+    Node1 -.->|"Quorum Check Fails (2 < 3)"| StepDown["Node 1 MUST Step Down!"]
+    Node3 -->|"Majority Won (3 > 2.5)"| ValidLeader["Node 3 Operates as True Leader"]
 
     style NetworkSplit fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,stroke-dasharray: 5 5,color:#fca5a5
     style SubClusterA fill:#1e293b,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
@@ -401,6 +400,7 @@ floor + 1$ nodes. The minor partition ($2 < 3$) can never form a quorum and must
 A mechanism where distributed cluster nodes periodically transmit lightweight telemetry signals (**Heartbeats**) to a coordinator or peer cluster nodes (e.g., every 1 second). If a node fails to send a heartbeat within an agreed-upon lease timeout window (e.g., 5 seconds), the **Failure Detector** marks the node as `DEAD` and triggers automated failover, partition reassignment, and re-replication.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor Worker as Worker Node 3
@@ -513,9 +513,9 @@ flowchart TD
 
     subgraph DistributedCluster ["Database Sharding (Multiple Network Hosts)"]
         Router{Sharding Router}
-        Router -->|hash(key) in [0, 33)| Shard1["Physical DB Node 1 (IP: 10.0.1.10)"]
-        Router -->|hash(key) in [34, 66)| Shard2["Physical DB Node 2 (IP: 10.0.1.11)"]
-        Router -->|hash(key) in [67, 100]| Shard3["Physical DB Node 3 (IP: 10.0.1.12)"]
+        Router -->|"hash(key) in [0, 33]"| Shard1["Physical DB Node 1 (IP: 10.0.1.10)"]
+        Router -->|"hash(key) in [34, 66]"| Shard2["Physical DB Node 2 (IP: 10.0.1.11)"]
+        Router -->|"hash(key) in [67, 100]"| Shard3["Physical DB Node 3 (IP: 10.0.1.12)"]
     end
 
     style SingleHost fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -683,6 +683,7 @@ Guarantees that if a user reloads a page after making a modification, **their ow
 - Track client commit timestamps (or Log Sequence Numbers - LSN) and only route reads to replicas whose replication offset $\ge$ commit timestamp.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor User
@@ -820,17 +821,17 @@ The set of read nodes and the set of write nodes **must overlap on at least one 
 ```mermaid
 flowchart TD
     subgraph REST_Fetch ["1. REST API (Fixed Schema, Over-Fetching)"]
-        Client1[Client] -->|GET /users/1| S1[Server]
+        Client1[Client] -->|"GET /users/1"| S1[Server]
         S1 -->|Returns all 40 columns in JSON| Client1
     end
 
     subgraph GraphQL_Fetch ["2. GraphQL (Client Controls Payload Shape)"]
-        Client2[Client] -->|POST: query { user(id: 1) { name email } }| S2[Server]
+        Client2[Client] -->|"POST: query { user(id: 1) { name email } }"| S2[Server]
         S2 -->|Returns ONLY name and email in JSON| Client2
     end
 
     subgraph gRPC_Fetch ["3. gRPC (High-Speed Binary Protobuf on HTTP/2)"]
-        Client3[Microservice Client] -->|GetUser(UserRequest)| S3[gRPC Server]
+        Client3[Microservice Client] -->|"GetUser(UserRequest)"| S3[gRPC Server]
         S3 -->|Binary Protobuf Byte Stream| Client3
     end
 
@@ -880,20 +881,23 @@ flowchart TD
 A JWT is a compact, URL-safe string structured as:
 $$\text{Header (Algorithm)} \; . \; \text{Payload (Claims/User ID/Expiry)} \; . \; \text{Signature (Cryptographic HMAC)}$$
 
-```mermaid
-flowchart LR
-    H["Header: {'alg': 'HS256', 'typ': 'JWT'}"] --> D1["."]
-    P["Payload: {'sub': '101', 'role': 'admin', 'exp': 1727913600}"] --> D2["."]
-    S["Signature: HMACSHA256(Base64(H) + '.' + Base64(P), Secret)"]
-    
-    H --- D1 --- P --- D2 --- S
+```json
+    // "header": 
+    {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+    // "payload": 
+    {
+        "sub": "user_12345",
+        "iat": 1700000000,
+        "exp": 1700003600,
+        "roles": ["admin", "data_ingest"]
+    }
+    // "signature": "a-string-secret-at-least-256-bits-long"
 
-    style H fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style D1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style P fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style D2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Base64 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+// Gets Encoded as: 
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEyMzQ1IiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsInJvbGVzIjpbImFkbWluIiwiZGF0YV9pbmdlc3QiXX0.DWkrkUkOXitp6TASupJi-vV7l7C84yUiPWAZ4_cDO0k
 ```
 
 ---
@@ -904,6 +908,7 @@ flowchart LR
 Used by automated data ingestion jobs to authenticate without user interaction.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     participant Pipeline as Data Ingestion Pipeline
     participant AuthServer as OAuth 2.0 Token Server
@@ -958,20 +963,28 @@ Requests enter a buffer (the bucket) at arbitrary burst rates and leak out at a 
 
 ```mermaid
 flowchart TD
-    Burst["Bursty Traffic Ingress (Spikes of 500 req/sec)"] --> Bucket["Leaky Bucket Buffer (Capacity: 50 slots)"]
-    Bucket --> OverFlow{"Buffer Full?"}
-    OverFlow -- Yes --> Drop["HTTP 429: Queue Overflow"]
-    OverFlow -- No --> Queue["Enqueued in FIFO Buffer"]
-    Queue --> Leak["Constant Leak Rate (Smooth 10 req/sec)"]
-    Leak --> BackendService["Downstream Processing Engine"]
+    subgraph Stage1 ["Stage 1: Traffic Ingress & Overflow Evaluation"]
+        direction LR
+        Burst["Bursty Ingress<br/>(Spikes of 500 req/s)"] --> Bucket["Leaky Bucket Buffer<br/>(Capacity: 50 slots)"] --> OverFlow{"Buffer Full?"}
+        OverFlow -- Yes --> Drop["HTTP 429: Queue Overflow"]
+    end
 
+    subgraph Stage2 ["Stage 2: FIFO Regulation & Downstream Execution"]
+        direction LR
+        Queue["Enqueued in FIFO Buffer"] --> Leak["Constant Leak Rate<br/>(Smooth 10 req/s)"] --> BackendService["Downstream Engine"]
+    end
+
+    OverFlow -- No --> Queue
+
+    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Burst fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Bucket fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style OverFlow fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Drop fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Queue fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Leak fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style BackendService fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Drop fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Queue fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Leak fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style BackendService fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### Code Example: Leaky Bucket Rate Limiter
@@ -1084,6 +1097,7 @@ def resilient_get(url: str, max_retries: int = 5) -> Dict[str, Any]:
 - **Webhooks (Server Push / Reverse API)**: The event producer makes an asynchronous HTTP `POST` request directly to the consumer's registered public URL the moment an event occurs. Near-zero resource consumption while idle; near-instantaneous event delivery.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
     actor Client

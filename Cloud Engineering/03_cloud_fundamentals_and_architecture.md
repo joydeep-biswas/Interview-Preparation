@@ -100,22 +100,12 @@ flowchart TD
 
 Cloud computing categorizes infrastructure resources based on the level of abstraction provided to the consumer:
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                                CLOUD ABSTRACTION SPECTRUM                               |
-+---------------------+-------------------+---------------------+-------------------------+
-| IaaS                | PaaS              | FaaS (Serverless)   | SaaS                    |
-| (Infrastructure)    | (Platform)        | (Function)          | (Software)              |
-+---------------------+-------------------+---------------------+-------------------------+
-| EC2 / Azure VM      | Azure App Service | AWS Lambda / Azure  | Microsoft 365           |
-| Raw Block Storage   | AWS Elastic BStk  | Functions           | Salesforce, Datadog     |
-+---------------------+-------------------+---------------------+-------------------------+
-| YOU MANAGE:         | YOU MANAGE:       | YOU MANAGE:         | YOU MANAGE:             |
-| - OS Patching       | - App Code        | - Event Handler Code| - User Access / Config  |
-| - Networking / Fire.| - App Data        | - Function Memory   |                         |
-| - Runtime & Runtime |                   |                     |                         |
-+---------------------+-------------------+---------------------+-------------------------+
-```
+| Delivery Model | Examples | Consumer Management Responsibilities | Cloud Provider Responsibilities |
+| :--- | :--- | :--- | :--- |
+| **IaaS**<br/>(Infrastructure) | EC2, Azure VM, Compute Engine, Raw Block Storage | OS Patching, Networking, Firewalls, Runtimes, Middleware, App Code & Data | Physical Servers, Hypervisor, Datacenter Facilities, Storage Hardware |
+| **PaaS**<br/>(Platform) | Azure App Service, AWS Elastic Beanstalk, Cloud Run | Application Code, Application Configurations, Business Data | OS Provisioning, Runtime Updates, Auto-scaling infrastructure, Hypervisor |
+| **FaaS / Serverless**<br/>(Function) | AWS Lambda, Azure Functions, Cloud Functions | Event Handler Code, Function Triggers, Memory Allocation | Scaling to zero, Server provisioning, Runtime patching, Concurrency routing |
+| **SaaS**<br/>(Software) | Microsoft 365, Salesforce, Datadog | User Access Control, Tenant Data, Integration Configurations | Entire Application Lifecycle, Upgrades, High Availability, Security |
 
 1. **Infrastructure as a Service (IaaS):** Direct provisioning of virtual machines, software-defined networks, and raw block storage. Highest architectural flexibility; highest operational toil (OS maintenance, security patching, kernel tuning).
 2. **Platform as a Service (PaaS):** Cloud provider manages operating systems, runtimes, web servers, and hardware virtualization. Consumers deploy application binaries and configure databases.
@@ -157,17 +147,10 @@ flowchart TD
 
 ### 2.2 Fault Domains vs. Update Domains
 
-```text
-+-----------------------------------------------------------------------------------------+
-|                               AVAILABILITY SET TOPOLOGY                                 |
-+------------------------------+------------------------------+---------------------------+
-| FAULT DOMAIN 0               | FAULT DOMAIN 1               | FAULT DOMAIN 2            |
-| (Rack A: Power Unit 1, TOR 1)| (Rack B: Power Unit 2, TOR 2)| (Rack C: Power Unit 3,TOR)|
-+------------------------------+------------------------------+---------------------------+
-| [VM 1] (Update Domain 0)     | [VM 2] (Update Domain 1)     | [VM 3] (Update Domain 2)  |
-| [VM 4] (Update Domain 3)     | [VM 5] (Update Domain 4)     | [VM 6] (Update Domain 0)  |
-+------------------------------+------------------------------+---------------------------+
-```
+| Topology Dimension | Fault Domain 0 (Rack A) | Fault Domain 1 (Rack B) | Fault Domain 2 (Rack C) |
+| :--- | :--- | :--- | :--- |
+| **Physical Isolation** | Power Unit 1, TOR Switch 1 | Power Unit 2, TOR Switch 2 | Power Unit 3, TOR Switch 3 |
+| **Assigned Instances** | `VM 1` (Update Domain 0)<br/>`VM 4` (Update Domain 3) | `VM 2` (Update Domain 1)<br/>`VM 5` (Update Domain 4) | `VM 3` (Update Domain 2)<br/>`VM 6` (Update Domain 0) |
 
 1. **Fault Domain (FD):** Represents a single point of failure in physical infrastructure sharing a common power source and Top-of-Rack (TOR) network switch. Placing instances across distinct FDs prevents total service collapse during hardware or power loss.
 2. **Update Domain (UD):** Logical group of hardware that can be rebooted or patched simultaneously by the cloud hypervisor. Spreading instances across multiple UDs prevents reboot outages during platform maintenance.
@@ -180,18 +163,16 @@ flowchart TD
 
 The Shared Responsibility Model establishes the precise contractual and operational demarcation between the cloud service provider (CSP) and the customer:
 
-```text
-Responsibility Area            | On-Premises | IaaS     | PaaS     | SaaS
-─────────────────────────────────────────────────────────────────────────
-Customer Data Classification   | Customer    | Customer | Customer | Customer
-User Identity & Access (IAM)   | Customer    | Customer | Customer | Customer
-Application Logic & APIs       | Customer    | Customer | Customer | Provider
-Operating System & Patching    | Customer    | Customer | Provider | Provider
-Network Configuration & NSGs   | Customer    | Customer | Shared   | Provider
-Hypervisor & Virtualization    | Customer    | Provider | Provider | Provider
-Physical Servers & Hardware    | Customer    | Provider | Provider | Provider
-Data Center Facilities & Power | Customer    | Provider | Provider | Provider
-```
+| Responsibility Area            | On-Premises | IaaS     | PaaS     | SaaS
+| ------------------------------ | ----------- | -------- | -------- | --------
+| Customer Data Classification   | Customer    | Customer | Customer | Customer
+| User Identity & Access (IAM)   | Customer    | Customer | Customer | Customer
+| Application Logic & APIs       | Customer    | Customer | Customer | Provider
+| Operating System & Patching    | Customer    | Customer | Provider | Provider
+| Network Configuration & NSGs   | Customer    | Customer | Shared   | Provider
+| Hypervisor & Virtualization    | Customer    | Provider | Provider | Provider
+| Physical Servers & Hardware    | Customer    | Provider | Provider | Provider
+| Data Center Facilities & Power | Customer    | Provider | Provider | Provider
 
 > [!CAUTION]
 > **Data and Identity Invariant:** Regardless of the delivery model (even in fully managed SaaS like Salesforce or Microsoft 365), **the customer is ALWAYS 100% responsible for customer data classification, backup retention policies, user access management (IAM), and endpoint security.** A ransomware attack encrypting data via compromised API credentials is fully the customer's operational responsibility.
@@ -213,6 +194,7 @@ flowchart LR
     end
 
     subgraph DataPlane ["Data Plane (Simple, Ultra-High Availability, High Packet Rate)"]
+        direction LR
         Router["Physical Switching Hardware<br/>(Forwarding IP Packets, Flow Tables)"]
         Hypervisor["KVM / Hyper-V Engine<br/>(Executing CPU instructions)"]
         StorageEngine["Block Storage NVMe Engine<br/>(Reading/Writing disk blocks)"]
@@ -248,14 +230,34 @@ flowchart LR
 
 Enterprise governance mandates strict hierarchical nesting for policy inheritance, role-based access control (RBAC), and cost aggregation:
 
-```text
-[Management Root Group] (Enforces Org-wide Compliance Policies)
-    ├── [Platform Management Group]
-    │       ├── Subscription: Core Networking (Hub VNet, ExpressRoute, Firewalls)
-    │       └── Subscription: Shared Identity & Security (Key Vault, SIEM)
-    └── [Landing Zones Management Group]
-            ├── Subscription: E-Commerce Production (Prod App & DB Resources)
-            └── Subscription: E-Commerce Staging (Dev/Test Sandbox)
+```mermaid
+flowchart TD
+    Root["Management Root Group<br/>(Enforces Org-wide Compliance Policies)"]
+    Plat["Platform Management Group"]
+    LZ["Landing Zones Management Group"]
+
+    SubNet["Subscription: Core Networking<br/>(Hub VNet, ExpressRoute, Firewalls)"]
+    SubId["Subscription: Shared Identity & Security<br/>(Key Vault, SIEM)"]
+
+    SubProd["Subscription: E-Commerce Production<br/>(Prod App & DB Resources)"]
+    SubStage["Subscription: E-Commerce Staging<br/>(Dev / Test Sandbox)"]
+
+    Root --> Plat
+    Root --> LZ
+
+    Plat --> SubNet
+    Plat --> SubId
+
+    LZ --> SubProd
+    LZ --> SubStage
+
+    classDef rootNode fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef mg fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef sub fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#ecfdf5;
+
+    class Root rootNode;
+    class Plat,LZ mg;
+    class SubNet,SubId,SubProd,SubStage sub;
 ```
 
 ---
@@ -275,23 +277,41 @@ Cloud APIs protect backend systems via **Token Bucket** rate limiting. Rapid req
 - **Recovery Point Objective (RPO):** Maximum acceptable data loss measured in time. (e.g. RPO = 5 minutes means you can afford to lose at most 5 minutes of transactional data).
 - **Recovery Time Objective (RTO):** Maximum acceptable downtime before the service is restored to operational status.
 
-```text
-Outage Occurs (T_0)
-      │
-<─────┼─────────────────>
-      │                  │
-Last Data Backup   Service Restored
-(RPO: Data Delta)  (RTO: Downtime Duration)
+```mermaid
+flowchart TD
+    subgraph Timeline ["Disaster Recovery Timeline: RPO vs. RTO"]
+        Backup["Last Data Backup<br/>(Recovery Point)"]
+        Outage["Outage Occurs (T₀)<br/>(Incident Trigger)"]
+        Restored["Service Restored<br/>(Recovery Time)"]
+
+        Backup -->|"RPO: Maximum Acceptable Data Loss"| Outage
+        Outage -->|"RTO: Maximum Acceptable Downtime"| Restored
+    end
+
+    style Timeline fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Backup fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Outage fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fff
+    style Restored fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
 ```
 
 ---
 
 ### 6.2 Disaster Recovery Strategies: Backup to Active-Active
 
-```text
-Cost & Complexity: Low ──────────────────────────────────────────────────────────> High
-RTO / RPO:         Hours/Days ─────────────────────────────────────────────────> Seconds
-                  [Backup & Restore]  -->  [Pilot Light]  -->  [Warm Standby]  -->  [Active-Active]
+```mermaid
+flowchart LR
+    subgraph DRSpectrum ["Disaster Recovery Strategy Spectrum (Cost vs RTO/RPO)"]
+        direction LR
+        S1["Backup & Restore<br/>(Hours/Days RTO/RPO)<br/>Lowest Cost"] --> S2["Pilot Light<br/>(Tens of Mins RTO/RPO)<br/>Low Cost"]
+        S2 --> S3["Warm Standby<br/>(Minutes RTO/RPO)<br/>Medium Cost"]
+        S3 --> S4["Active-Active Multi-Region<br/>(Zero RTO/RPO)<br/>Highest Cost & Complexity"]
+    end
+
+    style DRSpectrum fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S2 fill:#1f2937,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style S3 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style S4 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
 1. **Backup and Restore:** Cold backups stored in secondary region storage. RTO = Hours/Days; RPO = Hours.

@@ -94,6 +94,7 @@ Designing modern data platforms requires balancing physical hardware constraints
 ```mermaid
 flowchart TD
     subgraph TradeOffTriad ["The Core Trade-Off Triad"]
+        direction TD
         Scalability["Scalability<br/>(Horizontal scale, sharding, partition pruning)"]
         Reliability["Reliability & Fault Tolerance<br/>(Replication, checkpoints, idempotence)"]
         Cost["Cost & Resource Efficiency<br/>(Compute-storage separation, spot instances)"]
@@ -157,9 +158,18 @@ In distributed data pipelines, physical machine clocks drift due to quartz cryst
 
 When upstream event producers produce traffic spikes that exceed downstream processing throughput, unbuffered systems encounter thread starvation, memory exhaustion, and cascading Out-Of-Memory (OOM) failures.
 
-```text
-[High QPS Producers] ---> [Durable Distributed Log (Kafka)] ---> [Pull-Based Consumer (Spark / Flink)]
-      (Push Ingress)               (Disk-Backed Buffer)                (Processes at Regulated Rate)
+```mermaid
+flowchart LR
+    Producers["High QPS Producers<br/>(Push Ingress)"] -->|"Unregulated Ingress"| Kafka["Durable Distributed Log (Kafka)<br/>(Disk-Backed Buffer / NVMe)"]
+    Kafka -->|"Regulated Pull-Based Fetch"| Consumers["Pull-Based Consumers (Spark / Flink)<br/>(Processes at Regulated Rate)"]
+
+    classDef prod fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef buf fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef proc fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+
+    class Producers prod;
+    class Kafka buf;
+    class Consumers proc;
 ```
 
 - **Queue Decoupling:** Ingestion buffers (Kafka/Event Hubs) absorb traffic bursts on persistent NVMe disks. Upstream APIs return `202 Accepted` immediately without waiting for ETL completion.
@@ -178,21 +188,17 @@ Senior system design interviews require rapid, precise quantitative estimations.
 
 ### 2.1 The Back-of-the-Envelope Estimation Framework
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       TIME & DATA CONVERSION CONSTANTS                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 1 Day              = 86,400 seconds ≈ 10^5 seconds                          │
-│ 1 Month            = 2.59 × 10^6 seconds ≈ 3 × 10^6 seconds                 │
-│ 1 Year             = 3.15 × 10^7 seconds ≈ 3 × 10^7 seconds                 │
-│ 1 MB               = 1,000 KB = 10^6 Bytes                                  │
-│ 1 GB               = 1,000 MB = 10^9 Bytes                                  │
-│ 1 TB               = 1,000 GB = 10^12 Bytes                                 │
-│ 1 PB               = 1,000 TB = 10^15 Bytes                                 │
-│ 100 Million QPD    ≈ 1,150 QPS average                                      │
-│ 1 Billion QPD      ≈ 11,500 QPS average                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+| Metric / Unit | Exact Value | Interview Approximation | Storage / Traffic Equivalent |
+| :--- | :--- | :--- | :--- |
+| **1 Day** | 86,400 seconds | $\approx 10^5 \text{ seconds}$ | Standard daily time quantum |
+| **1 Month (30 Days)** | $2.59 \times 10^6 \text{ seconds}$ | $\approx 3 \times 10^6 \text{ seconds}$ | Monthly billing / partition cycle |
+| **1 Year (365 Days)** | $3.15 \times 10^7 \text{ seconds}$ | $\approx 3 \times 10^7 \text{ seconds}$ | Annual retention baseline |
+| **1 MB** | $1,024 \text{ KB}$ | $10^6 \text{ Bytes}$ | Medium document / telemetry batch |
+| **1 GB** | $1,024 \text{ MB}$ | $10^9 \text{ Bytes}$ | Memory partition / Parquet block |
+| **1 TB** | $1,024 \text{ GB}$ | $10^{12} \text{ Bytes}$ | Daily data warehouse ingress |
+| **1 PB** | $1,024 \text{ TB}$ | $10^{15} \text{ Bytes}$ | Large-scale analytical lakehouse |
+| **100 Million QPD** | $10^8 / 86,400$ | $\approx 1,150 \text{ QPS}$ | Moderate consumer platform scale |
+| **1 Billion QPD** | $10^9 / 86,400$ | $\approx 11,500 \text{ QPS}$ | Global enterprise scale |
 
 ---
 
