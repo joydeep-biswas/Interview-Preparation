@@ -86,6 +86,11 @@ flowchart TD
    - [6.4 Stragglers Detection & Speculative Execution](#64-stragglers-detection-speculative-execution)
    - [6.5 Task Failure Root Causes (FetchFailedException, Heartbeat Timeout)](#65-task-failure-root-causes)
    - [6.6 End-to-End Spark ETL Optimization Playbook (Troubleshooting Slow ETL Pipelines)](#66-end-to-end-spark-etl-optimization-playbook)
+7. [Summary Comparison & Engineering Reference Matrix](#7-summary-comparison--engineering-reference-matrix)
+   - [7.1 Distributed Spark Join Strategies Reference Matrix](#71-distributed-spark-join-strategies-reference-matrix)
+   - [7.2 Spark Memory Management & Spill Calculus](#72-spark-memory-management--spill-calculus)
+   - [7.3 Production Spark Engineering Invariants & Optimization Playbook](#73-production-spark-engineering-invariants--optimization-playbook)
+8. [References & Further Reading](#8-references--further-reading)
 
 ---
 
@@ -335,7 +340,7 @@ flowchart TD
 The Catalyst Optimizer is the core optimization engine powering Spark SQL, DataFrames, and Datasets. It applies rule-based and cost-based optimizations across four distinct phases:
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Stage1 ["Stage 1: Analysis & Catalog Resolution"]
         direction LR
         Unresolved["1. Unresolved Logical Plan<br/>(Code Syntax Tree)"] --> Catalog["Catalog / Metastore<br/>(Resolve Tables & Columns)"] --> Logical["2. Resolved Logical Plan<br/>(Valid Attributes)"]
@@ -351,8 +356,8 @@ flowchart LR
         Phys["5. Selected Physical Plan<br/>(SparkPlan Strategy Selection)"] --> CodeGen["6. Whole-Stage CodeGen<br/>(Janino Bytecode Generation)"] --> Exec["7. Execution on Workers<br/>(Tungsten Off-Heap Engine)"]
     end
 
-    Logical --> OptLogical
-    CBO --> Phys
+    Stage1 --> Stage2
+    Stage2 --> Stage3
 
     style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Stage2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
@@ -386,17 +391,20 @@ Project Tungsten is the underlying CPU and memory performance engine of Apache S
 
 ```mermaid
 flowchart LR
-    subgraph TungstenPillars ["The Three Pillars of Project Tungsten"]
-        OffHeap["1. Off-Heap Memory Management<br/>(Bypasses JVM GC; Manages Raw Bytes via sun.misc.Unsafe)"]
-        CacheAware["2. Cache-Aware Computation<br/>(L1/L2/L3 CPU Cache Prefetching & Cache Locality)"]
-        WholeStage["3. Whole-Stage Java Code Generation<br/>(Collapses Pipeline into a Single Fast C-Style Loop)"]
+    subgraph TungstenPipeline ["Project Tungsten Execution Engine Architecture"]
+        direction LR
+        OffHeap["<b>1. Memory Management</b><br/>(Binary Off-Heap Formats via sun.misc.Unsafe)"]
+        CacheAware["<b>2. Cache-Aware Computation</b><br/>(8-Byte Key/Pointer Arrays aligned to 64-byte Cache Lines)"]
+        CodeGen["<b>3. Whole-Stage Codegen</b><br/>(Janino compiles physical plan into a single flattened loop)"]
+        
+        OffHeap -->|"Binary Pointers"| CacheAware
+        CacheAware -->|"L1 Cache Residency"| CodeGen
     end
 
-    style TungstenPillars fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-
-    style OffHeap fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style CacheAware fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style WholeStage fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style TungstenPipeline fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style OffHeap fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style CacheAware fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style CodeGen fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 #### Architectural Impact
@@ -581,12 +589,14 @@ flowchart TD
 Introduced in Spark 3.0, Adaptive Query Execution (AQE) is an optimization framework that re-optimizes and mutates the physical query execution plan **at runtime based on actual stage runtime statistics**.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph TraditionalExecution ["Traditional Execution: Static Plan Fixed at Compile Time"]
+        direction LR
         Compile["Compile Plan"] --> RunAll["Execute All Stages (Cannot Adapt to Runtime Skew)"]
     end
 
     subgraph AQEExecution ["Adaptive Query Execution (AQE): Dynamic Re-Optimization"]
+        direction LR
         Stage1Done["Stage 1 Completes (Shuffle Files Written)"] --> Stats["Inspect Real Runtime Stage Stats!"]
         Stats --> Adapt{"Runtime Optimizations Triggered:"}
         Adapt --> Opt1["1. Dynamically Coalesce Small Shuffle Partitions"]
@@ -730,7 +740,7 @@ $$	ext{Partitions} = \frac{	ext{Total Shuffle Volume (e.g. 500GB)}}{150	ext{MB}}
 The Spark UI is a web dashboard (running by default on port `4040` on the Driver) providing deep operational metrics on running and completed jobs.
 
 ```mermaid
-flowchart LR
+flowchart TD
     UI["Spark UI Core Tabs"]
     UI --> Jobs["Jobs Tab: High-level Action duration & progress"]
     UI --> Stages["Stages Tab: DAG visualization, shuffle read/write, task skew"]
@@ -930,14 +940,16 @@ df_pivoted = df_sales.groupBy("product_id") \
 - **Vectorized Pandas UDF (`@pandas_udf`):** Built on **Apache Arrow**. Transfers entire batches of columnar records in-memory directly between the JVM and Python processes without serialization overhead, executing SIMD-accelerated NumPy/Pandas operations.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph StandardUDF ["Standard Python UDF: Row-by-Row Bottleneck"]
+        direction LR
         JVM1[JVM Memory] -->|Serialize Row via Pickle| PyProc1[Python Worker Process]
         PyProc1 -->|Execute Python Function| PyProc1
         PyProc1 -->|Deserialize Row to JVM| JVM1
     end
 
     subgraph VectorizedArrowUDF ["Vectorized Pandas UDF: Zero-Copy Apache Arrow"]
+        direction LR
         JVM2[JVM Memory] <-->|Apache Arrow Shared In-Memory Format| VectorPy[Python Pandas / NumPy Batch Processing]
     end
 
@@ -1532,8 +1544,9 @@ Each Spark executor JVM allocates its available memory (`spark.executor.memory`)
 ```mermaid
 flowchart TD
     subgraph TotalJVM ["Total Executor JVM Memory (e.g., 16 GB)"]
+        direction LR
         subgraph SystemMemory ["Base Memory Allocations"]
-            direction LR
+            direction TD
             Reserved["Reserved Memory<br/>(300 MB fixed for Spark internals)"]
             UserMem["User Memory (25%)<br/>(Custom structures, UDFs, maps)"]
         end
@@ -1711,3 +1724,56 @@ df_optimized = df_orders.withColumn(
 ```
 
 ---
+
+# 7. Summary Comparison & Engineering Reference Matrix
+
+### 7.1 Distributed Spark Join Strategies Reference Matrix
+
+The choice of distributed join algorithm dictates network shuffle volume, memory allocation, and risk of executor Out-Of-Memory (OOM) failures. The Catalyst optimizer dynamically evaluates these strategies based on table statistics, join hints, and Adaptive Query Execution (AQE) metrics.
+
+| Join Strategy | Physical Execution Mechanics | Network Shuffle Overhead | Memory Requirements | Sort Requirement | Supported Join Types | Production Failure Hazards & Optimal Fit |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Broadcast Hash Join (BHJ)** | Driver collects small relation and broadcasts full copy to all executor memory pools; executors perform local hash lookups. | **Zero Network Shuffle** (Network broadcast overhead on driver $\rightarrow$ executors) | High driver RAM during collection; fits inside executor memory (`spark.sql.autoBroadcastJoinThreshold`, default 10MB). | None | Inner, Left (if right is broadcast), Right (if left is broadcast). | **Highest performance**. Hazard: Driver OOM if broadcast relation exceeds driver heap; broadcast timeout on slow networks. |
+| **Shuffle Hash Join (SHJ)** | Hashes join keys across both datasets, shuffles matching hash partitions to identical executors, builds an in-memory hash table for the smaller partition. | **Full Shuffle** across network for both sides of the join ($O(N + M)$) | High: Smaller relation partition must fit entirely into executor execution memory. | None | Equi-joins only (Inner, Left, Right, Full Outer, Semi, Anti). | Preferred over SMJ when data is not pre-sorted and partition sizes fit in memory; fails with OOM if partition exceeds execution memory. |
+| **Sort-Merge Join (SMJ)** | Shuffles datasets across network by hash of join keys, sorts partitions on each executor by join key, then merges sorted streams linearly. | **Full Shuffle** across network for both sides of the join | **Low to Moderate**: Only buffers duplicate keys in memory; spills gracefully to disk. | **Mandatory**: Requires sorting both partitions ($O(K \log K)$ per partition). | Equi-joins only (All join types supported). | **Default workhorse** for massive datasets ($>100\text{GB}$). Highly resilient against OOM; slow when disk spill occurs during sorting. |
+| **Broadcast Nested Loop Join (BNLJ)** | Broadcasts one dataset to all executors; executes a nested loop comparison ($O(N \cdot M)$) across all records. | Zero Shuffle (Driver broadcast) | Low executor RAM; high CPU utilization. | None | Non-equi joins (`<`, `>`, `<=`, `>=`), Cartesian products. | **Extreme performance hazard**. Used only as last resort for non-equi joins without equality predicates; causes CPU throttling. |
+| **Cartesian Product Join (CPJ)** | Full cross-product across all partitions ($N \times M$ output rows). | **Exhaustive Shuffle** across all cluster slots | Exponential memory expansion; high risk of executor disk saturation. | None | Explicit Cross Joins. | Severe anti-pattern in ETL pipelines; produces quadratic output row explosions ($1\text{M} \times 1\text{M} = 10^{12}$ rows). |
+
+---
+
+### 7.2 Spark Memory Management & Spill Calculus
+
+Spark manages executor memory via a unified memory manager (`UnifiedMemoryManager`) divided into distinct logical regions:
+
+$$\text{Total Executor Memory} = \text{spark.executor.memory} + \text{Overhead Memory} + \text{Off-Heap Memory}$$
+
+| Memory Region | Default Fraction / Size | Configuration Parameter | Operational Functionality | Spill Behavior & OOM Hazard |
+| :--- | :--- | :--- | :--- | :--- |
+| **Reserved Memory** | Fixed $300\text{ MB}$ | Hardcoded internal limit | System overhead, internal Spark runtime processes, and safety buffers. | Non-configurable. If executor memory is $< 450\text{ MB}$, Spark fails to initialize. |
+| **User Memory** | $40\%$ of $(\text{Heap} - 300\text{ MB})$ | $1.0 - \text{spark.memory.fraction}$ | Stores user-defined data structures, internal metadata, UDF execution buffers, and non-Spark objects. | Unmanaged by Spark. Memory leaks in custom Python/Java objects directly cause `java.lang.OutOfMemoryError: Java heap space`. |
+| **Spark Execution Memory** | $\approx 30\%$ of $(\text{Heap} - 300\text{ MB})$ | Dynamic borrow pool (`spark.memory.storageFraction`) | Buffers shuffle maps, join hash tables, aggregation hash maps, and sort buffers. | **Can evict Storage Memory**. Spills to local NVMe disk (`spill (Memory)` vs `spill (Disk)`) when execution pool is exhausted. |
+| **Spark Storage Memory** | $\approx 30\%$ of $(\text{Heap} - 300\text{ MB})$ | `spark.memory.storageFraction` (default 0.5 of unified pool) | Holds cached DataFrames (`.cache()`, `.persist()`) and broadcast variables. | Cannot evict Execution Memory. Cached blocks are evicted to disk or dropped according to `StorageLevel` policy. |
+| **Overhead Memory** | $\max(384\text{ MB}, 0.10 \times \text{Executor Memory})$ | `spark.executor.memoryOverhead` | Off-heap allocations, PySpark JVM inter-process communication, NIO buffers, and OS page cache. | Causes YARN / Kubernetes container termination (`Exit code 137: Container killed by YARN for exceeding memory limits`). |
+
+---
+
+### 7.3 Production Spark Engineering Invariants & Optimization Playbook
+
+- **The 100MB–200MB Partition Sizing Rule:** Always size shuffle partitions such that target partition sizes on disk/RAM range between **$100\text{ MB}$ and $200\text{ MB}$**. Partitions $< 10\text{ MB}$ cause high driver scheduling latency and small file explosion; partitions $> 1\text{ GB}$ cause executor memory spill, GC pauses, and task OOM failures.
+- **Adaptive Query Execution (AQE) Mandate:** Ensure `spark.sql.adaptive.enabled = true` is active in all production Spark 3.x deployments. AQE automatically coalesces post-shuffle partitions, converts sort-merge joins to broadcast joins at runtime, and dynamically handles data skew via partition splitting.
+- **Key Salting for Extreme Data Skew:** When AQE skew join optimization cannot resolve severe skew (e.g., $95\%$ of records sharing a single `NULL` or default foreign key), isolate skewed keys and append an integer salt $[0, S-1]$ to distribute the key across multiple executor cores before joining.
+- **Avoid Python UDF Row Serialization:** Prohibit standard Python `@udf` decorators in ETL pipelines. Python UDFs require row-by-row serialization across the JVM $\leftrightarrow$ Python daemon IPC boundary. Mandate native PySpark SQL expressions (`pyspark.sql.functions`) or Vectorized Apache Arrow Pandas UDFs (`@pandas_udf`), which process columnar record batches with SIMD acceleration.
+- **Memory Overhead for PySpark Workloads:** When running heavy PySpark or Pandas UDF workloads, increase `spark.executor.memoryOverheadFactor` from $0.10$ to $0.20-0.25$. PyArrow memory allocations occur in C++ off-heap space outside the JVM heap, exhausting container memory and causing Kubernetes/YARN SIGKILL terminations if overhead headroom is insufficient.
+- **Explicit Caching Lifecycle Governance:** Always pair `.cache()` or `.persist()` calls with explicit `.unpersist()` invocations in `finally` blocks once downstream consumption finishes. Abandoned cached DataFrames prevent garbage collection, starve the unified execution memory pool, and force subsequent queries to spill to disk.
+
+---
+
+# 8. References & Further Reading
+
+- [Apache Spark Official Documentation: Tuning Spark](https://spark.apache.org/docs/latest/tuning.html) — Authoritative guidance on memory tuning, serialization, and shuffle optimization.
+- [Adaptive Query Execution (AQE) Architectural Overview (Databricks)](https://www.databricks.com/blog/2020/05/29/adaptive-query-execution-speeding-up-spark-sql-at-runtime.html) — Dynamic partition coalescing, runtime join switching, and skew handling.
+- [Deep Dive into Project Tungsten: Bringing Spark Closer to Bare Metal (Databricks)](https://www.databricks.com/blog/2015/04/28/project-tungsten-bringing-spark-closer-to-bare-metal.html) — Off-heap binary memory management and whole-stage code generation.
+- [Learning Spark: Lightning-Fast Data Analytics, 2nd Edition (Jules S. Damji, Brooke Wenig, Tathagata Das, Denny Lee)](https://www.oreilly.com/library/view/learning-spark-2nd/9781492050032/) — Comprehensive enterprise reference on Spark internals and PySpark.
+- [High Performance Spark: Best Practices for Scaling and Optimizing Apache Spark (Holden Karau, Rachel Warren)](https://www.oreilly.com/library/view/high-performance-spark/9781491943199/) — Low-level join strategies, memory spills, and distributed data structures.
+- [Spark: Cluster Computing with Working Sets (Zaharia et al., HotCloud 2010)](https://www.usenix.org/legacy/event/hotcloud10/tech/full_papers/Zaharia.pdf) — The seminal research paper introducing the RDD architecture.
+- [Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing (Zaharia et al., NSDI 2012)](https://www.usenix.org/system/files/conference/nsdi12/nsdi12-final138.pdf) — Architectural principles behind lineage-based fault recovery.

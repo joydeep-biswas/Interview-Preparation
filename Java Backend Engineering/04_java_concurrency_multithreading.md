@@ -2,7 +2,7 @@
 
 A comprehensive reference guide covering thread fundamentals, thread synchronization, Java Memory Model, lock-free atomic constructs, locks, the Executor framework, CompletableFuture asynchronous pipelines, and modern Virtual Threads (Project Loom).
 
-For collection implementation details and selection trade-offs, see [Topic 02: Java Collections](./02_java_collections_generics_data_handling.md); for concurrent collection behavior, see [Concurrent Collections](./02_java_collections_generics_data_handling.md#popular-implementations-architecture).
+For collection implementation details and selection trade-offs, see [Topic 02: Java Collections](./02_java_collections_generics_data_handling.md); for concurrent collection behavior, see [Concurrent Collections](./02_java_collections_generics_data_handling.md#5-map-implementations).
 
 ---
 
@@ -71,8 +71,9 @@ flowchart TD
 8. [Modern Java Concurrency](#8-modern-java-concurrency)
    - [Virtual Threads (Project Loom / Java 21)](#virtual-threads-project-loom-java-21)
    - [Structured Concurrency Concepts](#structured-concurrency-concepts)
-9. [Summary Comparison & Engineering Reference Matrix](#9-summary-comparison-engineering-reference-matrix)
-10. [References & Further Reading](#10-references-further-reading)
+9. [Production Troubleshooting Playbook](#9-production-troubleshooting-playbook)
+10. [Summary Comparison & Engineering Reference Matrix](#10-summary-comparison--engineering-reference-matrix)
+11. [References & Further Reading](#11-references--further-reading)
 
 ---
 
@@ -96,8 +97,8 @@ flowchart TD
             T2PC["PC Register"]
         end
     end
-    Heap --- Thread1
-    Heap --- Thread2
+    T1Stack -->|"Object Reference Pointer"| Heap
+    T2Stack -->|"Concurrent Memory Contention"| Heap
 
     style OSProcess fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
     style Thread1 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
@@ -814,7 +815,7 @@ public class SemaphoreDemo {
 Concurrent collections located in `java.util.concurrent` provide thread-safe operations and significantly higher concurrency throughput than legacy synchronized wrappers (`Collections.synchronizedMap`) by eliminating single global lock bottlenecks. They leverage fine-grained locking, lock-free Compare-And-Swap (CAS) primitives, and immutable snapshot arrays.
 
 > [!NOTE]
-> For detailed internal data structures, hash collision resolution, red-black treeification, and complete Big-O time complexity charts of these collections, see [02. Java Collections, Generics & Data Handling](02_java_collections_generics_data_handling.md#popular-implementations-architecture).
+> For detailed internal data structures, hash collision resolution, red-black treeification, and complete Big-O time complexity charts of these collections, see [02. Java Collections, Generics & Data Handling](02_java_collections_generics_data_handling.md#architectural-overview-java-collections-framework--map-architecture).
 
 | Concurrent Collection | Internal Concurrency Mechanism | Lock Contention Profile | Production Backend Target Use Case | Detailed Architectural Reference |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1314,7 +1315,198 @@ public class StructuredConcurrencyDemo {
 
 ---
 
-# 9. Summary Comparison & Engineering Reference Matrix
+# 9. Production Troubleshooting Playbook
+
+### Incident 1: Cyclic Deadlock Outage in Multi-Resource Operations
+* **Symptom**: Microservice throughput drops to zero, active worker thread count plateaus at maximum pool capacity, and application stops responding to incoming HTTP traffic without throwing errors.
+* **Root Cause**: Two or more threads attempt to acquire mutual locks on shared resources in opposing sequences (e.g. Thread 1 locks Account A then Account B; Thread 2 locks Account B then Account A).
+* **Diagnostic & Detection via `ThreadMXBean`**:
+  ```java
+  package com.enterprise.concurrency.diagnostics;
+
+  import java.lang.management.ManagementFactory;
+  import java.lang.management.ThreadInfo;
+  import java.lang.management.ThreadMXBean;
+
+  public final class DeadlockDetector {
+      private static final ThreadMXBean THREAD_MX_BEAN = ManagementFactory.getThreadMXBean();
+
+      public static void detectAndLogDeadlocks() {
+          long[] deadlockedThreadIds = THREAD_MX_BEAN.findDeadlockedThreads();
+          if (deadlockedThreadIds != null && deadlockedThreadIds.length > 0) {
+              ThreadInfo[] threadInfos = THREAD_MX_BEAN.getThreadInfo(deadlockedThreadIds, true, true);
+              System.err.println("CRITICAL: DEADLOCK DETECTED AMONG " + deadlockedThreadIds.length + " THREADS!");
+              for (ThreadInfo info : threadInfos) {
+                  System.err.println("Thread '" + info.getThreadName() + "' (ID: " + info.getThreadId() + 
+                                     ") is BLOCKED on lock: " + info.getLockName() + 
+                                     " held by Thread: '" + info.getLockOwnerName() + "' (ID: " + info.getLockOwnerId() + ")");
+              }
+          }
+      }
+  }
+  ```
+* **Production Remedy**:
+  1. **Enforce Global Deterministic Lock Ordering**: Always sort resource IDs before acquiring locks:
+     ```java
+     Account first = accountA.getId() < accountB.getId() ? accountA : accountB;
+     Account second = accountA.getId() < accountB.getId() ? accountB : accountA;
+     synchronized (first) {
+         synchronized (second) {
+             // Safe transfer: circular deadlock cycle mathematically impossible
+         }
+     }
+     ```
+  2. **Adopt Timed Lock Acquisition with `tryLock()`**:
+     ```java
+     if (lockA.tryLock(500, TimeUnit.MILLISECONDS)) {
+         try {
+             if (lockB.tryLock(500, TimeUnit.MILLISECONDS)) {
+                 try { executeTransfer(); } finally { lockB.unlock(); }
+             } else {
+                 // Back off and retry later to prevent livelock
+             }
+         } finally { lockA.unlock(); }
+     }
+     ```
+
+---
+
+### Incident 2: Thread Pool Queue Starvation & Unbounded Queue Out-Of-Memory
+* **Symptom**: Application experiences sudden JVM process crashes with `java.lang.OutOfMemoryError: Java heap space`. Heap dumps show millions of queued `FutureTask` instances occupying 85% of memory.
+* **Root Cause**: Using `Executors.newFixedThreadPool(n)` or `Executors.newSingleThreadExecutor()`. Both factory methods back the thread pool with an **unbounded** `LinkedBlockingQueue` (capacity $2^{31}-1 \approx 2.14 \text{ billion}$ elements). When downstream services slow down, requests queue up endlessly until heap exhaustion.
+* **Production Remedy**:
+  Always define custom, bounded `ThreadPoolExecutor` configurations with explicit saturation backpressure policies:
+  ```java
+  @Bean(name = "productionTaskExecutor")
+  public ThreadPoolTaskExecutor productionTaskExecutor() {
+      ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+      executor.setCorePoolSize(16);
+      executor.setMaxPoolSize(32);
+      executor.setQueueCapacity(1000); // Strictly bounded queue!
+      executor.setThreadNamePrefix("prod-worker-");
+      // CallerRunsPolicy pushes execution back to calling thread, slowing down producers!
+      executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+      executor.setWaitForTasksToCompleteOnShutdown(true);
+      executor.setAwaitTerminationSeconds(30);
+      executor.initialize();
+      return executor;
+  }
+  ```
+
+---
+
+### Incident 3: `ThreadLocal` Memory Leak in Container Thread Pools
+* **Symptom**: Web applications deployed on Tomcat/Jetty report creeping Old Generation heap growth over days. Heap dump analysis reveals thousands of leaked `ThreadLocalMap$Entry` objects holding custom class loaders and user data.
+* **Root Cause**: Worker threads in servlet containers are pooled and never terminate. If a servlet request sets a `ThreadLocal` value (e.g. user authentication context) and fails to call `.remove()`, that object remains referenced by the worker thread's internal `threadLocals` table indefinitely.
+* **Production Remedy**:
+  1. Always invoke `remove()` inside a mandatory `finally` block:
+     ```java
+     public static final ThreadLocal<RequestContext> CONTEXT = new ThreadLocal<>();
+
+     public void handleRequest(HttpRequest request) {
+         try {
+             CONTEXT.set(new RequestContext(request));
+             processRequest();
+         } finally {
+             CONTEXT.remove(); // MANDATORY: Prevents memory leaks on pooled threads!
+         }
+     }
+     ```
+  2. Implement Spring's `TaskDecorator` to clear MDC and context maps upon asynchronous thread boundary traversal.
+
+---
+
+### Incident 4: The ABA Problem in Lock-Free Concurrent Algorithms
+* **Symptom**: A custom lock-free stack or queue experiences silent data corruption or lost elements under concurrent worker threads.
+* **Root Cause**:
+  Thread 1 reads node value $A$.
+  Thread 2 preempts Thread 1, pops $A$, pushes $B$, and pushes a *new* node $A$ at the identical memory address.
+  Thread 1 resumes, executes `compareAndSet(A, C)`, and succeeds because the reference matches $A$, unaware that the intermediate state changed!
+* **Production Remedy**:
+  Utilize `AtomicStampedReference<V>` to pair object references with an incrementing integer version stamp:
+  ```java
+  package com.enterprise.concurrency.lockfree;
+
+  import java.util.concurrent.atomic.AtomicStampedReference;
+
+  public class LockFreeStack<T> {
+      private static class Node<T> {
+          final T value;
+          Node<T> next;
+          Node(T value) { this.value = value; }
+      }
+
+      private final AtomicStampedReference<Node<T>> top = new AtomicStampedReference<>(null, 0);
+
+      public void push(T value) {
+          Node<T> newHead = new Node<>(value);
+          int[] stampHolder = new int[1];
+          Node<T> currentHead;
+          do {
+              currentHead = top.get(stampHolder);
+              newHead.next = currentHead;
+          } while (!top.compareAndSet(currentHead, newHead, stampHolder[0], stampHolder[0] + 1));
+      }
+
+      public T pop() {
+          int[] stampHolder = new int[1];
+          Node<T> currentHead;
+          Node<T> newHead;
+          do {
+              currentHead = top.get(stampHolder);
+              if (currentHead == null) return null;
+              newHead = currentHead.next;
+          } while (!top.compareAndSet(currentHead, newHead, stampHolder[0], stampHolder[0] + 1));
+          return currentHead.value;
+      }
+  }
+  ```
+
+---
+
+### Incident 5: False Sharing & Cache Line Ping-Pong Under High Contention
+* **Symptom**: Increasing CPU core count degrades throughput rather than improving it on atomic counters or queue ring buffers.
+* **Root Cause**: Two distinct variables modified by independent CPU cores reside on the identical **64-byte L1/L2 cache line**. When Core 1 writes to variable $A$, the MESI cache coherence protocol invalidates the entire 64-byte line on Core 2, forcing expensive cache reloads across the interconnect bus.
+* **Production Remedy**:
+  1. Add 64-byte padding or employ `@jdk.internal.vm.annotation.Contended`:
+     ```java
+     // Requires JVM flag: -XX:-RestrictContended
+     @jdk.internal.vm.annotation.Contended
+     public class IsolatedCounter {
+         public volatile long counterValue = 0L;
+     }
+     ```
+  2. For high-velocity counters, migrate from `AtomicLong` to `LongAdder`, which stripes contention across an array of internally padded `Cell` elements.
+
+---
+
+### Incident 6: Virtual Thread Carrier Pinning Under High Concurrency
+* **Symptom**: Migrating an I/O-intensive service to Java 21 Virtual Threads (`spring.threads.virtual.enabled=true`) results in thread pool starvation and surging p99 latency; carrier threads reach 100% CPU.
+* **Root Cause**: Virtual threads executing blocking operations inside a `synchronized` block or calling native C libraries (JNI) are **pinned** to their underlying OS carrier thread, preventing unmounting.
+* **Diagnostic Flags & Remedy**:
+  1. Run JVM with `-Djdk.tracePinnedThreads=full` to print stack traces where pinning occurs.
+  2. Replace `synchronized` blocks around network or database calls with `ReentrantLock`:
+     ```java
+     // BAD: Pins virtual thread to carrier OS thread during blocking socket I/O!
+     public synchronized String queryExternalService() {
+         return restClient.get().retrieve().body(String.class);
+     }
+
+     // GOOD: ReentrantLock allows virtual thread to unmount cleanly during socket wait!
+     private final ReentrantLock lock = new ReentrantLock();
+     public String queryExternalServiceSafe() {
+         lock.lock();
+         try {
+             return restClient.get().retrieve().body(String.class);
+         } finally {
+             lock.unlock();
+         }
+     }
+     ```
+
+---
+
+# 10. Summary Comparison & Engineering Reference Matrix
 
 | Concurrency Primitive / Mechanism | Underlying JVM / OS Mechanics | Memory Overhead | Contention Handling | Production Engineering Rule |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1330,7 +1522,7 @@ public class StructuredConcurrencyDemo {
 
 ---
 
-# 10. References & Further Reading
+# 11. References & Further Reading
 
 - [Oracle OpenJDK - JEP 444: Virtual Threads](https://openjdk.org/jeps/444) — Specification for user-mode virtual threads in Java 21.
 - [JEP 453: Structured Concurrency (Preview)](https://openjdk.org/jeps/453) — OpenJDK API simplifying multi-threaded error propagation and cancellation.

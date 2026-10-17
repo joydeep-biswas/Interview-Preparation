@@ -563,6 +563,74 @@ public class PriorityQueueDemo {
 
 **Primary Source Reference**: [GeeksforGeeks - PriorityQueue in Java](https://www.geeksforgeeks.org/priority-queue-class-in-java/)
 
+#### Advanced Production Pattern: Interval Scheduling & Min-Heap Resource Allocation (Meeting Rooms II)
+A classic high-concurrency problem in backend distributed systems is determining the minimum concurrent server instances, worker threads, or conference rooms required to handle overlapping time intervals without resource collision.
+
+```mermaid
+flowchart TD
+    subgraph Intervals ["Meeting / Task Intervals"]
+        direction TB
+        I1["Interval 1: [0, 30]"]
+        I2["Interval 2: [5, 10]"]
+        I3["Interval 3: [15, 20]"]
+    end
+
+    subgraph MinHeap ["Min-Heap: Tracks Earliest End Time"]
+        direction TB
+        H1["Room 1: ends at 30"]
+        H2["Room 2: ends at 10 -> reusable for [15, 20]"]
+    end
+
+    Intervals -->|"Sort by Start Time"| MinHeap
+
+    style Intervals fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style MinHeap fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style I1 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style I2 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style I3 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style H1 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style H2 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+```
+
+```java
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.PriorityQueue;
+
+public final class IntervalResourceManager {
+
+    public record Interval(int start, int end) {}
+
+    /**
+     * Determines minimum resources needed using Greedy Interval Sorting and Min-Heap.
+     * Time Complexity: O(N log N) | Space Complexity: O(N)
+     */
+    public static int minMeetingRooms(Interval[] intervals) {
+        if (intervals == null || intervals.length == 0) return 0;
+
+        // Step 1: Sort intervals by start time ascending
+        Arrays.sort(intervals, Comparator.comparingInt(Interval::start));
+
+        // Step 2: Min-heap stores end times of active allocations
+        PriorityQueue<Integer> allocator = new PriorityQueue<>(intervals.length);
+
+        // Add the first meeting's end time
+        allocator.offer(intervals[0].end());
+
+        for (int i = 1; i < intervals.length; i++) {
+            // If the earliest finishing room is free before current meeting starts, reuse it
+            if (intervals[i].start() >= allocator.peek()) {
+                allocator.poll(); // Room is vacated
+            }
+            // Allocate room (push new meeting end time)
+            allocator.offer(intervals[i].end());
+        }
+
+        return allocator.size(); // Total rooms allocated
+    }
+}
+```
+
 ---
 
 ### `ArrayDeque`

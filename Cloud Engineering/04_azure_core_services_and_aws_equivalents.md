@@ -853,7 +853,7 @@ flowchart TD
 
 ---
 
-### 10.3 Equivalent AWS Counterpart: Amazon Aurora
+### 10.3 Equivalent AWS Counterpart
 
 #### AWS Counterpart Architecture (Dedicated Diagram)
 ```mermaid

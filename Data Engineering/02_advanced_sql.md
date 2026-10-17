@@ -1,6 +1,6 @@
 # 02. Advanced SQL
 
-A comprehensive, production-grade guide to advanced relational query design, distributed join algorithms, analytical window functions, hierarchical recursive queries, multi-dimensional aggregations, transaction isolation levels, and database programmability tailored for Data Engineering and AI Engineering workflows.
+A comprehensive, production-grade guide to advanced relational query design, distributed join algorithms, analytical window functions, hierarchical recursive queries, multi-dimensional aggregations, transaction isolation levels, and database programmability tailored for Data Engineering, Lakehouse architectures, and AI Engineering pipelines.
 
 ---
 
@@ -8,71 +8,106 @@ A comprehensive, production-grade guide to advanced relational query design, dis
 
 ```mermaid
 flowchart TD
-    subgraph Optimizer ["Cost-Based Optimizer (CBO)"]
-        SQL["Declarative Analytical SQL<br/>(Window functions, CTEs, complex joins)"]
-        AstCbo["Logical Plan -> Physical Tree<br/>(Histogram statistics & cost estimation)"]
-    end
-    subgraph JoinStrategies ["Distributed Physical Join Operators"]
-        BHJ["Broadcast Hash Join<br/>(Small dimension broadcast; zero fact shuffle)"]
-        SHJ["Shuffle Hash Join<br/>(Network key hash redistribution)"]
-        SMJ["Sort-Merge Join<br/>(External disk sort; resilient to skew & spill)"]
-    end
-    subgraph Materialization ["Persistence & Serving"]
-        MV["Materialized Views & CDC UPSERT<br/>(Precomputed query rewrite & Delta MERGE)"]
+    subgraph ClientQuery ["1. Declarative Analytical Query"]
+        SQL["Complex Analytical SQL Query<br/>(Window functions with custom framing (ROWS vs RANGE), Recursive CTEs & LATERAL subqueries, Multi-table non-equi joins & CDC MERGE statements)"]
     end
 
-    SQL --> AstCbo
-    AstCbo --> BHJ
-    AstCbo --> SHJ
-    AstCbo --> SMJ
-    JoinStrategies --> MV
+    subgraph OptimizerTier ["2. Query Compilation & Cost-Based Optimizer (CBO)"]
+        Parser["AST Parser & Logical Plan Generation"]
+        StatsCatalog[("Database Catalog & Statistics<br/>(HyperLogLog Cardinality Estimates, Equi-Depth Histograms, Null Fraction & Key Skew Metrics)")]
+        CBO["Cost-Based Optimizer (CBO)<br/>(Predicate Pushdown & Subquery Decorrelation, Join Reordering (Bushy vs Left-Deep Trees), Physical Operator Selection (BHJ vs SHJ vs SMJ))"]
+        
+        SQL --> Parser
+        Parser --> CBO
+        StatsCatalog -.-> CBO
+    end
 
-    style Optimizer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style JoinStrategies fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style Materialization fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    subgraph PhysicalExecutionTier ["3. Distributed Physical Join Operators"]
+        BHJ["Broadcast Hash Join (BHJ)<br/>(Small dimension broadcast to all executors, Zero network shuffle of massive fact table, Driver memory threshold: autoBroadcastJoinThreshold)"]
+        SHJ["Shuffle Hash Join (SHJ)<br/>(Network key hash exchange across cluster, In-memory hash table built on executor task, Fast when partition fits in executor heap)"]
+        SMJ["Sort-Merge Join (SMJ)<br/>(Network key shuffle -> External disk merge-sort, Sequential pointer scan over sorted streams, Ultra-resilient to data skew & petabyte data)"]
+        
+        CBO --> BHJ
+        CBO --> SHJ
+        CBO --> SMJ
+    end
+
+    subgraph MaterializationTier ["4. Persistence, Storage & Serving"]
+        MV["Materialized Views & Precomputed Aggregations<br/>(Query Rewrite Engine automatically intercepts raw queries)"]
+        DeltaMerge["Deterministic Delta Lake / Snowflake MERGE<br/>(ACID UPSERT & Soft Deletion CDC Pipelines)"]
+        
+        BHJ & SHJ & SMJ --> MV
+        BHJ & SHJ & SMJ --> DeltaMerge
+    end
+
+    style ClientQuery fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style OptimizerTier fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style PhysicalExecutionTier fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style MaterializationTier fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+
     style SQL fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style AstCbo fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Parser fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style StatsCatalog fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style CBO fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style BHJ fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style SHJ fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style SMJ fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style MV fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style DeltaMerge fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
 ```
 
 ---
 
 ## Table of Contents
 1. [Advanced Joins & Distributed Execution Mechanics](#1-advanced-joins-distributed-execution-mechanics)
-   - [1.1 SEMI JOIN & ANTI JOIN](#11-semi-join-anti-join)
-   - [1.2 SELF JOIN & Asymmetric Pairing](#12-self-join-asymmetric-pairing)
-   - [1.3 Distributed Join Strategies: Broadcast, Shuffle Hash, Sort-Merge](#13-distributed-join-strategies-broadcast-shuffle-hash-sort-merge)
-   - [1.4 Join Order & Cost-Based Optimizer (CBO) Execution Trees](#14-join-order-cost-based-optimizer-cbo-execution-trees)
-   - [1.5 Join Cardinality, Skew & Fan-Out Prevention (Pre-Aggregation & Salting)](#15-join-cardinality-skew-fan-out-prevention-pre-aggregation-salting)
-   - [1.6 Non-Equi Joins & Temporal / SCD2 Range Matching](#16-non-equi-joins-temporal-scd2-range-matching)
+   - [1.1 SEMI JOIN & ANTI JOIN: Mechanics, Null Immunity & Memory Footprint](#11-semi-join-anti-join-mechanics-null-immunity--memory-footprint)
+   - [1.2 SELF JOIN & Asymmetric Pairing Patterns](#12-self-join-asymmetric-pairing-patterns)
+   - [1.3 Distributed Join Strategies: Broadcast Hash Join (BHJ)](#13-distributed-join-strategies-broadcast-hash-join-bhj)
+   - [1.4 Distributed Join Strategies: Shuffle Hash Join (SHJ)](#14-distributed-join-strategies-shuffle-hash-join-shj)
+   - [1.5 Distributed Join Strategies: Sort-Merge Join (SMJ)](#15-distributed-join-strategies-sort-merge-join-smj)
+   - [1.6 Distributed Join Comparison & Selection Decision Tree](#16-distributed-join-comparison--selection-decision-tree)
+   - [1.7 Join Order & Cost-Based Optimizer (CBO) Execution Trees](#17-join-order-cost-based-optimizer-cbo-execution-trees)
+   - [1.8 Join Cardinality, Metric Fan-Out & Pre-Aggregation Patterns](#18-join-cardinality-metric-fan-out--pre-aggregation-patterns)
+   - [1.9 The Salting Technique for Extreme Data Skew](#19-the-salting-technique-for-extreme-data-skew)
+   - [1.10 Non-Equi Joins & Temporal / SCD2 Range Matching](#110-non-equi-joins-temporal-scd2-range-matching)
 2. [Advanced Subqueries, CTEs & Hierarchical Recursion](#2-advanced-subqueries-ctes-hierarchical-recursion)
-   - [2.1 Correlated Subqueries & Query Decorrelation (LATERAL / CROSS APPLY)](#21-correlated-subqueries-query-decorrelation-lateral-cross-apply)
-   - [2.2 Common Table Expressions (CTEs) & Materialization Semantics](#22-common-table-expressions-ctes-materialization-semantics)
-   - [2.3 Recursive CTEs & Graph / Hierarchy Traversal](#23-recursive-ctes-graph-hierarchy-traversal)
-   - [2.4 EXISTS vs. NOT EXISTS vs. IN / NOT IN Deep-Dive](#24-exists-vs-not-exists-vs-in-not-in-deep-dive)
+   - [2.1 Correlated Subqueries & Query Decorrelation Mechanics](#21-correlated-subqueries-query-decorrelation-mechanics)
+   - [2.2 `LATERAL` Joins & `CROSS APPLY`: The SQL For-Each Loop](#22-lateral-joins--cross-apply-the-sql-for-each-loop)
+   - [2.3 Common Table Expressions (CTEs): Inlining vs. Optimization Fences](#23-common-table-expressions-ctes-inlining-vs-optimization-fences)
+   - [2.4 Recursive CTEs: Fixed-Point Relational Iteration](#24-recursive-ctes-fixed-point-relational-iteration)
+   - [2.5 Hierarchical Tree Traversal with Cycle Detection & Path Building](#25-hierarchical-tree-traversal-with-cycle-detection--path-building)
+   - [2.6 Bill of Materials (BOM) Multi-Level Parts Explosion](#26-bill-of-materials-bom-multi-level-parts-explosion)
+   - [2.7 `EXISTS` vs. `NOT EXISTS` vs. `IN` / `NOT IN` Deep-Dive](#27-exists-vs-not-exists-vs-in-not-in-deep-dive)
 3. [Window Functions & Analytical SQL](#3-window-functions-analytical-sql)
-   - [3.1 Window Functions Architecture & Syntax](#31-window-functions-architecture-syntax)
-   - [3.2 Window Framing Deep-Dive: ROWS vs. RANGE vs. GROUPS](#32-window-framing-deep-dive-rows-vs-range-vs-groups)
-   - [3.3 Ranking Functions: ROW_NUMBER, RANK, DENSE_RANK, NTILE](#33-ranking-functions-rownumber-rank-denserank-ntile)
-   - [3.4 Value Navigation Functions: LEAD, LAG, FIRST_VALUE, LAST_VALUE, NTH_VALUE](#34-value-navigation-functions-lead-lag-firstvalue-lastvalue-nthvalue)
-   - [3.5 Cumulative Patterns: Running Totals & Moving Averages](#35-cumulative-patterns-running-totals-moving-averages)
-   - [3.6 Advanced Analytical Patterns: Top-N, Deduplication, Sessionization, Gaps and Islands](#36-advanced-analytical-patterns-top-n-deduplication-sessionization-gaps-and-islands)
-   - [3.7 The QUALIFY Clause](#37-the-qualify-clause)
+   - [3.1 Window Function Architecture & The 9-Stage SQL Lifecycle](#31-window-function-architecture-the-9-stage-sql-lifecycle)
+   - [3.2 Window Framing Deep-Dive: `ROWS` vs. `RANGE` vs. `GROUPS`](#32-window-framing-deep-dive-rows-vs-range-vs-groups)
+   - [3.3 The Lethal Implicit `RANGE` Default Trap](#33-the-lethal-implicit-range-default-trap)
+   - [3.4 Ranking Functions: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `NTILE`](#34-ranking-functions-row_number-rank-dense_rank-ntile)
+   - [3.5 Value Navigation Functions: `LEAD`, `LAG`, `FIRST_VALUE`, `LAST_VALUE`, `NTH_VALUE`](#35-value-navigation-functions-lead-lag-first_value-last_value-nth_value)
+   - [3.6 The `LAST_VALUE()` Unbounded Following Framing Gotcha](#36-the-last_value-unbounded-following-framing-gotcha)
+   - [3.7 Cumulative Patterns: Running Totals, Moving Averages & Physical vs. Calendar Windows](#37-cumulative-patterns-running-totals-moving-averages--physical-vs-calendar-windows)
+   - [3.8 Advanced Analytical Pattern 1: Deduplication via Window Ranking](#38-advanced-analytical-pattern-1-deduplication-via-window-ranking)
+   - [3.9 Advanced Analytical Pattern 2: The Gaps and Islands Problem (Difference-of-Ranks)](#39-advanced-analytical-pattern-2-the-gaps-and-islands-problem-difference-of-ranks)
+   - [3.10 Advanced Analytical Pattern 3: Sessionization via Inactivity Thresholds](#310-advanced-analytical-pattern-3-sessionization-via-inactivity-thresholds)
+   - [3.11 Advanced Analytical Pattern 4: Top-N per Group with Tie-Breaker Handling](#311-advanced-analytical-pattern-4-top-n-per-group-with-tie-breaker-handling)
+   - [3.12 The Modern `QUALIFY` Clause](#312-the-modern-qualify-clause)
 4. [Advanced Grouping, Aggregation & Pivoting](#4-advanced-grouping-aggregation-pivoting)
-   - [4.1 Multi-Dimensional Grouping: GROUPING SETS, ROLLUP, CUBE](#41-multi-dimensional-grouping-grouping-sets-rollup-cube)
-   - [4.2 PIVOT and UNPIVOT](#42-pivot-and-unpivot)
+   - [4.1 Multi-Dimensional Grouping: `GROUPING SETS`, `ROLLUP`, `CUBE`](#41-multi-dimensional-grouping-grouping-sets-rollup-cube)
+   - [4.2 The `GROUPING()` and `GROUPING_ID()` Bitmask Functions](#42-the-grouping-and-grouping_id-bitmask-functions)
+   - [4.3 Cross-Tabulation & Pivoting: `PIVOT` and `UNPIVOT`](#43-cross-tabulation--pivoting-pivot-and-unpivot)
 5. [Advanced Data Modification, Concurrency & Transactions](#5-advanced-data-modification-concurrency-transactions)
-   - [5.1 MERGE / UPSERT & Change Data Capture (CDC) Patterns](#51-merge-upsert-change-data-capture-cdc-patterns)
-   - [5.2 Transaction Control & ACID Mechanics](#52-transaction-control-acid-mechanics)
-   - [5.3 ANSI SQL Isolation Levels & Concurrency Anomalies](#53-ansi-sql-isolation-levels-concurrency-anomalies)
+   - [5.1 `MERGE` / `UPSERT` Mechanics & Change Data Capture (CDC)](#51-merge-upsert-mechanics--change-data-capture-cdc)
+   - [5.2 The Fatal `MERGE` Target Row Collision Trap & Remediation](#52-the-fatal-merge-target-row-collision-trap--remediation)
+   - [5.3 Transaction Control: Two-Phase Locking (2PL), Savepoints & WAL](#53-transaction-control-two-phase-locking-2pl-savepoints--wal)
+   - [5.4 ANSI SQL Isolation Levels & Concurrency Anomalies](#54-ansi-sql-isolation-levels-concurrency-anomalies)
+   - [5.5 Multi-Version Concurrency Control (MVCC) Internals](#55-multi-version-concurrency-control-mvcc-internals)
 6. [Advanced Database Programmability & Objects](#6-advanced-database-programmability-objects)
-   - [6.1 Materialized Views & Query Rewrite Engines](#61-materialized-views-query-rewrite-engines)
-   - [6.2 Stored Procedures & Transactional Orchestration](#62-stored-procedures-transactional-orchestration)
-   - [6.3 User-Defined Functions (UDFs: Scalar, Table-Valued, Vectorized)](#63-user-defined-functions-udfs-scalar-table-valued-vectorized)
-   - [6.4 Temporary Views & Global Virtual Catalogs](#64-temporary-views-global-virtual-catalogs)
+   - [6.1 Materialized Views, Query Rewrite Engines & Incremental Refresh](#61-materialized-views-query-rewrite-engines--incremental-refresh)
+   - [6.2 Stored Procedures & Transactional Orchestration](#62-stored-procedures--transactional-orchestration)
+   - [6.3 User-Defined Functions (UDFs): Scalar, Table-Valued & Vectorized PyArrow](#63-user-defined-functions-udfs-scalar-table-valued--vectorized-pyarrow)
+   - [6.4 Temporary Views, Session Scopes & Global Virtual Catalogs](#64-temporary-views-session-scopes--global-virtual-catalogs)
+7. [Production Engineering Summary & Key Takeaways](#7-production-engineering-summary--key-takeaways)
+8. [References & Further Reading](#8-references--further-reading)
 
 ---
 
@@ -82,21 +117,22 @@ Foundational join mechanics (covered in [01. SQL Fundamentals](01_sql_fundamenta
 
 ---
 
-### 1.1 SEMI JOIN & ANTI JOIN
+### 1.1 SEMI JOIN & ANTI JOIN: Mechanics, Null Immunity & Memory Footprint
 
-#### Definition
-- **SEMI JOIN:** Returns records from the left table where at least one match exists in the right table. Unlike an `INNER JOIN`, **it never duplicates left-table rows** even if multiple matches exist on the right, and it never projects right-table columns.
-- **ANTI JOIN:** Returns records from the left table where **no matching record** exists in the right table.
+#### The Intuitive Mental Model
+- **SEMI JOIN is like a Nightclub Bouncer with a VIP Guest List:** The bouncer inspects each patron waiting in the general admission line (the Left Table). He checks whether their name appears anywhere on the VIP guest list (the Right Table). The very microsecond he spots their name on the list, he stamps their hand and lets them through the door. **He does not care if their name appears 5 times on the VIP list**; they are admitted **exactly once**, and no VIP list attributes (like table reservation numbers) are attached to them.
+- **ANTI JOIN is like a Bouncer with a Blacklist:** The bouncer checks each patron against a list of banned troublemakers. If the person's name is **not** on the blacklist, they enter. If their name appears on the blacklist, they are turned away immediately.
 
 ```mermaid
 flowchart LR
-    subgraph SemiJoin ["LEFT SEMI JOIN"]
+    subgraph SemiJoin ["LEFT SEMI JOIN: Filter Left where Match Exists"]
         direction LR
-        L1["Left: Customer 101"] --- R1["Right: Order A (101)<br/>Right: Order B (101)"] ==> SJ["Customer 101 (Appears EXACTLY ONCE)"]
+        L1["Customer #101"] --- R1["Order #A (101)<br/>Order #B (101)"] ==> SJ["Customer #101 (Appears EXACTLY ONCE)"]
     end
-    subgraph AntiJoin ["LEFT ANTI JOIN"]
+
+    subgraph AntiJoin ["LEFT ANTI JOIN: Filter Left where Match Does NOT Exist"]
         direction LR
-        L2["Left: Customer 102"] --- R2["Right: No Matching Orders"] ==> AJ["Customer 102 (Retained)"]
+        L2["Customer #102"] --- R2["No Orders Found"] ==> AJ["Customer #102 (Retained Cleanly)"]
     end
 
     style SemiJoin fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
@@ -110,172 +146,285 @@ flowchart LR
     style AJ fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
 ```
 
-#### Code Example
+#### Concrete Step-by-Step Dataset Walkthrough
+
+Consider the following customer and order datasets:
+
+**Left Table: `crm.customers`**
+| `customer_id` | `customer_name` | `tier` | `signup_date` |
+| :--- | :--- | :--- | :--- |
+| `101` | Sarah Connor | Enterprise | `2024-01-15` |
+| `102` | John Connor | Standard | `2024-02-01` |
+| `103` | Kyle Reese | Standard | `2024-02-10` |
+| `104` | Miles Dyson | Enterprise | `2024-03-05` |
+
+**Right Table: `sales.orders`**
+| `order_id` | `customer_id` | `order_amount` | `order_date` |
+| :--- | :--- | :--- | :--- |
+| `ORD-901` | `101` | \$450.00 | `2024-04-01` |
+| `ORD-902` | `101` | \$1,200.00 | `2024-04-10` |
+| `ORD-903` | `101` | \$85.00 | `2024-04-12` |
+| `ORD-904` | `104` | \$3,500.00 | `2024-04-15` |
+| `ORD-905` | `NULL` | \$15.00 | `2024-04-16` |
+
+##### 1. The `INNER JOIN` Duplication Trap
+If a query attempts to find all customers who placed an order using a standard `INNER JOIN`:
 ```sql
--- Production Semi-Join: Find high-value customers who placed orders in 2024
--- Preserves customer uniqueness without triggering row fan-out
-
--- Databricks / Spark SQL syntax
-SELECT 
-    c.customer_id,                                           -- Unique customer key
-    c.customer_name,                                         -- Customer name
-    c.tier                                                   -- Account tier
+SELECT c.customer_id, c.customer_name, c.tier
 FROM crm.customers AS c
-LEFT SEMI JOIN sales.orders AS o                             -- Preserves left side strictly; discards right columns
-    ON c.customer_id = o.customer_id                         -- Join key equality
-   AND o.order_date >= '2024-01-01';                         -- Right-side filter condition
+INNER JOIN sales.orders AS o ON c.customer_id = o.customer_id;
+```
+Sarah Connor (`customer_id = 101`) appears **3 separate times** because she placed 3 orders! If downstream engineers feed this result into a machine learning feature pipeline or customer count metric, Sarah is counted 3 times unless an expensive `DISTINCT` operator is added.
 
--- ANSI SQL equivalent (PostgreSQL, Snowflake, BigQuery) using EXISTS
-SELECT 
-    c.customer_id,                                           -- Unique customer key
-    c.customer_name,                                         -- Customer name
-    c.tier                                                   -- Account tier
+##### 2. The `LEFT SEMI JOIN` Execution
+A `SEMI JOIN` matches keys, verifies existence, short-circuits, and projects **only the columns of the left table**:
+```sql
+-- Databricks / Spark SQL / Hive native syntax
+SELECT c.customer_id, c.customer_name, c.tier
 FROM crm.customers AS c
-WHERE EXISTS (                                               -- Short-circuits immediately on first match
-    SELECT 1 
-    FROM sales.orders AS o 
-    WHERE o.customer_id = c.customer_id 
-      AND o.order_date >= '2024-01-01'
-);
+LEFT SEMI JOIN sales.orders AS o ON c.customer_id = o.customer_id;
+```
+**Result Table:**
+| `customer_id` | `customer_name` | `tier` |
+| :--- | :--- | :--- |
+| `101` | Sarah Connor | Enterprise |
+| `104` | Miles Dyson | Enterprise |
+*Guarantees:* Sarah Connor appears exactly once. Zero row multiplication. Zero right-table memory footprint.
 
--- Production Anti-Join: Detect orphaned accounts that registered but NEVER placed an order
-SELECT 
-    c.customer_id,                                           -- Unique customer key
-    c.customer_name,                                         -- Customer name
-    c.signup_date                                            -- Registration timestamp
+##### 3. The `LEFT ANTI JOIN` Execution & The Lethal `NOT IN (NULL)` Trap
+To find all customers who registered but **never placed an order**:
+```sql
+-- DANGEROUS ANTI-PATTERN: If sales.orders contains a single NULL customer_id, this returns ZERO rows!
+SELECT * FROM crm.customers
+WHERE customer_id NOT IN (SELECT customer_id FROM sales.orders);
+```
+**Why `NOT IN` fails completely:** In our sample data, row `ORD-905` has `customer_id = NULL`.
+The condition evaluates as:
+`102 NOT IN (101, 104, NULL)` $\implies$ `102 != 101 AND 102 != 104 AND 102 != NULL`
+$\implies$ `TRUE AND TRUE AND UNKNOWN` $\implies$ `UNKNOWN`.
+In SQL filtering, `UNKNOWN` evaluates to false! **The query returns 0 rows, silently corrupting your pipeline.**
+
+**The Production Solution: `LEFT ANTI JOIN` or `NOT EXISTS`**
+```sql
+-- Production Safe Pattern 1: Databricks / Spark SQL LEFT ANTI JOIN
+SELECT c.customer_id, c.customer_name, c.tier
 FROM crm.customers AS c
-WHERE NOT EXISTS (                                           -- Immunized against NULL hazards of NOT IN
-    SELECT 1 
-    FROM sales.orders AS o 
-    WHERE o.customer_id = c.customer_id
+LEFT ANTI JOIN sales.orders AS o ON c.customer_id = o.customer_id;
+
+-- Production Safe Pattern 2: ANSI SQL NOT EXISTS (PostgreSQL, Snowflake, BigQuery)
+SELECT c.customer_id, c.customer_name, c.tier
+FROM crm.customers AS c
+WHERE NOT EXISTS (
+    SELECT 1 FROM sales.orders AS o WHERE o.customer_id = c.customer_id
 );
 ```
-
-#### Key Points & Common Pitfalls
-- **Row Multiplication Prevention:** If a customer placed 10,000 orders, an `INNER JOIN` multiplies that customer row 10,000 times, requiring a subsequent expensive `DISTINCT` pass. A `SEMI JOIN` evaluates existence and stops scanning.
-- **Immunity to NULLs:** As shown in [01. SQL Fundamentals](01_sql_fundamentals.md#32-is-null-is-not-null--the-not-in-null-trap), `NOT IN` collapses to zero rows if the subquery contains a single `NULL`. `NOT EXISTS` and `LEFT ANTI JOIN` avoid this pitfall.
-
-#### References
-- [Databricks Documentation: SEMI JOIN Syntax](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-qry-select-join.html)
-- [PostgreSQL Documentation: Subquery Expressions - EXISTS](https://www.postgresql.org/docs/current/functions-subquery.html#FUNCTIONS-SUBQUERY-EXISTS)
+**Result Table:**
+| `customer_id` | `customer_name` | `tier` |
+| :--- | :--- | :--- |
+| `102` | John Connor | Standard |
+| `103` | Kyle Reese | Standard |
+*Guarantees:* Completely immune to `NULL` values in the right table. High performance index seek.
 
 ---
 
-### 1.2 SELF JOIN & Asymmetric Pairing
+### 1.2 SELF JOIN & Asymmetric Pairing Patterns
 
-#### Definition
-A `SELF JOIN` joins a table to itself using separate table aliases. It is used to resolve hierarchical parent-child relationships or compare rows within the same dataset.
+A `SELF JOIN` joins a table to itself using distinct aliases. While common for resolving parent-child employee-manager hierarchies, senior data engineers employ **Asymmetric Self Joins** to detect collisions, fraud rings, and cohort overlaps without generating duplicate symmetric pairs.
 
-#### Code Example
-```sql
--- Asymmetric self-join: Detect fraud rings where different users share an IP address within 10 minutes
--- Scenario: Find distinct user pairs sharing identical IP logins without generating mirrored duplicates.
+#### The Symmetric Collision Problem: Avoiding Mirrored Duplicates
+Suppose you must identify all pairs of user accounts logging in from the same IP address within 15 minutes of each other.
+If you join with an inequality condition `u1.user_id != u2.user_id`, the engine generates two mirrored rows for every pair: `(User1, User2)` and `(User2, User1)`. Furthermore, comparing $N$ rows against $N$ rows requires evaluating $N^2 - N$ combinations!
 
-SELECT 
-    u1.user_id                                     AS user_a_id,             -- Primary user
-    u2.user_id                                     AS user_b_id,             -- Colluding user
-    u1.ip_address                                  AS shared_ip,             -- Identified common IP
-    u1.login_timestamp                             AS user_a_login_time,     -- Login time user A
-    u2.login_timestamp                             AS user_b_login_time,     -- Login time user B
-    ABS(EXTRACT(EPOCH FROM (u1.login_timestamp - u2.login_timestamp))) AS seconds_apart -- Time gap in seconds
-FROM security.user_logins AS u1
-INNER JOIN security.user_logins AS u2
-    ON u1.ip_address = u2.ip_address                                         -- Same network IP
-   AND u1.user_id < u2.user_id                                               -- Asymmetric condition: eliminates self-pairing (a=a) and mirrored pairs (b,a)
-   AND u1.login_timestamp BETWEEN u2.login_timestamp - INTERVAL '10 minutes' -- Temporal proximity check
-                              AND u2.login_timestamp + INTERVAL '10 minutes';
-```
-
-#### Key Points & Common Pitfalls
-- **Avoid `!=` in Self Joins:** Using `u1.user_id != u2.user_id` produces redundant mirror rows `(User1, User2)` and `(User2, User1)`. Using strict inequality `u1.user_id < u2.user_id` ensures each pair appears exactly once.
-
----
-
-### 1.3 Distributed Join Strategies: Broadcast, Shuffle Hash, Sort-Merge
-
-In distributed engines (Apache Spark, Databricks, Snowflake, BigQuery, AWS Athena), large-scale joins fall into three major execution physical operators:
+By enforcing the **strict asymmetric inequality** `u1.user_id < u2.user_id`:
+1. Self-pairing `(User1, User1)` is mathematically impossible ($1 < 1$ is False).
+2. Mirrored pairs `(User2, User1)` are eliminated because $2 < 1$ is False.
+3. The comparison space is reduced by over 50% ($\frac{N(N-1)}{2}$ combinations).
 
 ```mermaid
 flowchart LR
-    subgraph BroadcastStrategy ["1. Broadcast Hash Join (Map-Side)"]
-        direction LR
-        BDim[("Small Dimension Table<br/>(< 10MB - 100MB)")] -.->|Broadcast Full Copy to All Nodes| N1["Worker 1 (In-Memory Join)"]
-        BDim -.->|Broadcast Full Copy to All Nodes| N2["Worker 2 (In-Memory Join)"]
-        F1["Fact Partition 1"] --> N1
-        F2["Fact Partition 2"] --> N2
-        note1["Zero Fact Shuffling across Network!"]
+    Pairs["Raw Pair Comparisons:<br/>(Alice, Bob) & (Bob, Alice)"]
+    
+    subgraph FilterGate ["Strict Inequality Filter: u1.id &lt; u2.id"]
+        Keep["Alice &lt; Bob: TRUE (1 &lt; 2)<br/><i>(Unique Canonical Combination)</i>"]
+        Drop["Bob &lt; Alice: FALSE (2 &lt; 1)<br/><i>(Mirrored Duplicate)</i>"]
     end
+    
+    Output["Deduplicated Result Set:<br/>(Alice, Bob)"]
+    Trash[("Discarded")]
 
-    subgraph ShuffleHashStrategy ["2. Shuffle Hash Join"]
-        SF1["Node A: Data Key H(x)"] -->|Network Hash Shuffle| SHW1["Worker Node 1: Join Hash Partition 1"]
-        SF2["Node B: Data Key H(x)"] -->|Network Hash Shuffle| SHW1
-        note2["High Network I/O; Requires Large In-Memory Hash Table"]
-    end
+    Pairs --> Keep --> Output
+    Pairs --> Drop -.->|"Pruned"| Trash
 
-    subgraph SortMergeStrategy ["3. Sort-Merge Join"]
-        SM1["Partition A"] --> Sort1["External Sort Key"] --> Merge["Merge Scan Pointers"]
-        SM2["Partition B"] --> Sort2["External Sort Key"] --> Merge
-        note3["Memory Resilient; Handles Skew & Massive Tables via Disk Spilling"]
-    end
-
-    style BroadcastStrategy fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style ShuffleHashStrategy fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style SortMergeStrategy fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-
-    style BDim fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style N1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style N2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style F1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style F2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style note1 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style SF1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style SHW1 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style SF2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style note2 fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#fde68a
-    style SM1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Sort1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Merge fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style SM2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Sort2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style note3 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Pairs fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style FilterGate fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style Keep fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Drop fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style Output fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
+    style Trash fill:#331111,stroke:#ef4444,stroke-width:1px,color:#fca5a5
 ```
 
-#### Comparison of Distributed Join Operators
-| Strategy | Pre-conditions | Advantages | Disadvantages / Failure Modes |
-| :--- | :--- | :--- | :--- |
-| **Broadcast Hash Join (BHJ)** | One table is small enough to fit in driver & executor memory | Zero network shuffle of the large table; lowest latency | Driver `OutOfMemoryError` if broadcasted table exceeds memory |
-| **Shuffle Hash Join (SHJ)** | Both tables large; keys distributed uniformly | Fast when hash table fits in memory partition | Fails with OOM if a partition spills or key is heavily skewed |
-| **Sort-Merge Join (SMJ)** | Default for massive distributed joins | Robust against memory pressure; can spill gracefully to disk | High CPU & I/O overhead due to sorting both sides |
-
-#### Code Example
+#### Production Fraud Ring Detection Query
 ```sql
--- Distributed Spark SQL / Databricks Broadcast Join Hint
--- Forces the optimizer to broadcast dim_tax_codes across all executor nodes
-
-SELECT /*+ BROADCAST(t) */
-    f.transaction_id,                                        -- Fact column: Transaction key
-    f.account_id,                                            -- Fact column: Account identifier
-    f.gross_amount,                                          -- Fact column: Raw monetary measure
-    t.tax_rate,                                              -- Dimension column: Tax percentage
-    f.gross_amount * t.tax_rate AS calculated_tax            -- Calculated metric
-FROM data_lake.fact_billion_transactions AS f
-INNER JOIN data_lake.dim_tax_codes AS t 
-    ON f.tax_jurisdiction_code = t.jurisdiction_code;       -- Equi-join key
+-- Detect multiple distinct user accounts logging in from the same IP within a 15-minute window
+SELECT 
+    u1.user_id                                                         AS primary_user_id,
+    u2.user_id                                                         AS colluding_user_id,
+    u1.ip_address                                                      AS shared_ip,
+    u1.login_timestamp                                                 AS login_time_user_1,
+    u2.login_timestamp                                                 AS login_time_user_2,
+    ABS(EXTRACT(EPOCH FROM (u1.login_timestamp - u2.login_timestamp))) AS seconds_between_logins
+FROM security.user_logins AS u1
+INNER JOIN security.user_logins AS u2
+    ON u1.ip_address = u2.ip_address                                   -- Identical IP address
+   AND u1.user_id < u2.user_id                                         -- Asymmetric filter: eliminates self-match & mirrors
+   AND u1.login_timestamp BETWEEN u2.login_timestamp - INTERVAL '15 minutes'
+                              AND u2.login_timestamp + INTERVAL '15 minutes';
 ```
-
-> [!NOTE]
-> For PySpark configurations, memory tuning, and shuffle partition sizing (`spark.sql.shuffle.partitions`), see [08. Apache Spark & PySpark](08_apache_spark_pyspark.md). For physical database engine join algorithms (Hash Join, Merge Join, Nested Loop), see [04. Database Internals & Performance](04_database_internals_and_performance.md#39-join-optimization).
 
 ---
 
-### 1.4 Join Order & Cost-Based Optimizer (CBO) Execution Trees
+### 1.3 Distributed Join Strategies: Broadcast Hash Join (BHJ)
 
-#### Definition
-SQL is purely declarative; the syntactic order of tables in `FROM` and `JOIN` clauses is parsed by the engine into an abstract syntax tree and optimized by the **Cost-Based Optimizer (CBO)**. The CBO uses table cardinality statistics, histograms, and selectivity estimates to build an execution tree.
+#### Physical Execution Mechanics
+In a distributed compute cluster (Spark, Databricks, Trino), physical worker nodes are separated by network top-of-rack switches. When joining a 10 TB Fact Table against a 15 MB Dimension Table:
+1. **Driver Collection:** The driver node pulls the complete 15 MB dimension table from storage into its local memory.
+2. **Torrent Broadcast:** The driver uses a peer-to-peer BitTorrent-like protocol to replicate the 15 MB dataset directly into the local memory heap of **every single worker executor node** across the cluster.
+3. **Local Hash Table Build:** Each worker task builds an in-memory hash table of the broadcasted dimension table.
+4. **Zero-Shuffle Stream Probe:** Each executor reads its assigned partition of the 10 TB fact table from local storage or cloud disk. As fact rows stream through CPU cache, the executor performs instant $O(1)$ memory lookups against the broadcasted hash table.
+5. **Network Savings:** **Zero rows of the 10 TB fact table traverse the physical network switches!**
 
 ```mermaid
 flowchart TD
-    subgraph LeftDeepTree ["Left-Deep Tree (Standard Pipeline)"]
+    DriverNode["Spark Driver Node<br/>(Reads 15MB dim_stores)"] -->|Torrent Broadcast Protocol| W1_RAM["Worker 1 Heap RAM"]
+    DriverNode -->|Torrent Broadcast Protocol| W2_RAM["Worker 2 Heap RAM"]
+    DriverNode -->|Torrent Broadcast Protocol| W3_RAM["Worker 3 Heap RAM"]
+
+    W1_RAM --> Hash1["In-Memory Hash Table"]
+    W2_RAM --> Hash2["In-Memory Hash Table"]
+    W3_RAM --> Hash3["In-Memory Hash Table"]
+
+    F1["Fact Partition 1 (Local Disk)"] -->|Stream Probe| Hash1
+    F2["Fact Partition 2 (Local Disk)"] -->|Stream Probe| Hash2
+    F3["Fact Partition 3 (Local Disk)"] -->|Stream Probe| Hash3
+
+    style DriverNode fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style W1_RAM fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style W2_RAM fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style W3_RAM fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Hash1 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Hash2 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Hash3 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style F1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style F2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style F3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+```
+
+#### Production Thresholds & Failure Traps
+- **Default Threshold:** Spark's `spark.sql.autoBroadcastJoinThreshold` defaults to 10 MB (`10485760` bytes). In modern clouds, you can safely tune this threshold to **64 MB or 128 MB**:
+  ```python
+  spark.conf.set("spark.sql.autoBroadcastJoinThreshold", 67108864) # 64 MB
+  ```
+- **The Fatal Driver OOM Trap:** If a developer applies a broadcast hint `/*+ BROADCAST(t) */` on a table that turns out to have 10 GB of data due to missing filters, the driver attempts to collect 10 GB into heap RAM, instantly crashing the master node with:
+  `java.lang.OutOfMemoryError: Java heap space`.
+
+---
+
+### 1.4 Distributed Join Strategies: Shuffle Hash Join (SHJ)
+
+#### Physical Execution Mechanics
+When both tables are too large to broadcast, but one table is significantly smaller than the other and can fit into the memory allocated to a single executor task partition:
+1. **Network Hash Redistribution:** Both tables are scanned. For each row, the engine computes `hash(join_key) % num_partitions` (default 200 partitions).
+2. Rows from both tables sharing identical hash buckets are transmitted across network switches to the same physical worker node.
+3. **Task-Level Hash Table:** For each partition slice, the executor builds an in-memory hash table of the smaller table's partition.
+4. **Stream Probe:** The executor streams the larger table's matching partition, performing hash lookups.
+
+#### When to Use vs. Failure Mode
+- **Advantage:** Faster than Sort-Merge Join because it does not incur the CPU overhead of sorting both sides.
+- **Vulnerability:** If data skew causes one key to have 5 million rows, that single partition's hash table exceeds executor heap memory, crashing the task with an OOM error. Spark therefore disables Shuffle Hash Join by default in favor of Sort-Merge Join (`spark.sql.join.preferSortMergeJoin = true`).
+
+---
+
+### 1.5 Distributed Join Strategies: Sort-Merge Join (SMJ)
+
+#### Physical Execution Mechanics
+Sort-Merge Join is the **battle-hardened workhorse** of distributed big data processing. It operates in three sequential phases:
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    participant Scan as Storage Scanners
+    participant Shuffle as Network Exchange
+    participant Disk as External Disk Merge-Sorter
+    participant Joiner as Linear Pointer Merge Joiner
+
+    Scan->>Shuffle: 1. Hash exchange: hash(key) % num_partitions
+    Shuffle->>Disk: 2. Transmit partition slices to assigned worker node
+    Disk->>Disk: 3. External Run Sort: Sort Partition A by Key
+    Disk->>Disk: 4. External Run Sort: Sort Partition B by Key
+    Disk->>Joiner: 5. Stream sorted stream A via pointer
+    Disk->>Joiner: 6. Stream sorted stream B via pointer
+    Joiner->>Joiner: 7. Linear single-pass comparison: advance matching pointers
+```
+
+#### Why Sort-Merge Join Never Dies (Disk Spilling Resilience)
+In Sort-Merge Join, neither table needs to fit entirely in RAM!
+If a partition has 50 GB of data and the executor only has 4 GB of working memory:
+1. The executor loads chunks into memory buffers, sorts them via Quicksort, and **spills sorted runs to local NVMe SSD disk**.
+2. It performs an external multi-way merge over the sorted runs on disk.
+3. Once both sides are sorted, the joiner maintains **two sliding pointers**:
+   - If `Key_A < Key_B`: Advance pointer A.
+   - If `Key_A > Key_B`: Advance pointer B.
+   - If `Key_A == Key_B`: Emit joined row!
+4. **Complexity:** Scanning sorted streams is strictly $O(N + M)$ linear time.
+
+---
+
+### 1.6 Distributed Join Comparison & Selection Decision Tree
+
+```mermaid
+flowchart TD
+    Start{Join Execution Planning} --> CheckSize{"Is either table <= 64MB - 100MB?"}
+    CheckSize -- Yes --> BHJ["Choose Broadcast Hash Join (BHJ)<br/>(Lowest latency, Zero fact network shuffle)"]
+    
+    CheckSize -- No --> CheckEqui{"Is it an Equi-Join (ON a.id = b.id)?"}
+    CheckEqui -- No: Non-Equi (a.ts BETWEEN b.start AND b.end) --> BNLJ["Broadcast Nested Loop Join (BNLJ) / Interval Join<br/>(Highly expensive O(N x M) Cartesian)"]
+    
+    CheckEqui -- Yes --> CheckMem{"Does smaller side partition fit in task RAM<br/>AND sorting disabled?"}
+    CheckMem -- Yes --> SHJ["Shuffle Hash Join (SHJ)<br/>(Fast; no sort overhead, Risk of OOM on partition skew)"]
+    CheckMem -- No (Standard) --> SMJ["Sort-Merge Join (SMJ)<br/>(Default enterprise standard, Resilient to memory pressure & disk spilling)"]
+
+    style Start fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style CheckSize fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style CheckEqui fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style CheckMem fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style BHJ fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style BNLJ fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style SHJ fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#fde68a
+    style SMJ fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+| Distributed Join Operator | Pre-conditions | Network I/O Cost | Memory Overhead | Disk Spilling Capability | Skew Tolerance |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Broadcast Hash Join (BHJ)** | One table $\le$ broadcast threshold | **Lowest:** Dimension broadcasted once; fact table zero shuffle | Must fit entirely in Driver & Executor JVM memory | None (Fails with OOM if table too large) | Excellent (Zero fact shuffle) |
+| **Shuffle Hash Join (SHJ)** | Equi-join; smaller side partition fits in RAM | **High:** $O(N + M)$ network exchange of all records | High: Builds in-memory hash table per partition | Poor (Crashes executor if partition spills) | Very Poor (Skewed key blows out memory) |
+| **Sort-Merge Join (SMJ)** | Equi-join; default for large datasets | **High:** $O(N + M)$ network exchange of all records | Low: Streams sorted records sequentially via pointers | **Full Spilling:** Spills sorted runs to NVMe SSD seamlessly | **High:** Skew slows down task but does not crash |
+
+---
+
+### 1.7 Join Order & Cost-Based Optimizer (CBO) Execution Trees
+
+#### How the Cost-Based Optimizer Evaluates Plans
+In relational databases, join order is not dictated by query text. Joining 4 tables ($A, B, C, D$) presents **24 possible join orders** ($4!$). Joining 10 tables presents **3,628,800 possible join permutations**!
+
+The **Cost-Based Optimizer (CBO)** estimates execution cost ($C$) using quantitative formulas:
+
+$$C_{\text{total}} = C_{\text{I/O}} \times \text{PagesRead} + C_{\text{CPU}} \times \text{TuplesProcessed} + C_{\text{Network}} \times \text{BytesShuffled}$$
+
+#### Left-Deep vs. Bushy Execution Trees
+```mermaid
+flowchart TD
+    subgraph LeftDeepTree ["Left-Deep Tree (Pipelined Execution)"]
         J3["Hash Join 3"] --> J2["Hash Join 2"]
         J3 --> DimC["Scan Dim C"]
         J2 --> J1["Hash Join 1"]
@@ -284,18 +433,17 @@ flowchart TD
         J1 --> DimA["Scan Dim A"]
     end
 
-    subgraph BushyTree ["Bushy Tree (Parallel Sub-tree Execution)"]
+    subgraph BushyTree ["Bushy Tree (Parallel Sub-Tree Execution)"]
         BJ["Final Join"] --> Sub1["Join A + B"]
         BJ --> Sub2["Join C + D"]
-        Sub1 --> T_A["Scan A"]
-        Sub1 --> T_B["Scan B"]
-        Sub2 --> T_C["Scan C"]
-        Sub2 --> T_D["Scan D"]
+        Sub1 --> T_A["Scan Table A"]
+        Sub1 --> T_B["Scan Table B"]
+        Sub2 --> T_C["Scan Table C"]
+        Sub2 --> T_D["Scan Table D"]
     end
 
     style LeftDeepTree fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style BushyTree fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-
     style J3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style J2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style DimC fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -312,70 +460,72 @@ flowchart TD
     style T_D fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
-#### Stale Statistics Danger
-If statistics (`ANALYZE TABLE`) are stale, the optimizer may believe a table has 500 rows when it actually contains 500,000,000 rows. It will erroneously choose a Broadcast Nested Loop or In-Memory Hash Join, triggering cluster memory exhaustion and job failure.
+- **Left-Deep Trees:** Pipelined; output of join 1 immediately feeds join 2. Keeps working memory strictly minimal because intermediate tables are consumed immediately without disk materialization.
+- **Bushy Trees:** Sub-joins ($A \bowtie B$ and $C \bowtie D$) execute concurrently across separate worker nodes and merge at the root. Essential when joining multiple large fact-to-fact or snowflake dimension models.
+
+#### The Stale Statistics Hazard
+If table statistics (`ANALYZE TABLE`) are out of date, the optimizer may believe a table has 500 rows when an upstream pipeline recently loaded 500 million rows. The CBO chooses a Broadcast Hash Join, and the driver immediately crashes with an OOM.
+*Remediation:* Enforce automated statistics collection in pipeline schedules:
+```sql
+ANALYZE TABLE sales.fact_orders COMPUTE STATISTICS FOR ALL COLUMNS;
+```
 
 ---
 
-### 1.5 Join Cardinality, Skew & Fan-Out Prevention (Pre-Aggregation & Salting)
+### 1.8 Join Cardinality, Metric Fan-Out & Pre-Aggregation Patterns
 
-#### The Metric Fan-Out Problem
-When joining a parent table (e.g., `orders`) to a child table (e.g., `order_items`) where the child has multiple records per order, the parent records replicate once per child row. If a query aggregates amounts from the parent table directly on the joined output, **metrics are multiplied (fanned out)**.
+#### The Mathematical Fan-Out Trap
+When joining a parent table (`orders`) to a child table (`order_items`), each parent row replicates for every matching child record:
 
-```mermaid
-flowchart TD
-    O["Order #1001 (Amount: $100)"]
-    I1["Item A ($40)"]
-    I2["Item B ($60)"]
-    
-    O -->|1:N Join| R1["Row 1: Order #1001 | $100 | Item A"]
-    O -->|1:N Join| R2["Row 2: Order #1001 | $100 | Item B"]
-    
-    R1 & R2 --> Err["SUM(order_amount) = $200!<br/>FATAL ERROR: Metric doubled due to join fan-out!"]
+$$\text{Recorded Amount} = \$100.00 \quad \xrightarrow{1:3 \text{ Join}} \quad 3 \times \$100.00 = \$300.00 \text{ in } \text{SUM}(\text{order\_amount})!$$
 
-    style O fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style I1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style I2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style R1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style R2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Err fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-```
-
-#### Production Solution 1: Pre-Aggregation Pattern
-Always pre-aggregate child tables to the grain of the parent key *before* executing the join:
+#### The Solution: The Pre-Aggregation CTE Pattern
+Never join raw parent to raw child before calculating aggregates. Pre-aggregate child records to the parent primary key grain first:
 
 ```sql
--- Solution: Pre-aggregate order_items in a CTE to maintain 1:1 join cardinality
-WITH aggregated_order_items AS (
+-- Step 1: Pre-aggregate order line items to order_id grain
+WITH aggregated_line_items AS (
     SELECT 
-        order_id,                                            -- Grouping grain matches parent table PK
-        COUNT(item_id)             AS total_item_count,      -- Metric 1: child row count
-        SUM(item_price * quantity) AS total_items_value      -- Metric 2: child calculated revenue
+        order_id,
+        COUNT(item_id)             AS total_items_count,
+        SUM(unit_price * quantity) AS total_items_value
     FROM sales.order_items
-    GROUP BY order_id                                        -- Guarantees uniqueness of order_id in CTE output
+    GROUP BY order_id  -- Guarantees uniqueness of order_id in CTE output
 )
+-- Step 2: 1-to-1 join with zero risk of row duplication or fan-out
 SELECT 
-    o.order_id,                                              -- Primary key of parent
-    o.order_amount                                 AS recorded_order_total, -- Exact uncorrupted parent metric
-    COALESCE(i.total_item_count, 0)                AS total_items_count,    -- Correct aggregated child measure
-    COALESCE(i.total_items_value, 0.00)            AS line_items_subtotal   -- Correct aggregated child measure
+    o.order_id,
+    o.customer_id,
+    o.order_amount                 AS original_clean_order_amount,
+    COALESCE(i.total_items_count, 0) AS total_items_count,
+    COALESCE(i.total_items_value, 0.00) AS calculated_items_value
 FROM sales.orders AS o
-LEFT JOIN aggregated_order_items AS i 
-    ON o.order_id = i.order_id;                              -- Guaranteed 1:1 match -> Zero fan-out!
+LEFT JOIN aggregated_line_items AS i 
+    ON o.order_id = i.order_id;
 ```
 
-#### Production Solution 2: Salting Technique for Skewed Joins
-When a join key has extreme data skew (e.g., 90% of rows have `customer_id = 0` or `'GUEST'`), the worker handling that hash key gets overloaded (straggler task). **Salting** breaks the skewed key across multiple worker buckets:
+---
+
+### 1.9 The Salting Technique for Extreme Data Skew
+
+#### The Problem: Straggler Tasks
+In distributed shuffles, rows are partitioned by `hash(key) % num_partitions`. If 90% of rows contain `customer_id = 0` or `'GUEST'`, 90% of all data lands on **one single worker executor**. While 99 workers finish in 5 seconds, worker 100 thrashes disk for 2 hours (or dies with an OOM error).
+
+#### The Salting Algorithm
+1. On the skewed fact table, append a random integer salt from $0 \dots (S-1)$ (e.g. $S=4$):
+   `salted_key = CONCAT(customer_id, '_', FLOOR(RAND() * 4))`
+2. On the dimension lookup table, replicate every record $S$ times, pairing it with every salt value ($0, 1, 2, 3$).
+3. Join on the composite salted key: `fact.customer_id = dim.customer_id AND fact.salt = dim.salt`.
+4. **Result:** The skewed key is shattered evenly across 4 independent cluster nodes!
 
 ```sql
--- Step 1: Add a random salt (e.g. 0 to 3) to the skewed fact table
--- Step 2: Replicate the lookup dimension table 4x with matching salts
+-- Production PySpark / Databricks SQL Salting Pattern
 WITH salted_fact AS (
     SELECT 
         transaction_id,
         customer_id,
         amount,
-        -- Add salt between 0 and 3 to distribute key 'GUEST' across 4 partitions
+        -- Scatter skewed key 'GUEST' across 4 distinct worker buckets
         FLOOR(RAND() * 4) AS salt
     FROM telemetry.clickstream_events
 ),
@@ -385,7 +535,7 @@ replicated_dim AS (
         c.customer_name,
         s.salt
     FROM crm.customers AS c
-    -- Cross join small array [0, 1, 2, 3] to replicate dimension rows 4 times
+    -- Cross join small array [0, 1, 2, 3] to duplicate dimension 4 times
     CROSS JOIN (SELECT EXPLODE(ARRAY(0, 1, 2, 3)) AS salt) AS s
 )
 SELECT 
@@ -395,34 +545,32 @@ SELECT
 FROM salted_fact AS f
 INNER JOIN replicated_dim AS d 
     ON f.customer_id = d.customer_id 
-   AND f.salt = d.salt;                                      -- Joins on composite key, eliminating data skew!
+   AND f.salt = d.salt;  -- Perfectly balanced shuffle partitions!
 ```
 
 ---
 
-### 1.6 Non-Equi Joins & Temporal / SCD2 Range Matching
+### 1.10 Non-Equi Joins & Temporal / SCD2 Range Matching
 
-In dimensional data warehouses, dimension attributes change over time (Slowly Changing Dimensions Type 2 - SCD2). Fact records must join to the dimension record that was active **at the exact instant the transaction occurred**.
+Non-equi joins join on inequality ranges (`<`, `>`, `BETWEEN`). Because keys are not equal, hash tables cannot be used, forcing engines into costly **Broadcast Nested Loop Joins (BNLJ)** ($O(N \times M)$) unless optimized.
+
+#### Point-in-Time Temporal Matching (SCD Type 2)
+In enterprise data warehouses, dimension records have validity windows (`valid_from` to `valid_to`). Fact records must join to the dimension version valid at that exact microsecond:
 
 ```sql
--- Point-in-time lookup matching transaction timestamps against SCD2 validity windows
 SELECT 
-    t.transaction_id,                                        -- Fact primary key
-    t.transaction_timestamp,                                 -- Exact event point in time
-    t.transaction_amount,                                    -- Measure
-    c.customer_key                                 AS dim_surrogate_key,    -- Active SCD2 surrogate key
-    c.customer_id                                  AS business_id,          -- Natural / business key
-    c.credit_rating                                AS historical_rating,    -- State of customer at transaction time
-    c.assigned_broker                              AS historical_broker     -- State of customer at transaction time
+    t.transaction_id,
+    t.transaction_timestamp,
+    t.amount,
+    c.customer_surrogate_key,
+    c.customer_id,
+    c.risk_tier                                 AS historical_risk_tier
 FROM warehouse.fact_financial_transactions AS t
-INNER JOIN warehouse.dim_customer_scd2 AS c 
-    ON t.customer_id = c.customer_id                         -- Equi-join on natural business key
-   AND t.transaction_timestamp >= c.effective_start_date     -- Non-equi lower boundary: event at or after effective date
-   AND t.transaction_timestamp <  c.effective_end_date;      -- Non-equi upper boundary: event strictly before expiration date
+INNER JOIN warehouse.dim_customers_scd2 AS c
+    ON t.customer_id = c.customer_id            -- Equi-join on natural key
+   AND t.transaction_timestamp >= c.valid_from  -- Non-equi lower boundary
+   AND t.transaction_timestamp <  c.valid_to;   -- Non-equi upper boundary
 ```
-
-> [!NOTE]
-> For SCD Type 1 vs. Type 2 dimensional modeling, surrogate key design, and Kimball bus architecture, see [06. Data Architecture & Modeling](06_data_architecture_and_modeling.md).
 
 ---
 
@@ -430,253 +578,258 @@ INNER JOIN warehouse.dim_customer_scd2 AS c
 
 ---
 
-### 2.1 Correlated Subqueries & Query Decorrelation (LATERAL / CROSS APPLY)
+### 2.1 Correlated Subqueries & Query Decorrelation Mechanics
 
-#### Definition
-A correlated subquery references columns from the outer query. While older engines executed correlated subqueries as nested loops ($O(N \times M)$), modern engines decorrelate them into hash joins where possible.
+A **Correlated Subquery** references columns from the outer enclosing query.
+- *Naive Execution:* Evaluates the subquery row-by-row in a nested loop: $O(N \times M)$ scans.
+- *Optimizer Decorrelation:* Modern optimizers (PostgreSQL, Snowflake, Spark) rewrite correlated scalar subqueries into `LEFT OUTER JOIN` or `LEFT SEMI JOIN` automatically during plan compilation.
 
-#### LATERAL Joins (CROSS APPLY)
-A `LATERAL` join (or `CROSS APPLY` in SQL Server) allows an inline subquery in the `FROM` clause to reference columns provided by previous tables in the same `FROM` clause:
+---
 
+### 2.2 `LATERAL` Joins & `CROSS APPLY`: The SQL For-Each Loop
+
+A `LATERAL` join (PostgreSQL, Snowflake) or `CROSS APPLY` (SQL Server) allows an inline subquery in the `FROM` clause to access columns from tables defined earlier in the query.
+
+#### Use Case: Top-K Records Per Group
 ```sql
--- LATERAL Join: Find the top 2 most expensive products purchased by EACH customer
--- Evaluates the subquery dynamically for each customer record
-
+-- Retrieve the top 2 highest-value orders for EACH customer
 SELECT 
-    c.customer_id,                                           -- Outer table: Customer key
-    c.customer_name,                                         -- Outer table: Customer name
-    top_items.product_name,                                  -- Lateral subquery column
-    top_items.unit_price                                     -- Lateral subquery column
+    c.customer_id,
+    c.customer_name,
+    top_orders.order_id,
+    top_orders.order_amount
 FROM crm.customers AS c
-CROSS JOIN LATERAL (                                         -- Lateral subquery can read c.customer_id
-    SELECT 
-        oi.product_name,
-        oi.unit_price
+CROSS JOIN LATERAL (
+    SELECT o.order_id, o.order_amount
     FROM sales.orders AS o
-    INNER JOIN sales.order_items AS oi ON o.order_id = oi.order_id
-    WHERE o.customer_id = c.customer_id                      -- Correlation link to outer table
-    ORDER BY oi.unit_price DESC                              -- Order within customer's purchases
-    LIMIT 2                                                  -- Pick top 2 per customer
-) AS top_items;
+    WHERE o.customer_id = c.customer_id  -- Correlated link to outer table
+    ORDER BY o.order_amount DESC
+    LIMIT 2                              -- Picks top 2 per customer via index seek
+) AS top_orders;
 ```
 
 ---
 
-### 2.2 Common Table Expressions (CTEs) & Materialization Semantics
+### 2.3 Common Table Expressions (CTEs): Inlining vs. Optimization Fences
 
-Common Table Expressions (`WITH` queries) modularize complex pipelines into sequential, readable steps.
-
-#### Inlining vs. Materialization
-- **Inlined CTE (Default in modern PostgreSQL/Snowflake):** The query planner merges the CTE definition into the outer query, enabling predicate pushdown.
-- **Materialized CTE (`AS MATERIALIZED`):** Forces the engine to compute and store the CTE once in memory/disk cache, preventing redundant scans when the CTE is referenced multiple times.
+- **Inlined CTE (Default in Snowflake, Databricks, PostgreSQL 12+):** The optimizer treats the CTE like a macro, merging its SQL directly into the outer query to enable **Predicate Pushdown** through the CTE boundary.
+- **Materialized CTE (`AS MATERIALIZED`):** Acts as an **Optimization Fence**. It forces the engine to compute the CTE once, store the result in a temporary memory/disk buffer, and reuse it across multiple references.
 
 ```sql
--- Multi-reference query using explicit MATERIALIZED CTE
-WITH high_velocity_merchants AS MATERIALIZED (               -- Cached once in memory; prevents multiple fact scans
+WITH heavy_aggregation AS MATERIALIZED (
     SELECT 
-        merchant_id,
-        SUM(amount)      AS q1_volume,
-        COUNT(order_id)  AS q1_transactions
-    FROM billing.transactions
-    WHERE transaction_date >= '2024-01-01' AND transaction_date < '2024-04-01'
-    GROUP BY merchant_id
-    HAVING SUM(amount) >= 1000000.00                         -- Filter to top merchants
+        department_id,
+        AVG(salary) AS avg_dept_salary,
+        MAX(salary) AS max_dept_salary
+    FROM hr.employees
+    GROUP BY department_id
 )
--- First reference: Merchants in high-risk categories
-SELECT m.merchant_id, 'HIGH_RISK_SECTOR' AS audit_bucket
-FROM high_velocity_merchants AS m
-INNER JOIN compliance.monitored_sectors AS s ON m.merchant_id = s.merchant_id
-
-UNION ALL
-
--- Second reference: Merchants with high chargeback rates
-SELECT m.merchant_id, 'CHARGEBACK_ANOMALY' AS audit_bucket
-FROM high_velocity_merchants AS m
-INNER JOIN compliance.chargebacks AS cb ON m.merchant_id = cb.merchant_id
-WHERE cb.dispute_count > 50;
+SELECT e.employee_id, e.salary, h.avg_dept_salary
+FROM hr.employees AS e
+INNER JOIN heavy_aggregation AS h ON e.department_id = h.department_id
+WHERE e.salary > h.avg_dept_salary;
 ```
 
 ---
 
-### 2.3 Recursive CTEs & Graph / Hierarchy Traversal
+### 2.4 Recursive CTEs: Fixed-Point Relational Iteration
 
-#### Definition
-A Recursive CTE references its own result set iteratively. It contains:
-1. **Anchor Member:** Initial query generating the root nodes (base cases).
-2. **Recursive Member:** Query joining against the CTE itself, executing until zero new rows are generated.
-3. **Termination Guard:** A filter limiting traversal depth to prevent infinite loops from circular references.
+A **Recursive CTE** executes fixed-point relational iteration until zero new rows are generated:
+1. **Anchor Query:** Base case query executing at Step 0.
+2. **Working Table:** Holds rows produced by Step $N-1$.
+3. **Recursive Query:** Joins against the working table, producing Step $N$.
+4. **Intermediate Queue:** Rows from Step $N$ are appended to the cumulative result (`UNION ALL`) and become the new working table for Step $N+1$.
+5. **Termination:** When Step $N$ returns 0 rows, recursion terminates cleanly.
 
 ```mermaid
 flowchart TD
-    Anchor["Step 0: Anchor Query<br/>(Find CEO / Top Executive: manager_id IS NULL)"] --> Loop{"Recursive Check:<br/>Did Step N return any new rows?"}
-    Loop -- Yes --> Rec["Step N: Recursive Query<br/>(Join Employees to Managers from Step N-1)"]
-    Rec --> Depth{"Depth Guard Check:<br/>depth < 20?"}
-    Depth -- Pass --> Loop
-    Depth -- Fail (Cycle) --> Halt["Raise Loop Abort"]
-    Loop -- No Rows --> Output["Terminate & Output UNION ALL Result"]
+    Anchor["Step 0: Anchor Query<br/>(Find CEO: manager_id IS NULL)"] --> Check{"Recursive Check:<br/>Did Step N yield new rows?"}
+    Check -- Yes --> Rec["Step N: Recursive Member<br/>(Join Employees to Managers from Step N-1)"]
+    Rec --> CycleCheck{"Cycle Guard:<br/>Visited Array Check"}
+    CycleCheck -- Pass --> Check
+    CycleCheck -- Cycle Detected --> Abort["Halt Recursion!"]
+    Check -- No Rows Left --> Out["Final UNION ALL Result Output"]
 
     style Anchor fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Loop fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Check fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style Rec fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Depth fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Halt fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Output fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-```
-
-#### Code Example
-```sql
--- Comprehensive Recursive CTE: Management hierarchy tree with path construction and cycle detection
-WITH RECURSIVE employee_hierarchy AS (
-    -- 1. Anchor Member: Identify top-level executives (nodes with no managers)
-    SELECT 
-        employee_id,                                         -- Employee primary key
-        manager_id,                                          -- Parent pointer (NULL for CEO)
-        full_name,                                           -- Employee name
-        department,                                          -- Business department
-        1                               AS hierarchy_level,  -- Base hierarchy depth (Level 1)
-        CAST(full_name AS VARCHAR(1000)) AS reporting_path,   -- Audit breadcrumb path
-        ARRAY[employee_id]              AS visited_nodes     -- Cycle detection array (PostgreSQL syntax)
-    FROM hr.employees
-    WHERE manager_id IS NULL                                 -- Identifies root of organization tree
-    
-    UNION ALL
-    
-    -- 2. Recursive Member: Iteratively join reporting employees to their managers
-    SELECT 
-        e.employee_id,                                       -- Current employee key
-        e.manager_id,                                        -- Manager key (matches parent employee_id)
-        e.full_name,                                         -- Current employee name
-        e.department,                                        -- Current employee department
-        eh.hierarchy_level + 1          AS hierarchy_level,  -- Increment depth level
-        CAST(eh.reporting_path || ' -> ' || e.full_name AS VARCHAR(1000)) AS reporting_path, -- Append to path
-        eh.visited_nodes || e.employee_id AS visited_nodes   -- Append ID to history array
-    FROM hr.employees AS e
-    INNER JOIN employee_hierarchy AS eh 
-        ON e.manager_id = eh.employee_id                     -- Join condition: child manager matches parent ID
-    WHERE NOT (e.employee_id = ANY(eh.visited_nodes))        -- Cycle prevention: aborts if node was already visited
-      AND eh.hierarchy_level < 20                            -- Hard recursion depth limiter
-)
-SELECT 
-    employee_id,
-    manager_id,
-    full_name,
-    department,
-    hierarchy_level,
-    reporting_path
-FROM employee_hierarchy
-ORDER BY hierarchy_level ASC, employee_id ASC;
+    style CycleCheck fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Abort fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style Out fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 ---
 
-### 2.4 EXISTS vs. NOT EXISTS vs. IN / NOT IN Deep-Dive
+### 2.5 Hierarchical Tree Traversal with Cycle Detection & Path Building
 
-#### Execution Mechanics
-- `EXISTS` executes an index semi-join and **short-circuits immediately** upon finding the first matching record. It ignores column projection (`SELECT 1` vs `SELECT *` produces identical plans).
-- `IN` constructs an in-memory hash set of all inner subquery records. If the inner result set is large, `IN` consumes substantial memory.
-- `NOT IN` fails completely when the subquery returns any `NULL` value. `NOT EXISTS` is safe and recommended in production pipelines.
+```sql
+WITH RECURSIVE org_chart AS (
+    -- 1. Anchor Member: Top executives (nodes with no managers)
+    SELECT 
+        employee_id,
+        manager_id,
+        full_name,
+        1 AS depth,
+        CAST(full_name AS VARCHAR(1000)) AS reporting_chain,
+        ARRAY[employee_id] AS visited_ids
+    FROM hr.employees
+    WHERE manager_id IS NULL
+    
+    UNION ALL
+    
+    -- 2. Recursive Member: Iteratively join child employees
+    SELECT 
+        e.employee_id,
+        e.manager_id,
+        e.full_name,
+        oc.depth + 1 AS depth,
+        CAST(oc.reporting_chain || ' -> ' || e.full_name AS VARCHAR(1000)),
+        oc.visited_ids || e.employee_id
+    FROM hr.employees AS e
+    INNER JOIN org_chart AS oc 
+        ON e.manager_id = oc.employee_id
+    WHERE NOT (e.employee_id = ANY(oc.visited_ids))  -- Prevents infinite cycle loops!
+      AND oc.depth < 20                             -- Safety depth ceiling
+)
+SELECT employee_id, full_name, depth, reporting_chain
+FROM org_chart
+ORDER BY depth ASC, employee_id ASC;
+```
+
+---
+
+### 2.6 Bill of Materials (BOM) Multi-Level Parts Explosion
+
+In manufacturing and supply chain pipelines, complex assemblies (e.g., an Electric Vehicle) are composed of sub-assemblies (Battery Pack), which contain sub-components (Lithium Cells), which contain raw materials.
+A **Bill of Materials (BOM) Explosion** uses a Recursive CTE to calculate the total cumulative quantity and cost of all sub-parts required to manufacture the top-level product:
+
+```sql
+WITH RECURSIVE bom_explosion AS (
+    -- Anchor: Top-level finished product (e.g., Model 3 EV, Assembly ID = 1000)
+    SELECT 
+        parent_part_id,
+        component_part_id,
+        quantity_required,
+        1 AS assembly_level,
+        quantity_required AS cumulative_quantity
+    FROM manufacturing.bill_of_materials
+    WHERE parent_part_id = 1000
+    
+    UNION ALL
+    
+    -- Recursive step: Explode sub-components down to raw materials
+    SELECT 
+        child.parent_part_id,
+        child.component_part_id,
+        child.quantity_required,
+        parent.assembly_level + 1,
+        parent.cumulative_quantity * child.quantity_required AS cumulative_quantity
+    FROM manufacturing.bill_of_materials AS child
+    INNER JOIN bom_explosion AS parent 
+        ON child.parent_part_id = parent.component_part_id
+)
+SELECT 
+    b.component_part_id,
+    p.part_name,
+    p.unit_cost,
+    SUM(b.cumulative_quantity) AS total_parts_needed,
+    SUM(b.cumulative_quantity * p.unit_cost) AS total_cost_contribution
+FROM bom_explosion AS b
+INNER JOIN manufacturing.parts_catalog AS p 
+    ON b.component_part_id = p.part_id
+GROUP BY b.component_part_id, p.part_name, p.unit_cost
+ORDER BY total_cost_contribution DESC;
+```
+
+---
+
+### 2.7 `EXISTS` vs. `NOT EXISTS` vs. `IN` / `NOT IN` Deep-Dive
+
+| Construct | Execution Strategy | Null Handling Behavior | Best Production Fit |
+| :--- | :--- | :--- | :--- |
+| **`EXISTS`** | Semi-Join index seek; short-circuits on first match. | Completely safe; ignores NULLs. | Subqueries filtering on existence. |
+| **`NOT EXISTS`** | Anti-Join index seek; short-circuits on match. | **Completely safe; ignores NULLs.** | **Standard enterprise pattern for exclusions.** |
+| **`IN`** | Builds an in-memory hash set of inner records. | Safe for positive matching. | Small static list of values (`IN ('US', 'CA')`). |
+| **`NOT IN`** | Compares every element via 3VL logic. | **Lethal trap: Collapses to 0 rows if 1 NULL exists.** | **Never use with subqueries!** |
 
 ---
 
 # 3. Window Functions & Analytical SQL
 
-Window functions execute calculations across a set of table rows related to the current row, **without collapsing individual rows into aggregate summaries**.
+---
+
+### 3.1 Window Function Architecture & The 9-Stage SQL Lifecycle
+
+In the logical query processing model, window functions execute at **Stage 8**, immediately after `SELECT` expressions, which is *after* `WHERE`, `GROUP BY`, and `HAVING` have evaluated:
+
+```mermaid
+flowchart LR
+    S1["1. FROM"] --> S2["2. ON"] --> S3["3. JOIN"] --> S4["4. WHERE"] --> S5["5. GROUP BY"]
+    S5 --> S6["6. HAVING"] --> S7["7. SELECT"] --> S8["8. WINDOW<br/>FUNCTIONS"] --> S9["9. ORDER BY<br/>& LIMIT"]
+
+    style S1 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S2 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S3 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S4 fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style S5 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S6 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S7 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style S8 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style S9 fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+```
+*Crucial Consequence:* You **cannot** filter on a window function in the `WHERE` clause because the `WHERE` clause evaluates at Stage 4, long before the window function exists! You must use a CTE or the `QUALIFY` clause.
 
 ---
 
-### 3.1 Window Functions Architecture & Syntax
+### 3.2 Window Framing Deep-Dive: `ROWS` vs. `RANGE` vs. `GROUPS`
+
+The frame clause specifies the sliding window of rows evaluated relative to the current row:
 
 ```sql
-FUNCTION(...) OVER (
-    [PARTITION BY partition_col1, partition_col2]
-    [ORDER BY sort_col1 [ASC|DESC]]
-    [ROWS|RANGE|GROUPS BETWEEN frame_start AND frame_end]
-)
+{ROWS | RANGE | GROUPS} BETWEEN frame_start AND frame_end
 ```
 
 ```mermaid
 flowchart TD
-    subgraph GroupByOp ["GROUP BY (Collapses Granularity)"]
-        Raw["3 Input Rows for 'Electronics'"] --> GB["1 Summary Output Row"]
-    end
-    subgraph WindowOp ["Window Function (Preserves Granularity)"]
-        Raw2["3 Input Rows for 'Electronics'"] --> W1["Row 1: Data + Window Aggregate"]
-        Raw2 --> W2["Row 2: Data + Window Aggregate"]
-        Raw2 --> W3["Row 3: Data + Window Aggregate"]
-    end
-
-    style GroupByOp fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style WindowOp fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-
-    style Raw fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style GB fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Raw2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style W1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style W2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style W3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-```
-
----
-
-### 3.2 Window Framing Deep-Dive: ROWS vs. RANGE vs. GROUPS
-
-The frame specification defines the sliding boundary of rows evaluated relative to the current row.
-
-```
-Window Frame Types:
-- ROWS:   Operates on physical row counts (ignores value ties).
-- RANGE:  Operates on logical value ranges in the ORDER BY column (includes all tied values).
-- GROUPS: Operates on groups of tied values.
-```
-
-```mermaid
-flowchart TD
-    subgraph FrameVisual ["Framing Comparison on Tied Dates"]
-        D1["Row 1: 2024-01-01 ($100)"]
-        D2["Row 2: 2024-01-02 ($200) [Tie]"]
-        D3["Row 3: 2024-01-02 ($200) [Tie]"]
+    subgraph FramingVisual ["Frame Comparison on Duplicate Values"]
+        Row1["Row 1: 2026-03-01 ($100)"]
+        Row2["Row 2: 2026-03-02 ($200) [TIE]"]
+        Row3["Row 3: 2026-03-02 ($200) [TIE]"]
         
-        D1 --> R_ROWS["ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW<br/>Row 2 Sum: $300<br/>Row 3 Sum: $500"]
-        D1 --> R_RANGE["RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (Default!)<br/>Row 2 Sum: $500 (Includes Row 3 because date is tied!)<br/>Row 3 Sum: $500"]
+        Row1 --> ROWS_Path["ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW<br/>(Row 2 Sum: $100 + $200 = $300, Row 3 Sum: $300 + $200 = $500)"]
+        Row1 --> RANGE_Path["RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (Default!)<br/>(Row 2 Sum: $500 (Includes Row 3 because dates are tied!), Row 3 Sum: $500)"]
     end
 
-    style FrameVisual fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-
-    style D1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style D2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style D3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style R_ROWS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style R_RANGE fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style FramingVisual fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Row1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Row2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Row3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ROWS_Path fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style RANGE_Path fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#fde68a
 ```
 
-> [!WARNING]
-> **The Implicit RANGE Default Trap:**
-> Specifying `ORDER BY` without a frame clause activates the ANSI default:
-> `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
-> This causes silent calculation bugs when duplicate values exist in the sort key and degrades performance. **Always explicitly write `ROWS BETWEEN ...`**.
+#### Concrete Framing Comparison Table
+
+| Row Number | Date | Amount | `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` | `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` |
+| :---: | :---: | :---: | :---: | :---: |
+| 1 | `2026-03-01` | \$100.00 | **\$100.00** | **\$100.00** |
+| 2 | `2026-03-02` | \$200.00 | **\$300.00** | **\$500.00** (Tied! Includes Row 3) |
+| 3 | `2026-03-02` | \$200.00 | **\$500.00** | **\$500.00** (Tied! Includes Row 2) |
+| 4 | `2026-03-03` | \$150.00 | **\$650.00** | **\$650.00** |
 
 ---
 
-### 3.3 Ranking Functions: ROW_NUMBER, RANK, DENSE_RANK, NTILE
+### 3.3 The Lethal Implicit `RANGE` Default Trap
 
-```sql
--- Ranking functions comparison across identical scores
-SELECT 
-    student_id,
-    department,
-    score,
-    -- ROW_NUMBER: Unique sequential integer; breaks ties arbitrarily
-    ROW_NUMBER() OVER (PARTITION BY department ORDER BY score DESC) AS row_num,
-    -- RANK: Assigns identical rank to ties; skips subsequent ranks (1, 2, 2, 4)
-    RANK()       OVER (PARTITION BY department ORDER BY score DESC) AS rnk,
-    -- DENSE_RANK: Assigns identical rank to ties; DOES NOT skip ranks (1, 2, 2, 3)
-    DENSE_RANK() OVER (PARTITION BY department ORDER BY score DESC) AS dense_rnk,
-    -- NTILE(4): Distributes rows into 4 equal quartiles (1, 2, 3, 4)
-    NTILE(4)     OVER (PARTITION BY department ORDER BY score DESC) AS quartile
-FROM academics.exam_results;
-```
+If you write `SUM(amount) OVER (ORDER BY transaction_date)` without specifying a frame, the ANSI standard defaults to:
+`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
+If multiple rows have the same `transaction_date`, `RANGE` evaluates all tied rows together, resulting in **duplicate running balances** instead of a continuous chronological balance!
+**Golden Production Rule:** Always explicitly write `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`.
 
-#### Ranking Functions Comparison Matrix
+---
+
+### 3.4 Ranking Functions: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `NTILE`
+
 | Student Score | `ROW_NUMBER()` | `RANK()` | `DENSE_RANK()` | `NTILE(2)` |
 | :---: | :---: | :---: | :---: | :---: |
 | 100 | 1 | 1 | 1 | 1 |
@@ -684,122 +837,113 @@ FROM academics.exam_results;
 | 95 (Tie) | 3 | 2 | 2 | 2 |
 | 90 | 4 | 4 (Skipped 3) | 3 (No Skip) | 2 |
 
+- **`ROW_NUMBER()`:** Assigns a unique sequential integer (1, 2, 3, 4). Breaks ties arbitrarily unless secondary sort keys are provided.
+- **`RANK()`:** Assigns identical rank to ties, but **skips subsequent ranks** (1, 2, 2, 4).
+- **`DENSE_RANK()`:** Assigns identical rank to ties, and **does not skip ranks** (1, 2, 2, 3). Essential for finding "top 3 salaries" where ties exist.
+- **`NTILE(N)`:** Divides ordered rows into $N$ roughly equal buckets (e.g., quartiles, percentiles).
+
 ---
 
-### 3.4 Value Navigation Functions: LEAD, LAG, FIRST_VALUE, LAST_VALUE, NTH_VALUE
+### 3.5 Value Navigation Functions: `LEAD`, `LAG`, `FIRST_VALUE`, `LAST_VALUE`, `NTH_VALUE`
 
 ```sql
--- Time-series navigation: Compute period-over-period growth and cohort delta
 SELECT 
-    ticker_symbol,
+    ticker,
     trade_date,
     close_price,
     
-    -- LAG: Access previous trading day's price (offset 1, fallback to close_price)
+    -- LAG: Access previous trading day price (default offset 1, default fallback 0.0)
     LAG(close_price, 1, close_price) OVER (
-        PARTITION BY ticker_symbol ORDER BY trade_date ASC
-    ) AS prior_day_price,
+        PARTITION BY ticker ORDER BY trade_date ASC
+    ) AS prev_close,
     
-    -- Compute day-over-day price change
-    close_price - LAG(close_price, 1, close_price) OVER (
-        PARTITION BY ticker_symbol ORDER BY trade_date ASC
-    ) AS daily_price_delta,
-    
-    -- LEAD: Access next day's price
+    -- LEAD: Access next trading day price
     LEAD(close_price, 1) OVER (
-        PARTITION BY ticker_symbol ORDER BY trade_date ASC
-    ) AS next_day_price,
+        PARTITION BY ticker ORDER BY trade_date ASC
+    ) AS next_close,
     
-    -- FIRST_VALUE: Initial trading price of the stock in this dataset
+    -- FIRST_VALUE: Initial trading price of the stock
     FIRST_VALUE(close_price) OVER (
-        PARTITION BY ticker_symbol 
-        ORDER BY trade_date ASC
+        PARTITION BY ticker ORDER BY trade_date ASC
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    ) AS year_opening_price,
+    ) AS opening_price,
     
-    -- LAST_VALUE: Most recent price (requires explicit unbounded following frame!)
+    -- LAST_VALUE: Most recent price (Must use UNBOUNDED FOLLOWING!)
     LAST_VALUE(close_price) OVER (
-        PARTITION BY ticker_symbol 
-        ORDER BY trade_date ASC
+        PARTITION BY ticker ORDER BY trade_date ASC
         ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
-    ) AS year_closing_price
+    ) AS closing_price
 FROM market.stock_daily;
 ```
 
 ---
 
-### 3.5 Cumulative Patterns: Running Totals & Moving Averages
+### 3.6 The `LAST_VALUE()` Unbounded Following Framing Gotcha
+
+Junior engineers frequently write:
+```sql
+-- INCORRECT: Returns current row value because default frame ends at CURRENT ROW!
+LAST_VALUE(close_price) OVER (PARTITION BY ticker ORDER BY trade_date ASC)
+```
+Because the default frame ends at `CURRENT ROW`, `LAST_VALUE()` only evaluates rows up to the current row, returning the current row's own value!
+**Fix:** Explicitly declare `ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING`.
+
+---
+
+### 3.7 Cumulative Patterns: Running Totals, Moving Averages & Physical vs. Calendar Windows
+
+- **Physical Window (`ROWS`):** Operates on row count (`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` = 7 physical rows).
+- **Calendar Range Window (`RANGE`):** Operates on time intervals (`RANGE BETWEEN INTERVAL '6 days' PRECEDING AND CURRENT ROW`). Correctly handles missing dates (e.g., weekends/holidays).
+
+---
+
+### 3.8 Advanced Analytical Pattern 1: Deduplication via Window Ranking
 
 ```sql
--- Chronological cumulative running balance and 7-day moving average
-SELECT 
-    account_id,
-    transaction_date,
-    transaction_amount,
-    
-    -- Running Total: Cumulative sum from start of account history to current row
-    SUM(transaction_amount) OVER (
-        PARTITION BY account_id 
-        ORDER BY transaction_date ASC
-        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    ) AS running_balance,
-    
-    -- 7-Day Physical Moving Average: Current day + prior 6 records
-    ROUND(AVG(transaction_amount) OVER (
-        PARTITION BY account_id 
-        ORDER BY transaction_date ASC
-        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
-    ), 2) AS moving_avg_7_period
-FROM banking.account_ledger;
+WITH ranked_records AS (
+    SELECT 
+        order_id,
+        customer_id,
+        order_amount,
+        updated_at,
+        ROW_NUMBER() OVER (
+            PARTITION BY order_id 
+            ORDER BY updated_at DESC, ingestion_timestamp DESC
+        ) AS rank_val
+    FROM bronze.raw_orders
+)
+SELECT order_id, customer_id, order_amount, updated_at
+FROM ranked_records
+WHERE rank_val = 1;
 ```
 
 ---
 
-### 3.6 Advanced Analytical Patterns: Top-N, Deduplication, Sessionization, Gaps and Islands
+### 3.9 Advanced Analytical Pattern 2: The Gaps and Islands Problem (Difference-of-Ranks)
 
-#### Pattern 1: Deduplication via Window Functions
-```sql
--- Gold Layer Deduplication: Retain only the latest state of each record
-WITH ranked_events AS (
-    SELECT 
-        event_id,
-        user_id,
-        event_payload,
-        updated_at,
-        -- Assign rank 1 to the most recent record per business key
-        ROW_NUMBER() OVER (
-            PARTITION BY event_id 
-            ORDER BY updated_at DESC, ingestion_timestamp DESC
-        ) AS dedup_rank
-    FROM bronze.raw_events
-)
-SELECT event_id, user_id, event_payload, updated_at
-FROM ranked_events
-WHERE dedup_rank = 1;                                        -- Prunes duplicate older versions
-```
+**The Mathematical Proof:** If you subtract a monotonically increasing integer sequence (`ROW_NUMBER()`) from a contiguous sequence of dates, **the resulting difference date remains strictly constant across all contiguous dates in that island**:
 
-#### Pattern 2: The Gaps and Islands Problem
-**The Goal:** Identify contiguous islands of consecutive calendar dates where a user performed daily logins, and detect where gaps occurred.
+$$\text{Island Identifier} = \text{Date} - \text{ROW\_NUMBER}() \times \text{INTERVAL '1 day'} = \text{Constant}$$
 
 ```mermaid
 flowchart LR
-    subgraph Data ["User Activity Dates"]
-        D1["2024-01-01 (Row 1)"] --> D2["2024-01-02 (Row 2)"]
-        D2 --> D3["2024-01-03 (Row 3)"]
-        D3 -.->|Gap!| D4["2024-01-06 (Row 4)"]
-        D4 --> D5["2024-01-07 (Row 5)"]
-    end
-    subgraph GroupingKey ["Difference: (Date - RowNum)"]
-        G1["Jan 1 - 1 = Dec 31 (Island 1)"]
-        G2["Jan 2 - 2 = Dec 31 (Island 1)"]
-        G3["Jan 3 - 3 = Dec 31 (Island 1)"]
-        G4["Jan 6 - 4 = Jan 02 (Island 2)"]
-        G5["Jan 7 - 5 = Jan 02 (Island 2)"]
+    subgraph RawDates ["User Daily Login Events"]
+        direction LR
+        D1["Jan 01 (Row 1)"] --> D2["Jan 02 (Row 2)"] --> D3["Jan 03 (Row 3)"]
+        D3 -.->|3-Day Inactivity Gap!| D4["Jan 07 (Row 4)"] --> D5["Jan 08 (Row 5)"]
     end
 
-    style Data fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style GroupingKey fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    subgraph DiffMath ["Difference: Date - RowNumber"]
+        direction TD
+        G1["Jan 01 - 1 = Dec 31 (Island A)"]
+        G2["Jan 02 - 2 = Dec 31 (Island A)"]
+        G3["Jan 03 - 3 = Dec 31 (Island A)"]
+        G4["Jan 07 - 4 = Jan 03 (Island B)"]
+        G5["Jan 08 - 5 = Jan 03 (Island B)"]
+    end
 
+    style RawDates fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style DiffMath fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style D1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style D2 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style D3 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -812,44 +956,40 @@ flowchart LR
     style G5 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
+#### Production Gaps and Islands SQL Implementation
 ```sql
--- Production Gaps and Islands Implementation: Difference-of-Ranks Technique
-WITH distinct_user_logins AS (
-    SELECT DISTINCT 
-        user_id,
-        CAST(login_timestamp AS DATE) AS login_date
+WITH distinct_logins AS (
+    SELECT DISTINCT user_id, CAST(login_time AS DATE) AS login_date
     FROM telemetry.user_logins
 ),
-numbered_logins AS (
+islands AS (
     SELECT 
         user_id,
         login_date,
-        -- Assign sequential row index per user
-        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date ASC) AS seq_num,
-        -- Subtract seq_num days from login_date.
-        -- For contiguous dates, the difference remains CONSTANT (creating the island identifier).
-        login_date - CAST(ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date ASC) || ' days' AS INTERVAL) AS island_group
-    FROM distinct_user_logins
+        login_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date ASC) * INTERVAL '1 day') AS island_id
+    FROM distinct_logins
 )
 SELECT 
     user_id,
-    MIN(login_date)                                          AS streak_start_date,
-    MAX(login_date)                                          AS streak_end_date,
-    COUNT(*)                                                 AS consecutive_days_streak
-FROM numbered_logins
-GROUP BY user_id, island_group
-HAVING COUNT(*) >= 3                                         -- Filter for streaks of 3 or more days
-ORDER BY user_id, streak_start_date;
+    MIN(login_date) AS streak_start,
+    MAX(login_date) AS streak_end,
+    COUNT(*)        AS streak_length_days
+FROM islands
+GROUP BY user_id, island_id
+HAVING COUNT(*) >= 3;
 ```
 
-#### Pattern 3: Sessionization Pattern (Inactivity Gap Threshold)
+---
+
+### 3.10 Advanced Analytical Pattern 3: Sessionization via Inactivity Thresholds
+
+Group continuous event clickstreams into discrete user browsing sessions when inactivity exceeds 30 minutes:
+
 ```sql
--- Group clickstream events into sessions based on a 30-minute inactivity threshold
 WITH lagged_events AS (
     SELECT 
         user_id,
         event_timestamp,
-        -- Check time since previous user event in seconds
         EXTRACT(EPOCH FROM (event_timestamp - LAG(event_timestamp) OVER (
             PARTITION BY user_id ORDER BY event_timestamp ASC
         ))) AS seconds_since_last_event
@@ -859,7 +999,6 @@ session_starts AS (
     SELECT 
         user_id,
         event_timestamp,
-        -- Flag new session if gap > 1800 seconds (30 mins) or if it's the user's first event
         CASE 
             WHEN seconds_since_last_event > 1800 OR seconds_since_last_event IS NULL THEN 1 
             ELSE 0 
@@ -870,7 +1009,6 @@ sessionized AS (
     SELECT 
         user_id,
         event_timestamp,
-        -- Cumulative sum of session start flags generates a unique session ID
         SUM(is_new_session) OVER (
             PARTITION BY user_id ORDER BY event_timestamp ASC
             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
@@ -884,22 +1022,35 @@ GROUP BY user_id, session_id;
 
 ---
 
-### 3.7 The QUALIFY Clause
-
-Modern cloud data warehouses (Snowflake, BigQuery, Databricks) support the `QUALIFY` clause. `QUALIFY` filters the results of window functions **directly**, eliminating the boilerplate of wrapping queries in CTEs or subqueries.
+### 3.11 Advanced Analytical Pattern 4: Top-N per Group with Tie-Breaker Handling
 
 ```sql
--- Snowflake / BigQuery / Databricks QUALIFY pattern
--- Retrieve only the top-earning employee per department in a single query block
+WITH ranked_products AS (
+    SELECT 
+        category_id,
+        product_id,
+        product_name,
+        revenue,
+        DENSE_RANK() OVER (
+            PARTITION BY category_id 
+            ORDER BY revenue DESC
+        ) AS rank_dense
+    FROM catalog.product_sales
+)
+SELECT * FROM ranked_products WHERE rank_dense <= 3;
+```
 
-SELECT 
-    employee_id,
-    department_id,
-    first_name,
-    salary,
-    DENSE_RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) AS salary_rank
+---
+
+### 3.12 The Modern `QUALIFY` Clause
+
+Supported natively by Snowflake, BigQuery, and Databricks SQL, `QUALIFY` filters window function results directly without requiring CTE wrappers:
+
+```sql
+-- Retrieve the single highest earner per department directly
+SELECT employee_id, department_id, salary
 FROM hr.employees
-QUALIFY salary_rank = 1;                                     -- Directly filters window results!
+QUALIFY ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC) = 1;
 ```
 
 ---
@@ -908,92 +1059,47 @@ QUALIFY salary_rank = 1;                                     -- Directly filters
 
 ---
 
-### 4.1 Multi-Dimensional Grouping: GROUPING SETS, ROLLUP, CUBE
+### 4.1 Multi-Dimensional Grouping: `GROUPING SETS`, `ROLLUP`, `CUBE`
 
-Standard `GROUP BY` aggregates at a single dimensional grain. Multi-dimensional extensions compute multiple aggregation levels in a single query pass.
-
-```mermaid
-flowchart TD
-    subgraph RollupTree ["ROLLUP (Year, Region, Product)"]
-        L1["Grand Total ()"]
-        L2["Year Level (Year)"]
-        L3["Year + Region (Year, Region)"]
-        L4["Full Detail (Year, Region, Product)"]
-        L4 --> L3 --> L2 --> L1
-    end
-
-    style RollupTree fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-
-    style L1 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style L2 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style L3 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style L4 fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-```
+- **`ROLLUP(Year, Region, Product)`:** Generates hierarchical rollups ($N + 1$ levels): Full detail $\rightarrow$ `(Year, Region)` $\rightarrow$ `(Year)` $\rightarrow$ Grand Total `()`.
+- **`CUBE(Region, Channel)`:** Generates all $2^N$ combinatorial permutations.
+- **`GROUPING SETS`:** Explicitly declares exact target sub-aggregations.
 
 ```sql
--- Multi-level aggregation using GROUPING SETS, ROLLUP, and CUBE
-
--- 1. ROLLUP: Generates hierarchical subtotals and grand totals
 SELECT 
     calendar_year,
     region,
-    product_category,
     SUM(revenue) AS total_revenue,
-    GROUPING(calendar_year)    AS is_year_subtotal,         -- Returns 1 if column is aggregated in this row
-    GROUPING(region)           AS is_region_subtotal,
-    GROUPING(product_category) AS is_category_subtotal
+    GROUPING(calendar_year) AS is_year_subtotal,
+    GROUPING(region)        AS is_region_subtotal
 FROM analytics.fact_sales
-GROUP BY ROLLUP (calendar_year, region, product_category);
-
--- 2. CUBE: Generates all $2^N$ possible permutations of dimensions
-SELECT 
-    region,
-    channel,
-    SUM(revenue) AS total_revenue
-FROM analytics.fact_sales
-GROUP BY CUBE (region, channel);
-
--- 3. Explicit GROUPING SETS: Selectively computes specific target grains
-SELECT 
-    region,
-    product_category,
-    calendar_year,
-    SUM(revenue) AS total_revenue
-FROM analytics.fact_sales
-GROUP BY GROUPING SETS (
-    (region, product_category),                             -- Grain A: Region by Category
-    (calendar_year),                                        -- Grain B: Annual Total
-    ()                                                      -- Grain C: Overall Grand Total
-);
+GROUP BY ROLLUP (calendar_year, region);
 ```
 
 ---
 
-### 4.2 PIVOT and UNPIVOT
+### 4.2 The `GROUPING()` and `GROUPING_ID()` Bitmask Functions
 
-- **PIVOT:** Rotates row-level values into distinct columns.
-- **UNPIVOT:** Melts column headers into row-level values (normalizing denormalized sheets).
+When generating multi-dimensional summaries, NULL values appear in subtotal rows. How do you distinguish between a row that has a **real NULL in the data** vs. a **NULL created by aggregation**?
+- `GROUPING(column)` returns `1` if the column is aggregated in this subtotal row, and `0` if it represents actual data!
+
+---
+
+### 4.3 Cross-Tabulation & Pivoting: `PIVOT` and `UNPIVOT`
 
 ```sql
--- 1. PIVOT: Rotate quarterly row data into columnar summary (Snowflake / Databricks SQL)
+-- 1. PIVOT: Rotate quarterly rows to columns
 SELECT *
-FROM (
-    SELECT store_id, sale_quarter, revenue 
-    FROM sales.quarterly_store_performance
-)
+FROM (SELECT store_id, quarter, revenue FROM sales.quarterly_summary)
 PIVOT (
-    SUM(revenue) 
-    FOR sale_quarter IN ('Q1', 'Q2', 'Q3', 'Q4')             -- Pivot values to columns
-) AS p (store_id, q1_revenue, q2_revenue, q3_revenue, q4_revenue);
+    SUM(revenue) FOR quarter IN ('Q1', 'Q2', 'Q3', 'Q4')
+) AS p (store_id, q1_rev, q2_rev, q3_rev, q4_rev);
 
--- 2. UNPIVOT: Normalize horizontal monthly columns into a narrow relational table
-SELECT 
-    store_id,
-    month_name,
-    monthly_sales
-FROM sales.store_monthly_matrix
+-- 2. UNPIVOT: Normalize horizontal columns back to relational rows
+SELECT store_id, quarter_name, revenue
+FROM sales.pivoted_stores
 UNPIVOT (
-    monthly_sales FOR month_name IN (jan_sales, feb_sales, mar_sales, apr_sales)
+    revenue FOR quarter_name IN (q1_rev, q2_rev, q3_rev, q4_rev)
 );
 ```
 
@@ -1003,118 +1109,96 @@ UNPIVOT (
 
 ---
 
-### 5.1 MERGE / UPSERT & Change Data Capture (CDC) Patterns
+### 5.1 `MERGE` / `UPSERT` Mechanics & Change Data Capture (CDC)
 
-The `MERGE` statement synchronizes a target table with an incoming source stream in a single atomic transaction.
-
-```mermaid
-flowchart TD
-    Src["Incoming CDC Stream"] --> JoinCheck{"Match on Key: target.id = source.id"}
-    JoinCheck -- Match Found --> MatchAction{"Inspect CDC Op"}
-    MatchAction -- Op = 'DELETE' --> DeleteAction["DELETE FROM target"]
-    MatchAction -- Op = 'UPDATE' --> UpdateAction["UPDATE target SET ..."]
-    JoinCheck -- No Match Found --> InsertAction["INSERT INTO target VALUES (...)"]
-
-    style Src fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style JoinCheck fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style MatchAction fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style DeleteAction fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style UpdateAction fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style InsertAction fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-```
+The ANSI SQL `MERGE` statement synchronizes a target table with incoming CDC records atomically:
 
 ```sql
--- Production MERGE: Synchronize dimension table with upstream CDC stream
--- Handles inserts, updates, soft deletes, and source deletions
-
 MERGE INTO warehouse.dim_customers AS target
 USING staging.customer_cdc_stream AS source
-    ON target.customer_id = source.customer_id               -- Natural business key match
-WHEN MATCHED AND source.cdc_operation = 'D' THEN
-    UPDATE SET 
-        target.is_active = FALSE,
-        target.deleted_at = source.event_timestamp           -- Soft delete handling
-WHEN MATCHED AND source.cdc_operation = 'U' THEN
-    UPDATE SET 
-        target.first_name        = source.first_name,
-        target.last_name         = source.last_name,
-        target.email             = source.email,
-        target.last_updated_at   = source.event_timestamp
-WHEN NOT MATCHED AND source.cdc_operation IN ('I', 'U') THEN
-    INSERT (customer_id, first_name, last_name, email, is_active, created_at, last_updated_at)
-    VALUES (source.customer_id, source.first_name, source.last_name, source.email, TRUE, source.event_timestamp, source.event_timestamp);
-```
-
-> [!CAUTION]
-> **Non-Unique Source Join Keys Failure:**
-> If the source dataset contains duplicate rows for the same `customer_id`, the engine aborts the transaction with an error: `target row was matched by multiple source rows`. Always deduplicate source staging feeds using window functions (`ROW_NUMBER()`) prior to running `MERGE`.
-
-> [!NOTE]
-> For applying CDC feeds to Delta Lake tables with Change Data Feed (CDF), see [09. Databricks & Delta Lake](09_databricks_and_delta_lake.md). For end-to-end CDC architectures (Debezium, Kafka), see [10. Data Pipeline Design & Ingestion](10_data_pipeline_design_and_ingestion.md).
-
----
-
-### 5.2 Transaction Control & ACID Mechanics
-
-A transaction groups multiple operations into an indivisible unit governed by **ACID** properties (Atomicity, Consistency, Isolation, Durability).
-
-```sql
--- Multi-statement banking transfer with Savepoint error recovery
-BEGIN TRANSACTION;
-
--- Step 1: Debit sender balance (with integrity check)
-UPDATE banking.accounts
-SET balance = balance - 1000.00
-WHERE account_id = 'ACC_SENDER' AND balance >= 1000.00;
-
--- Set intermediate savepoint prior to non-critical auxiliary steps
-SAVEPOINT pre_notification_step;
-
--- Step 2: Credit recipient balance
-UPDATE banking.accounts
-SET balance = balance + 1000.00
-WHERE account_id = 'ACC_RECIPIENT';
-
--- Step 3: Insert immutable audit ledger record
-INSERT INTO banking.transfer_audit (sender_id, recipient_id, amount, status)
-VALUES ('ACC_SENDER', 'ACC_RECIPIENT', 1000.00, 'EXECUTED');
-
--- Finalize and permanently persist all operations to Write-Ahead Log (WAL)
-COMMIT;
-
--- Rollback scenario:
--- In case of failure: ROLLBACK TO SAVEPOINT pre_notification_step; OR ROLLBACK;
+    ON target.customer_id = source.customer_id
+WHEN MATCHED AND source.op = 'D' THEN
+    UPDATE SET target.is_active = FALSE, target.deleted_at = source.event_ts
+WHEN MATCHED AND source.op = 'U' THEN
+    UPDATE SET target.name = source.name, target.updated_at = source.event_ts
+WHEN NOT MATCHED AND source.op IN ('I', 'U') THEN
+    INSERT (customer_id, name, is_active, created_at, updated_at)
+    VALUES (source.customer_id, source.name, TRUE, source.event_ts, source.event_ts);
 ```
 
 ---
 
-### 5.3 ANSI SQL Isolation Levels & Concurrency Anomalies
+### 5.2 The Fatal `MERGE` Target Row Collision Trap & Remediation
 
-Concurrent database transactions are vulnerable to three primary read anomalies and write contention:
-1. **Dirty Read:** Transaction reads uncommitted modifications made by another concurrent transaction.
-2. **Non-Repeatable Read:** Transaction re-reads the same row and discovers that another transaction committed changes to its values.
-3. **Phantom Read:** Transaction re-executes a range query and discovers new rows inserted by another committed transaction.
-4. **Write Skew:** Two transactions concurrently read overlapping data, satisfy constraints independently, and write conflicting updates.
+If the incoming source staging table contains duplicate rows for the same primary key (e.g., two updates for customer `101` in the same batch), the database aborts with an error:
+`Target row was matched by multiple source rows`.
+**Mandatory Production Fix:** Deduplicate the staging table using `ROW_NUMBER() OVER (PARTITION BY id ORDER BY lsn DESC)` prior to executing `MERGE`.
+
+---
+
+### 5.3 Transaction Control: Two-Phase Locking (2PL), Savepoints & WAL
+
+A transaction is an atomic unit of work:
+- **Savepoints:** Allows partial rollback of non-fatal sub-operations without aborting the entire transaction.
+- **WAL (Write-Ahead Log):** Changes are flushed to disk sequentially *before* modifying memory pages, guaranteeing Durability ($D$).
+
+---
+
+### 5.4 ANSI SQL Isolation Levels & Concurrency Anomalies
+
+#### The 4 Concurrency Anomalies
+1. **Dirty Read:** Transaction A reads data modified by Transaction B *before* Transaction B commits. If B rolls back, A read data that never existed.
+2. **Non-Repeatable Read (Fuzzy Read):** Transaction A reads a row. Transaction B updates that row and commits. Transaction A re-reads the row and finds altered values.
+3. **Phantom Read:** Transaction A executes a range query (`WHERE amount > 100`). Transaction B inserts a new row matching that range and commits. Transaction A re-runs the range query and discovers a "phantom" new row.
+4. **Write Skew:** Two transactions read overlapping data, satisfy business constraints independently, and execute updates that together violate global constraints (e.g., both on-call doctors check out simultaneously, leaving 0 doctors on call).
 
 #### ANSI Isolation Level Support Matrix
-| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read | Concurrency Level |
-| :--- | :---: | :---: | :---: | :---: |
-| **Read Uncommitted** | Possible | Possible | Possible | Maximum |
-| **Read Committed** (Default in PostgreSQL) | **Prevented** | Possible | Possible | High |
-| **Repeatable Read** (Default in MySQL) | **Prevented** | **Prevented** | Possible (Snapshot prevents in PG) | Medium |
-| **Serializable** | **Prevented** | **Prevented** | **Prevented** | Lowest (Pessimistic locking / Aborts) |
+| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read | Write Skew | Concurrency Performance |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Read Uncommitted** | Possible | Possible | Possible | Possible | Maximum |
+| **Read Committed** (PostgreSQL Default) | **Prevented** | Possible | Possible | Possible | High |
+| **Repeatable Read** (MySQL InnoDB Default)| **Prevented** | **Prevented** | Possible (Prevented in PG MVCC) | Possible | Medium |
+| **Serializable** | **Prevented** | **Prevented** | **Prevented** | **Prevented** | Lowest (Pessimistic / Aborts) |
 
-```sql
--- Setting explicit isolation level for critical pipeline execution
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-BEGIN TRANSACTION;
-    -- Serializable read and write operations
-    SELECT SUM(balance) FROM banking.vault_reserves;
-COMMIT;
+#### Step-by-Step Multi-Transaction Concurrency Timeline
+| Step | Transaction A (Alice)<br/>`ISOLATION: READ COMMITTED` | Transaction B (Bob)<br/>`ISOLATION: READ COMMITTED` | State & Anomaly Analysis |
+| :---: | :--- | :--- | :--- |
+| **T1** | `BEGIN;` | `BEGIN;` | Both transactions start concurrently under Read Committed. |
+| **T2** | `SELECT balance FROM accounts WHERE id = 1;`<br/>*(Returns `$1,000`)* | — | Alice reads the initial committed state (`$1,000`). |
+| **T3** | — | `UPDATE accounts SET balance = 500 WHERE id = 1;` | Bob updates row `id = 1` in his private transaction buffer. |
+| **T4** | — | `COMMIT;` | Bob commits. The global committed state is now `$500`. |
+| **T5** | `SELECT balance FROM accounts WHERE id = 1;`<br/>*(Returns `$500`)* | — | **NON-REPEATABLE READ ANOMALY:** Alice re-reads the exact same row inside her still-open transaction, but receives `$500` instead of `$1,000`! |
+| **T6** | `COMMIT;` | — | Alice transaction completes with internal inconsistency. |
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    actor Alice as Transaction A (Alice)
+    participant DB as Accounts Table
+    actor Bob as Transaction B (Bob)
+
+    Note over Alice,Bob: Isolation: READ COMMITTED
+    Alice->>DB: BEGIN
+    Bob->>DB: BEGIN
+    Alice->>DB: SELECT balance WHERE id = 1
+    DB-->>Alice: Returns $1,000
+    Bob->>DB: UPDATE accounts SET balance = $500 WHERE id = 1
+    Bob->>DB: COMMIT
+    Alice->>DB: SELECT balance WHERE id = 1
+    DB-->>Alice: Returns $500 (Non-Repeatable Read!)
+    Alice->>DB: COMMIT
 ```
 
-> [!NOTE]
-> For physical lock implementations, Multi-Version Concurrency Control (MVCC), and Write-Ahead Logging (WAL) internals, see [04. Database Internals & Performance](04_database_internals_and_performance.md#4-transactions--concurrency-control).
+---
+
+### 5.5 Multi-Version Concurrency Control (MVCC) Internals
+
+Modern databases (PostgreSQL, MySQL InnoDB, Snowflake, Databricks) do not block readers with locks. They use **Multi-Version Concurrency Control (MVCC)**:
+- In PostgreSQL, every row (tuple) contains two internal transaction header columns: `xmin` (creating transaction ID) and `xmax` (deleting/updating transaction ID).
+- When an `UPDATE` executes, the engine does not overwrite the row in place; it appends a brand new row version with a new `xmin` and sets `xmax` on the old row.
+- Readers inspect their transaction snapshot ID to see only rows valid at the time their transaction began.
+- The `VACUUM` process reclaims physical disk space occupied by dead tuples once all active transactions that could read them have committed.
 
 ---
 
@@ -1122,48 +1206,26 @@ COMMIT;
 
 ---
 
-### 6.1 Materialized Views & Query Rewrite Engines
+### 6.1 Materialized Views, Query Rewrite Engines & Incremental Refresh
 
-Unlike standard views that execute their query definition dynamically, a **Materialized View** precomputes the query result and persists it to physical disk.
-
-```mermaid
-flowchart LR
-    UserQ["User Query:<br/>SELECT SUM(amount) FROM fact_orders<br/>WHERE year = 2024"] --> CBO["Optimizer Query Rewrite Engine"]
-    CBO -->|Detects Precomputed Materialized View| FastPath["Direct Scan of mv_yearly_order_summary<br/>(Reads 1 page instead of 100M rows!)"]
-    FastPath --> Res["Instant Output (< 5ms)"]
-
-    style UserQ fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style CBO fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style FastPath fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Res fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-```
+Unlike standard views which re-run queries dynamically, a **Materialized View** precomputes the result set and writes it to disk. Modern database optimizers feature **Query Rewrite Engines**: if a user queries the raw fact table, the optimizer intercepts the query and reads the materialized view automatically!
 
 ```sql
--- PostgreSQL syntax for materialized views
-CREATE MATERIALIZED VIEW reporting.mv_daily_sales_by_store
-TABLESPACE fast_ssd_storage
-AS
-SELECT 
-    store_id,
-    order_date,
-    COUNT(order_id)       AS total_orders,
-    SUM(order_amount)     AS gross_revenue
+-- PostgreSQL Materialized View with Concurrent Refresh
+CREATE MATERIALIZED VIEW reporting.mv_daily_store_revenue AS
+SELECT store_id, order_date, SUM(amount) AS gross_sales
 FROM sales.orders
-GROUP BY store_id, order_date
-WITH DATA;                                                   -- Populate immediately upon creation
+GROUP BY store_id, order_date;
 
--- Create an index directly on the materialized view
-CREATE UNIQUE INDEX idx_mv_store_date ON reporting.mv_daily_sales_by_store (store_id, order_date);
-
--- Fast non-blocking incremental/concurrent refresh
-REFRESH MATERIALIZED VIEW CONCURRENTLY reporting.mv_daily_sales_by_store;
+CREATE UNIQUE INDEX idx_mv_store ON reporting.mv_daily_store_revenue (store_id, order_date);
+REFRESH MATERIALIZED VIEW CONCURRENTLY reporting.mv_daily_store_revenue;
 ```
 
 ---
 
 ### 6.2 Stored Procedures & Transactional Orchestration
 
-Stored procedures combine SQL with procedural constructs (loops, conditionals, exception handling) and support explicit transaction control (`COMMIT` and `ROLLBACK`).
+Stored procedures support procedural control flow (loops, exception blocks) and **explicit multi-statement transaction control** (`COMMIT` / `ROLLBACK`).
 
 ```sql
 -- PL/pgSQL Stored Procedure managing partition archiving and automated maintenance
@@ -1197,81 +1259,49 @@ BEGIN
     COMMIT;
 END;
 $$;
-
--- Invocation:
-CALL maintenance.sp_archive_monthly_partitions(12, NULL);
 ```
 
 ---
 
-### 6.3 User-Defined Functions (UDFs: Scalar, Table-Valued, Vectorized)
+### 6.3 User-Defined Functions (UDFs): Scalar, Table-Valued & Vectorized PyArrow
 
-#### Function Volatility Classifications (PostgreSQL / Snowflake)
-- `IMMUTABLE`: Given identical arguments, always returns identical results. Can be precomputed and used in index expressions.
-- `STABLE`: Result does not change within a single table scan (e.g., depends on `CURRENT_TIMESTAMP`).
-- `VOLATILE`: Result changes on every evaluation (e.g., `RANDOM()`, `UUID_GENERATE_V4()`).
-
-```sql
--- 1. High-Performance Deterministic Scalar UDF
-CREATE OR REPLACE FUNCTION finance.fn_calculate_compound_growth(
-    principal NUMERIC(12, 2),
-    annual_rate NUMERIC(5, 4),
-    years INT
-)
-RETURNS NUMERIC(12, 2)
-LANGUAGE sql
-IMMUTABLE                                                    -- Informs optimizer the function is pure/deterministic
-AS $$
-    SELECT ROUND(principal * POWER((1.0 + annual_rate), years), 2);
-$$;
-
--- 2. Table-Valued Function (TVF) returning tabular records
-CREATE OR REPLACE FUNCTION catalog.fn_get_category_hierarchy(root_cat_id INT)
-RETURNS TABLE (category_id INT, category_name VARCHAR(100), depth INT)
-LANGUAGE sql
-STABLE
-AS $$
-    WITH RECURSIVE cat_tree AS (
-        SELECT category_id, category_name, 1 AS depth
-        FROM catalog.categories WHERE category_id = root_cat_id
-        UNION ALL
-        SELECT c.category_id, c.category_name, ct.depth + 1
-        FROM catalog.categories c
-        JOIN cat_tree ct ON c.parent_category_id = ct.category_id
-    )
-    SELECT * FROM cat_tree;
-$$;
-
--- Calling the table-valued function directly in FROM clause
-SELECT * FROM catalog.fn_get_category_hierarchy(501);
-```
+- **Scalar UDF Volatility:**
+  - `IMMUTABLE`: Pure function; deterministic; optimizer can inline or precompute.
+  - `STABLE`: Result constant within single table scan (e.g., depends on `CURRENT_DATE`).
+  - `VOLATILE`: Recomputed on every single row (e.g., `RANDOM()`).
 
 > [!WARNING]
-> **Scalar UDF Row-by-Row Bottleneck:**
-> Invoking non-inlined scalar UDFs in a `SELECT` across millions of rows prevents vectorized execution and runs row-by-row (RBAR - Row By Agonizing Row). Where possible, write inline SQL expressions or utilize Vectorized Pandas/PySpark UDFs. For Python and PySpark UDFs, see [03. Python for Data Engineering](03_python_for_data_engineering.md) and [08. Apache Spark & PySpark](08_apache_spark_pyspark.md).
+> **Scalar UDF Row-by-Row Bottleneck (RBAR):**
+> Calling a scalar UDF across 100 million rows disables SIMD vectorization and executes row-by-row in an interpreter, causing a 50x slowdown. Where possible, write inline SQL expressions or utilize Vectorized PyArrow UDFs.
 
 ---
 
-### 6.4 Temporary Views & Global Virtual Catalogs
+### 6.4 Temporary Views, Session Scopes & Global Virtual Catalogs
 
-Temporary views provide isolated virtual tables within a compute session without persisting schemas to an external metastore.
-
+Temporary views provide isolated virtual tables within a compute session (Spark / Databricks) without polluting global metastores:
 ```sql
--- Apache Spark / Databricks SQL syntax
--- Create session-scoped temporary view from raw bronze storage
-CREATE OR REPLACE TEMPORARY VIEW tv_filtered_clicks AS
-SELECT 
-    user_id,
-    page_url,
-    event_timestamp
-FROM bronze.clickstream_parquet
+-- Session-scoped temporary view in Databricks / Spark SQL
+CREATE OR REPLACE TEMPORARY VIEW tv_current_session_clicks AS
+SELECT user_id, event_type, event_timestamp
+FROM bronze.clickstream_raw
 WHERE event_timestamp >= CURRENT_DATE;
-
--- Create cluster-scoped Global Temporary View (visible across all sessions on the cluster)
-CREATE OR REPLACE GLOBAL TEMPORARY VIEW gtv_reference_lookup AS
-SELECT country_code, country_name, currency_symbol
-FROM reference.static_countries;
-
--- Querying global temp view requires the 'global_temp' system database qualifier
-SELECT * FROM global_temp.gtv_reference_lookup;
 ```
+
+---
+
+# 7. Production Engineering Summary & Key Takeaways
+
+- **Distributed Join Strategies & Skew Mitigation:** Broadcast Hash Joins eliminate network shuffle overhead but must strictly target tables under memory safety limits ($\le 100\text{ MB}$) to prevent executor OOM. For large-table joins where high-cardinality keys suffer extreme skew, apply salting techniques or adaptive query execution (AQE) skew handling, and pre-aggregate child records to parent grains to prevent metric duplication.
+- **Subquery Optimization & CTE Execution:** Negative membership checks must use `LEFT ANTI JOIN` or `NOT EXISTS` rather than `NOT IN` to prevent 3VL null-collapse failures. Recursive CTEs require cycle detection and recursion depth boundaries. When CTEs are referenced multiple times within a query, evaluate explicit `MATERIALIZED` hints to avoid redundant subquery re-evaluations.
+- **Window Analytic Integrity & Frame Scoping:** Running totals and cumulative aggregates must explicitly declare sliding frames (`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`) to prevent default range frame sorting penalties. Deterministic deduplication pipelines should favor `ROW_NUMBER()` over grouping hacks, leveraging modern `QUALIFY` clauses in engines like Snowflake, BigQuery, and Databricks to eliminate boilerplate subqueries.
+- **Transactional Safety & Concurrency Control:** `MERGE` / upsert operations require guaranteed uniqueness on target join keys to prevent non-deterministic updates and cardinal runtime errors. High-throughput mutation pipelines must enforce appropriate isolation levels to prevent phantom reads and serialization anomalies, while materialized views must feature unique indices to support concurrent, non-blocking refreshes.
+
+---
+
+# 8. References & Further Reading
+
+- [PostgreSQL Official Documentation: Advanced SQL Queries](https://www.postgresql.org/docs/current/tutorial-advanced.html)
+- [Databricks Documentation: SQL Language Reference](https://docs.databricks.com/en/sql/language-manual/index.html)
+- [Snowflake Documentation: Window Functions](https://docs.snowflake.com/en/sql-reference/functions-analytic)
+- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)
+- [Database Internals (Alex Petrov)](https://www.databass.dev/)

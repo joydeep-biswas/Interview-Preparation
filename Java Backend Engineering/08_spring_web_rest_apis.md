@@ -1,6 +1,6 @@
 # 08. Spring Web, REST APIs & API Development
 
-A comprehensive architectural and engineering guide covering Spring MVC, the Front Controller pattern (`DispatcherServlet`), RESTful API design principles, complete HTTP method taxonomy, API Idempotency architecture (`Idempotency-Key` specification, Redis locking, and payload hashing), JSON Patch vs JSON Merge Patch, CORS preflight mechanics, Spring web annotations, Data Transfer Objects (DTOs), Jakarta Bean Validation, pagination, OpenAPI specification, RFC 9457 Problem Details error handling, and cURL API diagnostic commands.
+A comprehensive, production-grade architectural and engineering guide covering Spring MVC, the Front Controller pattern (`DispatcherServlet`), HTTP/1.1 vs HTTP/2 vs HTTP/3 transport mechanics, RESTful API design principles, complete HTTP method taxonomy, API Idempotency architecture (`Idempotency-Key` specification, Redis locking, and payload SHA-256 hashing), JSON Patch vs JSON Merge Patch, CORS preflight handshakes, Spring web annotations, Data Transfer Objects (DTOs), Jakarta Bean Validation with validation groups, pagination with keyset/cursor pagination, declarative HTTP interfaces (`@HttpExchange`), OpenAPI 3 specification, RFC 9457 Problem Details error handling, gRPC Java implementations, and production troubleshooting playbooks.
 
 ---
 
@@ -51,62 +51,100 @@ flowchart TD
 ---
 
 ## Table of Contents
-1. [Spring MVC Architecture & Request Lifecycle](#1-spring-mvc-architecture-request-lifecycle)
-   - [1.1 The Front Controller Pattern & `DispatcherServlet`](#11-the-front-controller-pattern-dispatcherservlet)
+1. [Spring MVC Architecture & Request Processing Pipeline](#1-spring-mvc-architecture--request-processing-pipeline)
+   - [1.1 The Front Controller Pattern & `DispatcherServlet`](#11-the-front-controller-pattern--dispatcherservlet)
    - [1.2 End-to-End HTTP Request Lifecycle Sequence](#12-end-to-end-http-request-lifecycle-sequence)
+   - [1.3 `HandlerInterceptor` Lifecycle & ThreadLocal Context Cleanup](#13-handlerinterceptor-lifecycle--threadlocal-context-cleanup)
+   - [1.4 Custom `HandlerMethodArgumentResolver` Implementation](#14-custom-handlermethodargumentresolver-implementation)
+   - [1.5 `HttpMessageConverter` & Jackson Serialization Tuning](#15-httpmessageconverter--jackson-serialization-tuning)
+   - [1.6 Asynchronous HTTP Processing (`DeferredResult`, `CompletableFuture`, `SseEmitter`)](#16-asynchronous-http-processing-deferredresult-completablefuture-sseemitter)
 2. [HTTP Protocols, Methods Taxonomy & Safety vs Idempotence](#2-http-protocols-methods-taxonomy-safety-vs-idempotence)
    - [2.1 REST Architectural Constraints & Resource Modeling](#21-rest-architectural-constraints-resource-modeling)
-   - [2.2 Comprehensive HTTP Methods Taxonomy (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`)](#22-comprehensive-http-methods-taxonomy-get-post-put-patch-delete-options-head)
-   - [2.3 Deep-Dive: Safety vs Idempotence & The `DELETE` 404 Paradox](#23-deep-dive-safety-vs-idempotence-the-delete-404-paradox)
-   - [2.4 Partial Updates: JSON Merge Patch (RFC 7396) vs JSON Patch (RFC 6902)](#24-partial-updates-json-merge-patch-rfc-7396-vs-json-patch-rfc-6902)
-   - [2.5 `OPTIONS` Method & CORS Preflight Handshake Mechanics](#25-options-method-cors-preflight-handshake-mechanics)
-   - [2.6 HTTP Status Codes Reference Matrix](#26-http-status-codes-reference-matrix)
-   - [2.7 Content Negotiation (`Accept` & `Content-Type`)](#27-content-negotiation-accept-content-type)
+   - [2.2 Transport Protocol Evolution: HTTP/1.1 vs HTTP/2 vs HTTP/3 (QUIC)](#22-transport-protocol-evolution-http11-vs-http2-vs-http3-quic)
+   - [2.3 Comprehensive HTTP Methods Taxonomy (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`)](#23-comprehensive-http-methods-taxonomy-get-post-put-patch-delete-options-head)
+   - [2.4 Deep-Dive: Safety vs Idempotence & The `DELETE` 404 Paradox](#24-deep-dive-safety-vs-idempotence--the-delete-404-paradox)
+   - [2.5 Partial Updates: JSON Merge Patch (RFC 7396) vs JSON Patch (RFC 6902)](#25-partial-updates-json-merge-patch-rfc-7396-vs-json-patch-rfc-6902)
+   - [2.6 `OPTIONS` Method & CORS Preflight Handshake Mechanics](#26-options-method--cors-preflight-handshake-mechanics)
+   - [2.7 HTTP Status Codes Reference Matrix (2xx, 3xx, 4xx, 5xx)](#27-http-status-codes-reference-matrix-2xx-3xx-4xx-5xx)
+   - [2.8 Content Negotiation (`Accept` & `Content-Type`)](#28-content-negotiation-accept--content-type)
 3. [Production API Idempotency Architecture](#3-production-api-idempotency-architecture)
-   - [3.1 The Idempotency-Key Pattern & IETF Standard Specification](#31-the-idempotency-key-pattern-ietf-standard-specification)
+   - [3.1 The Idempotency-Key Pattern & IETF Standard Specification](#31-the-idempotency-key-pattern--ietf-standard-specification)
    - [3.2 Idempotency Lifecycle State Machine](#32-idempotency-lifecycle-state-machine)
-   - [3.3 Production Spring Boot Idempotency Filter with Redis & Payload SHA-256 Hashing](#33-production-spring-boot-idempotency-filter-with-redis-payload-sha-256-hashing)
-   - [3.4 Database-Level Idempotency Patterns (Unique Constraints, Conditional Updates, Upserts)](#34-database-level-idempotency-patterns-unique-constraints-conditional-updates-upserts)
+   - [3.3 Production Spring Boot Idempotency Filter with Redis & Payload SHA-256 Hashing](#33-production-spring-boot-idempotency-filter-with-redis--payload-sha-256-hashing)
+   - [3.4 Database-Level Idempotency Patterns (Unique Constraints, Conditional Updates, Upserts, Advisory Locks)](#34-database-level-idempotency-patterns-unique-constraints-conditional-updates-upserts-advisory-locks)
 4. [Spring MVC Web Annotations](#4-spring-mvc-web-annotations)
    - [4.1 Controller Stereotypes: `@Controller` vs `@RestController`](#41-controller-stereotypes-controller-vs-restcontroller)
-   - [4.2 Routing Mappings (`@GetMapping`, `@PostMapping`, etc.)](#42-routing-mappings-getmapping-postmapping-etc)
-   - [4.3 Extracting Input: `@PathVariable`, `@RequestParam`, `@RequestBody`](#43-extracting-input-pathvariable-requestparam-requestbody)
+   - [4.2 Routing Mappings (`@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`, `@PatchMapping`)](#42-routing-mappings-getmapping-postmapping-putmapping-deletemapping-patchmapping)
+   - [4.3 Extracting Input: `@PathVariable`, `@RequestParam`, `@RequestBody`, `@RequestHeader`, `@CookieValue`](#43-extracting-input-pathvariable-requestparam-requestbody-requestheader-cookievalue)
 5. [DTOs & Jakarta Bean Validation](#5-dtos-jakarta-bean-validation)
-   - [5.1 Entity vs DTO Separation of Concerns](#51-entity-vs-dto-separation-of-concerns)
-   - [5.2 Bean Validation Annotations (`@NotNull`, `@Size`, `@Email`)](#52-bean-validation-annotations-notnull-size-email)
-   - [5.3 `@Valid` vs `@Validated` & Group Validation](#53-valid-vs-validated-group-validation)
-   - [5.4 Custom Constraint Validators](#54-custom-constraint-validators)
-6. [Advanced API Capabilities](#6-advanced-api-capabilities)
-   - [6.1 Pagination, Sorting & Dynamic Filtering (`Pageable`)](#61-pagination-sorting-dynamic-filtering-pageable)
+   - [5.1 Entity vs DTO Separation of Concerns & Mass Assignment Defense](#51-entity-vs-dto-separation-of-concerns--mass-assignment-defense)
+   - [5.2 Bean Validation Annotations (`@NotNull`, `@NotBlank`, `@Size`, `@Pattern`)](#52-bean-validation-annotations-notnull-notblank-size-pattern)
+   - [5.3 `@Valid` vs `@Validated` & Group Validation (`OnCreate`, `OnUpdate`)](#53-valid-vs-validated--group-validation-oncreate-onupdate)
+   - [5.4 Custom Constraint Validators (e.g. ISO Country Code, Business Tax ID)](#54-custom-constraint-validators-eg-iso-country-code-business-tax-id)
+6. [Advanced API Capabilities & Modern Clients](#6-advanced-api-capabilities--modern-clients)
+   - [6.1 Pagination, Sorting & Cursor/Keyset Pagination](#61-pagination-sorting--cursorkeyset-pagination)
    - [6.2 API Versioning Strategies (URI, Header, Media Type)](#62-api-versioning-strategies-uri-header-media-type)
-   - [6.3 OpenAPI 3 / Swagger Documentation (SpringDoc)](#63-openapi-3-swagger-documentation-springdoc)
-   - [6.4 Cross-Origin Resource Sharing (CORS) Configuration](#64-cross-origin-resource-sharing-cors-configuration)
-7. [API Error Handling & Resilience](#7-api-error-handling-resilience)
+   - [6.3 OpenAPI 3 / Swagger Documentation (SpringDoc)](#63-openapi-3--swagger-documentation-springdoc)
+   - [6.4 Modern HTTP Clients: `RestClient`, `WebClient`, and Spring 6 `@HttpExchange`](#64-modern-http-clients-restclient-webclient-and-spring-6-httpexchange)
+   - [6.5 Cross-Origin Resource Sharing (CORS) Security Configuration](#65-cross-origin-resource-sharing-cors-security-configuration)
+7. [API Error Handling & Resilience](#7-api-error-handling--resilience)
    - [7.1 Centralized Exception Handling (`@RestControllerAdvice`)](#71-centralized-exception-handling-restcontrolleradvice)
    - [7.2 RFC 9457 Standard Problem Details](#72-rfc-9457-standard-problem-details)
    - [7.3 REST API Diagnostic cURL Commands Cheatsheet](#73-rest-api-diagnostic-curl-commands-cheatsheet)
-8. [API Communication Paradigms: REST vs RPC vs gRPC & Protocol Buffers](#8-api-communication-paradigms-rest-vs-rpc-vs-grpc-protocol-buffers)
+8. [API Communication Paradigms: REST vs RPC vs gRPC & Protocol Buffers](#8-api-communication-paradigms-rest-vs-rpc-vs-grpc--protocol-buffers)
    - [8.1 API Communication Paradigms (Resource-Oriented REST vs Action-Oriented RPC)](#81-api-communication-paradigms-resource-oriented-rest-vs-action-oriented-rpc)
-   - [8.2 gRPC Internals: HTTP/2 Transport & Binary Protocol Buffers](#82-grpc-internals-http2-transport-binary-protocol-buffers)
-   - [8.3 gRPC Communication Modes (Unary, Server, Client, Bidirectional Streaming)](#83-grpc-communication-modes)
-   - [8.4 Production gRPC Java Implementation (`.proto` Definition, ServiceBase, Stubs)](#84-production-grpc-java-implementation)
+   - [8.2 gRPC Internals: HTTP/2 Transport & Binary Protocol Buffers](#82-grpc-internals-http2-transport--binary-protocol-buffers)
+   - [8.3 gRPC Communication Modes (Unary, Server, Client, Bidirectional Streaming)](#83-grpc-communication-modes-unary-server-client-bidirectional-streaming)
+   - [8.4 Production gRPC Java Implementation (`.proto` Definition, ServiceBase, Stubs)](#84-production-grpc-java-implementation-proto-definition-servicebase-stubs)
    - [8.5 Comprehensive Evaluation: REST vs gRPC Architecture Comparison Matrix](#85-comprehensive-evaluation-rest-vs-grpc-architecture-comparison-matrix)
-9. [Summary Comparison & Engineering Reference Matrix](#9-summary-comparison-engineering-reference-matrix)
-10. [References & Further Reading](#10-references-further-reading)
+9. [Production Troubleshooting Playbook](#9-production-troubleshooting-playbook)
+10. [Summary Comparison & Engineering Reference Matrix](#10-summary-comparison--engineering-reference-matrix)
+11. [References & Further Reading](#11-references--further-reading)
 
 ---
 
-# 1. Spring MVC Architecture & Request Lifecycle
+# 1. Spring MVC Architecture & Request Processing Pipeline
 
 ---
 
 ### 1.1 The Front Controller Pattern & `DispatcherServlet`
 
-`DispatcherServlet` is the centralized HTTP entry point of Spring MVC. It orchestrates collaborating beans to process requests:
-1. **`HandlerMapping`**: Scans `@RequestMapping` annotations and URI templates to locate the matching controller method.
-2. **`HandlerAdapter`**: Adapts and invokes the controller method, using `HandlerMethodArgumentResolver` to extract parameters and trigger validation.
-3. **`HttpMessageConverter`**: Serializes and deserializes payloads (Jackson converting Java objects to/from JSON).
-4. **`HandlerExceptionResolver`**: Catches unhandled exceptions and routes them to `@RestControllerAdvice`.
+In early Java web applications (Servlets & JSPs), developers registered distinct `HttpServlet` classes for every URL route inside `web.xml`. This led to massive duplication of cross-cutting concerns: authentication, logging, request parsing, character encoding, and error routing had to be repeated across every servlet.
+
+Spring MVC implements the **Front Controller Architectural Pattern** via **`DispatcherServlet`**:
+* A single central servlet (`DispatcherServlet`) intercepts all incoming HTTP requests matching the servlet mapping (`/*`).
+* It coordinates a pipeline of specialized, modular components to route, parse, execute, validate, and serialize the request:
+
+```mermaid
+flowchart TD
+    Req["Incoming HTTP Request"] --> DS["DispatcherServlet (Central Front Controller)"]
+    
+    DS -->|1. Find Handler| HMap["HandlerMapping<br/>(RequestMappingHandlerMapping)"]
+    HMap -->|Returns HandlerExecutionChain| DS
+    
+    DS -->|2. Pre-process| Interceptors["HandlerInterceptors<br/>(preHandle() chain)"]
+    Interceptors -->|3. Execute Handler| HAdapter["HandlerAdapter<br/>(RequestMappingHandlerAdapter)"]
+    
+    HAdapter -->|4. Resolve Arguments| Resolvers["HandlerMethodArgumentResolver<br/>(@PathVariable, @RequestBody, @Valid)"]
+    Resolvers --> Ctrl["@RestController Method Execution"]
+    Ctrl -->|Returns Response Model| HAdapter
+    
+    HAdapter -->|5. Convert Payload| Conv["HttpMessageConverter<br/>(MappingJackson2HttpMessageConverter)"]
+    Conv -->|Returns Serialized Bytes| DS
+    
+    DS -->|6. Post-process & Completion| PostInterceptors["HandlerInterceptors<br/>(afterCompletion() chain)"]
+    PostInterceptors --> Resp["HTTP Response Stream (JSON 200/201/400)"]
+
+    style Req fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style DS fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style HMap fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Interceptors fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style HAdapter fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Resolvers fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style Ctrl fill:#0f172a,stroke:#ec4899,stroke-width:2px,color:#f472b6
+    style Conv fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
+    style Resp fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
 
 ---
 
@@ -116,23 +154,242 @@ flowchart TD
 %%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
-    actor Client as Client Browser / App
+    actor Client as HTTP Client
+    participant Filter as FilterChain (CORS, MDC)
     participant DS as DispatcherServlet
-    participant HM as HandlerMapping
-    participant HA as HandlerAdapter
-    participant CTRL as @RestController
-    participant HMC as HttpMessageConverter (Jackson)
+    participant HM as RequestMappingHandlerMapping
+    participant Interceptor as HandlerInterceptor
+    participant HA as RequestMappingHandlerAdapter
+    participant Resolver as HandlerMethodArgumentResolver
+    participant Controller as OrderRestController
+    participant Converter as JacksonHttpMessageConverter
 
-    Client->>DS: HTTP GET /api/v1/orders/101
-    DS->>HM: Locate handler for /api/v1/orders/101
-    HM-->>DS: Return HandlerExecutionChain (Controller + Interceptors)
-    DS->>HA: Dispatch request execution
-    HA->>CTRL: Invoke getOrder(id = 101)
-    CTRL-->>HA: Return OrderResponseDTO object
-    HA->>HMC: Serialize OrderResponseDTO to JSON
-    HMC-->>HA: Encoded JSON byte array
-    HA-->>DS: Request processing complete
-    DS-->>Client: HTTP 200 OK + JSON Payload
+    Client->>Filter: POST /api/v1/orders (JSON body)
+    Filter->>DS: doFilter(request, response)
+    DS->>HM: getHandler(request)
+    HM-->>DS: HandlerExecutionChain (OrderController + Interceptors)
+    
+    DS->>Interceptor: preHandle(request, response, handler)
+    Note over Interceptor: Auth checks, MDC logging setup
+    Interceptor-->>DS: true (proceed)
+    
+    DS->>HA: handle(request, response, handlerMethod)
+    HA->>Resolver: resolveArgument(CreateOrderRequest.class)
+    Resolver->>Converter: read(CreateOrderRequest.class, HTTP body)
+    Converter-->>Resolver: Java Object Instantiated & Validated
+    Resolver-->>HA: Injected CreateOrderRequest DTO
+    
+    HA->>Controller: createOrder(requestDto)
+    Note over Controller: Executes business logic & DB transactions
+    Controller-->>HA: return ResponseEntity.ok(orderResponseDto)
+    
+    HA->>Converter: write(orderResponseDto, application/json, response)
+    Converter-->>HA: JSON bytes written to ServletOutputStream
+    HA-->>DS: ModelAndView (null for @ResponseBody)
+    
+    DS->>Interceptor: afterCompletion(request, response, handler, ex)
+    Note over Interceptor: Clean up MDC & metrics
+    DS-->>Filter: Response committed
+    Filter-->>Client: HTTP 201 Created + JSON Body
+```
+
+---
+
+### 1.3 `HandlerInterceptor` Lifecycle & ThreadLocal Context Cleanup
+
+While Servlet `Filter` instances wrap the entire servlet invocation (before `DispatcherServlet` runs), `HandlerInterceptor` operates within the Spring context, giving you access to the specific Spring controller `HandlerMethod` that will execute:
+
+```mermaid
+flowchart TD
+    Pre["1. preHandle(): Returns boolean.<br/>Executes before controller. If false, halts execution immediately."]
+    --> Ctrl["Controller Method Execution"]
+    --> Post["2. postHandle(): Executes after controller returns, but BEFORE view rendering.<br/>(Skipped if exception thrown or @ResponseBody used)"]
+    --> After["3. afterCompletion(): ALWAYS executes in finally block.<br/>Critical for ThreadLocal & MDC clean-up!"]
+
+    style Pre fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Ctrl fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style Post fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style After fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+```
+
+#### Production Standard: Distributed Trace Logging & MDC Cleanup Interceptor
+```java
+@Component
+public class CorrelationIdInterceptor implements HandlerInterceptor {
+
+    private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+    private static final String MDC_KEY = "correlationId";
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = UUID.randomUUID().toString();
+        }
+        
+        // Populate SLF4J MDC (Mapped Diagnostic Context) stored in ThreadLocal
+        MDC.put(MDC_KEY, correlationId);
+        response.addHeader(CORRELATION_ID_HEADER, correlationId);
+        return true; // Continue processing chain
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, 
+                                Object handler, Exception ex) {
+        // ⚠️ CRITICAL STAFF RULE: Always clean up ThreadLocal in afterCompletion()!
+        // Tomcat threads are pooled. If MDC is not cleared, the next unrelated HTTP request
+        // handled by this pooled thread will inherit the previous user's correlation ID!
+        MDC.remove(MDC_KEY);
+    }
+}
+```
+
+Register the interceptor in Spring Web configuration:
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    private final CorrelationIdInterceptor correlationIdInterceptor;
+
+    public WebMvcConfig(CorrelationIdInterceptor correlationIdInterceptor) {
+        this.correlationIdInterceptor = correlationIdInterceptor;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(correlationIdInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns("/actuator/**", "/swagger-ui/**");
+    }
+}
+```
+
+---
+
+### 1.4 Custom `HandlerMethodArgumentResolver` Implementation
+
+Custom argument resolvers eliminate boilerplate code for extracting authenticated user context, tenant IDs, or device metadata:
+
+```java
+// 1. Define custom parameter annotation
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface CurrentUser {}
+
+// 2. Strongly-typed user context record
+public record AuthenticatedUser(String userId, String email, Set<String> roles) {}
+
+// 3. Implement HandlerMethodArgumentResolver
+@Component
+public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
+
+    @Override
+    public boolean supportsParameter(MethodParameter parameter) {
+        return parameter.hasParameterAnnotation(CurrentUser.class) 
+            && parameter.getParameterType().equals(AuthenticatedUser.class);
+    }
+
+    @Override
+    public Object resolveArgument(MethodParameter parameter,
+                                  ModelAndViewContainer mavContainer,
+                                  NativeWebRequest webRequest,
+                                  WebDataBinderFactory binderFactory) {
+        
+        // Extract JWT or SecurityContextHolder details
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
+
+        Jwt jwt = (Jwt) auth.getPrincipal();
+        return new AuthenticatedUser(
+                jwt.getSubject(),
+                jwt.getClaimAsString("email"),
+                new HashSet<>(jwt.getClaimAsStringList("roles"))
+        );
+    }
+}
+```
+
+Now, any controller method can seamlessly inject the current user without touching Spring Security APIs:
+```java
+@GetMapping("/api/v1/profile")
+public UserProfileResponse getProfile(@CurrentUser AuthenticatedUser user) {
+    return new UserProfileResponse(user.userId(), user.email());
+}
+```
+
+---
+
+### 1.5 `HttpMessageConverter` & Jackson Serialization Tuning
+
+Spring Boot configures `MappingJackson2HttpMessageConverter` as the default converter for `@ResponseBody` JSON serialization. In high-scale production systems, standard Jackson settings cause subtle date/time bugs, precision loss, and security risks.
+
+#### Production ObjectMapper Configuration:
+```java
+@Configuration
+public class JacksonConfig {
+
+    @Bean
+    @Primary
+    public ObjectMapper objectMapper() {
+        return JsonMapper.builder()
+                // 1. Support Java 8 Date and Time API (Instant, LocalDate, ZonedDateTime)
+                .addModule(new JavaTimeModule())
+                // 2. Prevent writing dates as timestamps ([2026, 10, 16]) -> write ISO-8601 strings
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                // 3. Tolerate unknown JSON fields sent by newer client versions without failing
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                // 4. Do NOT fail on empty beans
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                // 5. Exclude null fields from JSON output to save network bandwidth
+                .serializationInclusion(JsonInclude.Include.NON_NULL)
+                .build();
+    }
+}
+```
+
+---
+
+### 1.6 Asynchronous HTTP Processing (`DeferredResult`, `CompletableFuture`, `SseEmitter`)
+
+Standard Spring MVC request processing assigns one Tomcat worker thread per HTTP request. If a request blocks on a slow 5-second third-party service, that worker thread is trapped, leading to thread pool starvation under heavy load.
+
+#### 1. Non-Blocking CompletableFuture Controller
+```java
+@GetMapping("/api/v1/credit-score/{userId}")
+public CompletableFuture<CreditScoreResponse> getCreditScore(@PathVariable String userId) {
+    // Releases the Tomcat worker thread back to the pool immediately!
+    // The response is resumed on a dedicated Virtual Thread or async executor when ready.
+    return CompletableFuture.supplyAsync(() -> creditBureauClient.fetchScore(userId), asyncTaskExecutor);
+}
+```
+
+#### 2. Server-Sent Events (SSE) via `SseEmitter`
+SSE establishes a unidirectional persistent HTTP connection over which the server streams real-time updates (e.g. LLM token generation, live stock ticks):
+
+```java
+@GetMapping(value = "/api/v1/orders/{orderId}/tracking-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+public SseEmitter streamTrackingUpdates(@PathVariable String orderId) {
+    SseEmitter emitter = new SseEmitter(60_000L); // 60-second timeout
+
+    // Register async task to push updates
+    asyncTaskExecutor.execute(() -> {
+        try {
+            for (int i = 0; i < 5; i++) {
+                Thread.sleep(1000);
+                emitter.send(SseEmitter.event()
+                        .name("order-status")
+                        .data(new TrackingUpdate(orderId, "STEP_" + i, Instant.now())));
+            }
+            emitter.complete(); // Clean close
+        } catch (Exception ex) {
+            emitter.completeWithError(ex);
+        }
+    });
+
+    return emitter;
+}
 ```
 
 ---
@@ -143,23 +400,61 @@ sequenceDiagram
 
 ### 2.1 REST Architectural Constraints & Resource Modeling
 
-REST (Representational State Transfer) is governed by six foundational architectural constraints:
-1. **Client-Server Separation**: UI concerns separated from data storage.
-2. **Statelessness**: Every request contains all information needed to process it; zero session state stored on the server.
-3. **Cacheability**: Responses explicitly declare cacheability (`Cache-Control: max-age=3600`).
-4. **Uniform Interface**: Resource identification via URIs, manipulation via representations, self-descriptive messages, and HATEOAS.
-5. **Layered System**: Client cannot determine whether it is connected directly to the server or an intermediary proxy.
-6. **Code on Demand (Optional)**: Transferring executable scripts.
+REST (Representational State Transfer), formulated by Roy Fielding, is an architectural style defined by six core constraints:
+1. **Client-Server Separation**: Separation of concerns allows client UIs and backend persistence to evolve independently.
+2. **Statelessness**: Every request contains all necessary credentials and parameters; no conversational session state is stored on the server.
+3. **Cacheability**: Responses explicitly specify whether they can be cached via standard headers (`Cache-Control: max-age=3600, public`).
+4. **Uniform Interface**: Resources are addressed by consistent URIs (`/orders/{id}`), manipulated through representations (JSON DTOs), self-descriptive messages, and hypermedia (HATEOAS).
+5. **Layered System**: The client cannot tell whether it is communicating directly with the origin server or through an API Gateway, CDN, or load balancer.
+6. **Code-on-Demand (Optional)**: Transferring executable code (e.g. WebAssembly or JavaScript scripts).
 
 ---
 
-### 2.2 Comprehensive HTTP Methods Taxonomy (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`)
+### 2.2 Transport Protocol Evolution: HTTP/1.1 vs HTTP/2 vs HTTP/3 (QUIC)
+
+```mermaid
+flowchart TD
+    subgraph HTTP1 ["HTTP/1.1 (1997)"]
+        direction TB
+        H1["Text-Based Framing<br/>One active request per TCP socket<br/>Head-of-Line Blocking at HTTP layer<br/>Redundant uncompressed headers"]
+    end
+
+    subgraph HTTP2 ["HTTP/2 (2015)"]
+        direction TB
+        H2["Binary Framing (HEADERS & DATA frames)<br/>Multiplexing over Single TCP Connection<br/>HPACK Header Compression<br/>Server Push"]
+    end
+
+    subgraph HTTP3 ["HTTP/3 (2022)"]
+        direction TB
+        H3["QUIC Transport over UDP<br/>Zero Head-of-Line Blocking at TCP layer<br/>0-RTT Fast Connection Resumption<br/>Seamless IP Handover / Mobile Roaming"]
+    end
+
+    HTTP1 --> HTTP2
+    HTTP2 --> HTTP3
+
+    style HTTP1 fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style HTTP2 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style HTTP3 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+```
+
+| Dimension | HTTP/1.1 | HTTP/2 | HTTP/3 (QUIC) |
+| :--- | :--- | :--- | :--- |
+| **Transport Layer** | TCP | TCP | **UDP (QUIC)** |
+| **Wire Protocol** | Human-readable ASCII text | Binary frames | Binary packets |
+| **Connection Multiplexing** | No (Requires 6 parallel TCP connections) | **Yes** (Multiplexed streams over single TCP) | **Yes** (Independent streams over UDP) |
+| **Head-of-Line (HoL) Blocking** | Severe at application layer | Resolved at HTTP layer, **still exists at TCP packet loss level** | **Completely eliminated** (single lost packet affects only that stream) |
+| **Header Compression** | None (Redundant cookies sent every time) | **HPACK** (Sliding dictionary) | **QPACK** (Optimized for out-of-order UDP) |
+| **Connection Setup Latency** | 2–3 RTT (TCP + TLS 1.3 handshake) | 2–3 RTT | **0-RTT or 1-RTT (Integrated TLS 1.3)** |
+
+---
+
+### 2.3 Comprehensive HTTP Methods Taxonomy (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`)
 
 | HTTP Method | Purpose / Intent | Request Body? | Response Body? | Safe? | Idempotent? | Typical Status Codes |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
 | **`GET`** | Retrieve resource representation | No | **Yes** | **Yes** | **Yes** | `200 OK`, `304 Not Modified`, `404 Not Found` |
 | **`HEAD`** | Retrieve response headers only (no body) | No | **No** | **Yes** | **Yes** | `200 OK`, `304 Not Modified` |
-| **`POST`** | Create a new subordinate resource / trigger action | **Yes** | **Yes** | **No** | **No** | `201 Created` (`Location` header), `200 OK` |
+| **`POST`** | Create a subordinate resource / trigger action | **Yes** | **Yes** | **No** | **No** | `201 Created` (`Location` header), `200 OK` |
 | **`PUT`** | Completely replace resource / create at known URI | **Yes** | Optional | **No** | **Yes** | `200 OK`, `204 No Content` |
 | **`PATCH`**| Partially update specific fields of a resource | **Yes** | **Yes** | **No** | **Conditional**| `200 OK`, `204 No Content` |
 | **`DELETE`**| Permanently remove target resource | No | Optional | **No** | **Yes** | `200 OK`, `204 No Content`, `404 Not Found` |
@@ -168,38 +463,58 @@ REST (Representational State Transfer) is governed by six foundational architect
 
 ---
 
-### 2.3 Deep-Dive: Safety vs Idempotence & The `DELETE` 404 Paradox
+### 2.4 Deep-Dive: Safety vs Idempotence & The `DELETE` 404 Paradox
 
-#### 1. Safe vs Idempotent: What Is the Difference?
-- **Safe Methods ($f(x) \rightarrow \text{No State Mutation}$)**: Methods that **do not alter server resource state**. `GET` and `HEAD` are strictly read-only. Calling `GET /users` 1,000 times will never modify the database.
-- **Idempotent Methods ($f(f(x)) = f(x)$)**: Methods where **executing the operation once produces the exact same server state as executing it $N$ times consecutively**.
-  - **`PUT` is Idempotent**: `PUT /users/10 {'name': 'Alice'}` replaces user 10's name with 'Alice'. Repeating this call 50 times leaves user 10's name as 'Alice'—server state is identical.
-  - **`POST` is NOT Idempotent**: `POST /orders {'item': 'Book'}` creates a new order row each time. Calling it 5 times creates 5 distinct order records in the database with 5 distinct IDs!
+#### 1. Mathematical Definitions:
+* **Safe Methods ($f(x) \rightarrow \text{State Unmodified}$)**:
+  Methods that **never mutate resource state on the origin server**. `GET` and `HEAD` are strictly read-only. A client can execute `GET /orders/10` one million times without causing database side-effects.
+* **Idempotent Methods ($f(f(x)) = f(x)$)**:
+  Methods where **executing an operation once produces the exact same server resource state as executing it $N$ times consecutively**.
+
+```mermaid
+flowchart LR
+    subgraph NonIdempotent ["POST: Non-Idempotent"]
+        direction TB
+        P1["POST /orders (Book)"] --> DB1["Database: 1 Order"]
+        P2["Retry POST /orders (Book)"] --> DB2["Database: 2 Orders (DUPLICATE BILLING!)"]
+    end
+
+    subgraph Idempotent ["PUT: Strictly Idempotent"]
+        direction TB
+        U1["PUT /users/42 {name: 'Alice'}"] --> S1["Database: User 42 is Alice"]
+        U2["Retry PUT /users/42 {name: 'Alice'}"] --> S2["Database: User 42 is STILL Alice"]
+    end
+
+    style NonIdempotent fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style Idempotent fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+```
 
 #### 2. The `DELETE` 404 Paradox: Is `DELETE` Truly Idempotent?
 Consider this scenario:
-1. `DELETE /orders/101` $\rightarrow$ Server deletes order 101 and returns `204 No Content`.
-2. `DELETE /orders/101` (Retried) $\rightarrow$ Server cannot find order 101 and returns `404 Not Found`.
+1. Client sends `DELETE /orders/101` $\rightarrow$ Database deletes row, server returns `204 No Content`.
+2. Client retries `DELETE /orders/101` $\rightarrow$ Database row no longer exists, server returns `404 Not Found`.
 
 > [!IMPORTANT]
-> **Is `DELETE` still idempotent even though the response status code changed from 204 to 404?**
-> **YES!** Idempotence refers to **server resource state**, not the HTTP response status code. Before the first call, order 101 existed; after the first call, order 101 was deleted. After the second, third, and hundredth call, order 101 remains deleted. The server state has not changed.
+> **Is `DELETE` still idempotent even though the HTTP status code changed from 204 to 404?**
+> **YES!** Idempotency applies to **server resource state**, not HTTP response status codes.
+> - Prior to call 1: Order 101 existed.
+> - After call 1: Order 101 is deleted.
+> - After call 2, 3, and 100: Order 101 remains deleted.
+> The server's persistent state is completely identical after the first call and after subsequent calls.
 
 ---
 
-### 2.4 Partial Updates: JSON Merge Patch (RFC 7396) vs JSON Patch (RFC 6902)
+### 2.5 Partial Updates: JSON Merge Patch (RFC 7396) vs JSON Patch (RFC 6902)
 
-When updating a resource partially, `PUT` is improper because `PUT` requires replacing the **entire** object (fields omitted in a `PUT` are expected to be set to `null`). `PATCH` is the correct semantic tool:
-
-#### Comparison Matrix: RFC 7396 vs RFC 6902
+When modifying a subset of fields, `PUT` is semantically incorrect because `PUT` requires sending the **entire** object representation (omitted fields are assumed to be reset to `null`). `PATCH` is the standardized mechanism for partial updates:
 
 | Dimension | JSON Merge Patch (RFC 7396) | JSON Patch (RFC 6902) |
 | :--- | :--- | :--- |
-| **Content-Type** | `application/merge-patch+json` | `application/json-patch+json` |
+| **`Content-Type`** | `application/merge-patch+json` | `application/json-patch+json` |
 | **Payload Structure**| Partial JSON object matching target schema | Array of sequential operational instructions |
-| **Simplicity** | Extremely simple and human-readable | More complex; requires patch engine library |
-| **Field Deletion** | Sending `{"field": null}` deletes the field | Explicit operation: `{"op": "remove", "path": "/field"}` |
-| **Array Operations** | Replaces entire array; cannot append single item | Precise: `{"op": "add", "path": "/tags/1", "value": "java"}` |
+| **Complexity** | Extremely simple; intuitive for web/mobile developers | Higher complexity; requires patch processing engine |
+| **Null Semantics** | Sending `{"field": null}` deletes/nulls the field | Explicit operation: `{"op": "remove", "path": "/field"}` |
+| **Array Mutations** | Replaces the entire array; cannot append a single item | Surgical: `{"op": "add", "path": "/tags/1", "value": "java"}` |
 
 #### 1. JSON Merge Patch Example (RFC 7396)
 ```http
@@ -207,11 +522,11 @@ PATCH /api/v1/users/42 HTTP/1.1
 Content-Type: application/merge-patch+json
 
 {
-  "email": "new.email@company.com",
+  "email": "updated.email@enterprise.com",
   "phoneNumber": null
 }
 ```
-*(Updates email to `new.email@company.com` and sets `phoneNumber` to null/deletes it; leaves all other fields intact).*
+*(Updates email, removes phoneNumber, and leaves all other user attributes intact).*
 
 #### 2. JSON Patch Example (RFC 6902)
 ```http
@@ -219,17 +534,18 @@ PATCH /api/v1/orders/102 HTTP/1.1
 Content-Type: application/json-patch+json
 
 [
-  { "op": "replace", "path": "/status", "value": "SHIPPED" },
-  { "op": "add", "path": "/trackingNumbers/0", "value": "TRACK-998811" },
-  { "op": "remove", "path": "/internalNotes" }
+  { "op": "test", "path": "/status", "value": "PENDING" },
+  { "op": "replace", "path": "/status", "value": "APPROVED" },
+  { "op": "add", "path": "/trackingNumbers/0", "value": "FEDEX-889102" },
+  { "op": "remove", "path": "/temporaryHoldReason" }
 ]
 ```
 
 ---
 
-### 2.5 `OPTIONS` Method & CORS Preflight Handshake Mechanics
+### 2.6 `OPTIONS` Method & CORS Preflight Handshake Mechanics
 
-When a browser makes a cross-origin HTTP request (`https://frontend.com` calling `https://api.backend.com`) involving custom headers (`Authorization`, `Idempotency-Key`) or methods other than simple `GET`/`POST`, the browser **automatically pauses** and issues an `OPTIONS` **Preflight Request**:
+When a browser makes a cross-origin HTTP request (`https://dashboard.company.com` accessing `https://api.backend.com`) with non-simple headers (`Authorization`, `Idempotency-Key`) or methods other than `GET`/`POST`, the browser automatically executes an **`OPTIONS` Preflight Handshake**:
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
@@ -240,11 +556,11 @@ sequenceDiagram
 
     Note over Browser,API: 1. CORS Preflight Handshake (OPTIONS)
     Browser->>API: OPTIONS /api/v1/orders
-    Note over Browser: Headers:<br/>Origin: https://app.com<br/>Access-Control-Request-Method: POST<br/>Access-Control-Request-Headers: Authorization, Idempotency-Key
+    Note over Browser: Origin: https://app.com<br/>Access-Control-Request-Method: POST<br/>Access-Control-Request-Headers: Authorization, Idempotency-Key
     
-    API->>API: Evaluate CORS Filter Rules
+    API->>API: Match CORS Policy Filter
     API-->>Browser: HTTP 204 No Content
-    Note over API: Response Headers:<br/>Access-Control-Allow-Origin: https://app.com<br/>Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS<br/>Access-Control-Allow-Headers: Authorization, Idempotency-Key<br/>Access-Control-Max-Age: 3600 (Cache preflight for 1 hour!)
+    Note over API: Access-Control-Allow-Origin: https://app.com<br/>Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS<br/>Access-Control-Allow-Headers: Authorization, Idempotency-Key<br/>Access-Control-Max-Age: 3600 (Cache preflight for 1 hour!)
 
     Note over Browser,API: 2. Actual Business Request (POST)
     Browser->>API: POST /api/v1/orders (with Authorization & Idempotency-Key)
@@ -253,35 +569,47 @@ sequenceDiagram
 
 ---
 
-### 2.6 HTTP Status Codes Reference Matrix
+### 2.7 HTTP Status Codes Reference Matrix (2xx, 3xx, 4xx, 5xx)
 
 | Status Code | Reason Phrase | Semantic Meaning & Best Practice Usage |
 | :--- | :--- | :--- |
 | **`200 OK`** | Success | Request succeeded; response payload contains data. |
 | **`201 Created`** | Created | Resource created; includes `Location` header pointing to new resource URI. |
+| **`202 Accepted`** | Asynchronous | Request accepted for background processing; includes job status URL. |
 | **`204 No Content`** | No Content | Action succeeded; response body intentionally empty (common for `DELETE`). |
-| **`301 Moved Permanently`** | Redirection | Target resource moved permanently to URI specified in `Location`. |
-| **`304 Not Modified`** | Cached | Client's cached copy remains fresh (`ETag` matched). |
+| **`301 Moved Permanently`** | Redirect | Permanent redirect; client updates stored URLs to `Location`. |
+| **`304 Not Modified`** | Cached | Client's cached copy remains fresh (`ETag` or `If-Modified-Since` matched). |
 | **`400 Bad Request`** | Validation Error | Malformed JSON syntax or Bean Validation constraint failure. |
 | **`401 Unauthorized`** | Missing Auth | Missing or invalid authentication token. |
 | **`403 Forbidden`** | Access Denied | Authenticated, but lacking sufficient permissions or roles. |
 | **`404 Not Found`** | Missing Resource | Resource identified by URI does not exist. |
 | **`409 Conflict`** | State Collision | Database unique constraint violation or optimistic lock conflict. |
+| **`422 Unprocessable`** | Semantic Error | Syntactically valid JSON, but violates business validation rules. |
 | **`429 Too Many Requests`** | Rate Limited | Client exceeded rate limit; includes `Retry-After` header. |
 | **`500 Internal Error`** | Server Failure | Unhandled runtime exception inside application. |
-| **`502 Bad Gateway`** | Upstream Error | Upstream microservice or database returned invalid response. |
+| **`502 Bad Gateway`** | Upstream Error | Upstream microservice, database, or gateway returned invalid response. |
 | **`503 Unavailable`** | Maintenance/Overload| Server temporarily overloaded or undergoing graceful shutdown. |
+| **`504 Gateway Timeout`**| Network Timeout | Upstream service failed to respond within configured timeout window. |
 
 ---
 
-### 2.7 Content Negotiation (`Accept` & `Content-Type`)
+### 2.8 Content Negotiation (`Accept` & `Content-Type`)
 
-- `Content-Type`: Tells the server the media type of the payload being sent in the request body (`application/json`).
-- `Accept`: Tells the server what media type the client wants back in the response body.
+- `Content-Type`: Specifies the format of the data in the **request body** (`application/json`, `application/x-www-form-urlencoded`).
+- `Accept`: Informs the server what media format the **client expects in return** (`application/json`, `application/pdf`, `text/csv`).
 
 ```java
-@GetMapping(value = "/users/{id}", produces = {"application/json", "application/xml"})
-public UserResponseDTO getUser(@PathVariable Long id) { ... }
+@GetMapping(
+    value = "/api/v1/reports/{id}",
+    produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_PDF_VALUE}
+)
+public ResponseEntity<?> generateReport(@PathVariable String id, @RequestHeader(HttpHeaders.ACCEPT) String accept) {
+    if (accept.contains(MediaType.APPLICATION_PDF_VALUE)) {
+        byte[] pdfBytes = reportService.renderPdf(id);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).body(pdfBytes);
+    }
+    return ResponseEntity.ok(reportService.getJsonData(id));
+}
 ```
 
 ---
@@ -292,14 +620,15 @@ public UserResponseDTO getUser(@PathVariable Long id) { ... }
 
 ### 3.1 The Idempotency-Key Pattern & IETF Standard Specification
 
-In distributed networks, transient network timeouts (TCP drop, HTTP 504 Gateway Timeout) leave callers uncertain whether a mutating `POST` request was processed by the server:
-- If the client **does not retry**, the payment or order may never be executed.
-- If the client **retries naively**, the customer may be billed twice or duplicate orders may be created.
+In distributed microservices, transient network failures (dropped TCP connections, load balancer 504 timeouts) leave the client unsure whether a mutating `POST` request completed on the server:
+- If the client **does not retry**, a valid payment or order may never execute.
+- If the client **retries naively**, the customer may be charged multiple times or duplicate inventory may be reserved.
 
 The **`Idempotency-Key` specification (IETF Draft)** resolves this:
-1. The client generates a unique UUID (e.g. `Idempotency-Key: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d`) and attaches it as an HTTP header to mutating requests (`POST`).
-2. The server caches the response of the first execution under this key.
-3. If the client retries with the same key, the server **returns the cached original response immediately without re-executing business logic**.
+1. The client generates a unique UUID (e.g. `Idempotency-Key: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d`) and passes it in the header of mutating requests (`POST`).
+2. The server acquires a distributed lock in Redis for in-flight protection and hashes the request body.
+3. The server executes business logic and stores the resulting HTTP status and serialized response in Redis under the key.
+4. Any repeated request with the same key returns the cached response immediately, bypassing business re-execution.
 
 ---
 
@@ -390,7 +719,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        // Only enforce idempotency on mutating state methods (POST)
+        // Enforce idempotency checks only on mutating state methods (POST)
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
@@ -398,7 +727,6 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
         String idempotencyKey = request.getHeader(IDEMPOTENCY_HEADER);
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            // No idempotency key provided; proceed normally
             filterChain.doFilter(request, response);
             return;
         }
@@ -406,30 +734,29 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request);
         ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);
 
-        // Pre-read request body to calculate payload SHA-256 hash
+        // Read payload bytes to compute SHA-256 fingerprint
         byte[] body = wrappedRequest.getInputStream().readAllBytes();
         String currentPayloadHash = calculateSha256(body);
 
         String redisDataKey = "idempotency:data:" + idempotencyKey;
         String redisLockKey = "idempotency:lock:" + idempotencyKey;
 
-        // 1. Check if response is already cached from previous successful execution
+        // 1. Inspect if a previous execution completed successfully
         String cachedData = redisTemplate.opsForValue().get(redisDataKey);
         if (cachedData != null) {
-            // Format: "hash::status_code::response_body"
             String[] parts = cachedData.split("::", 3);
             String savedHash = parts[0];
             int savedStatus = Integer.parseInt(parts[1]);
             String savedBody = parts[2];
 
-            // Verify payload has not been tampered with under the same key
+            // Verify the client did not alter the payload with the same idempotency key
             if (!savedHash.equals(currentPayloadHash)) {
                 response.sendError(HttpStatus.UNPROCESSABLE_ENTITY.value(),
-                        "Idempotency key reused with different request payload");
+                        "Idempotency-Key was reused with a conflicting request payload");
                 return;
             }
 
-            // Return cached response immediately
+            // Return cached original response immediately
             response.setStatus(savedStatus);
             response.setContentType("application/json");
             response.addHeader("X-Cache-Lookup", "HIT-IDEMPOTENT");
@@ -437,19 +764,18 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Acquire atomic distributed lock for in-flight protection (SETNX with 30s TTL)
+        // 2. Atomic distributed lock acquisition for in-flight protection (SETNX with 30s TTL)
         Boolean lockAcquired = redisTemplate.opsForValue()
                 .setIfAbsent(redisLockKey, "IN_FLIGHT", Duration.ofSeconds(30));
 
         if (Boolean.FALSE.equals(lockAcquired)) {
-            // Concurrent in-flight request with same key already executing
             response.sendError(HttpStatus.CONFLICT.value(),
-                    "Concurrent request with same Idempotency-Key in progress");
+                    "Concurrent in-flight request with identical Idempotency-Key is actively processing");
             return;
         }
 
         try {
-            // 3. Execute downstream controller and service logic
+            // 3. Dispatch downstream to Spring MVC controller and service pipeline
             filterChain.doFilter(wrappedRequest, wrappedResponse);
 
             int status = wrappedResponse.getStatus();
@@ -462,11 +788,11 @@ public class IdempotencyFilter extends OncePerRequestFilter {
                 redisTemplate.opsForValue().set(redisDataKey, record, IDEMPOTENCY_TTL);
             }
 
-            // Copy response body back to original response stream
+            // Copy response bytes back to output stream so client receives them
             wrappedResponse.copyBodyToResponse();
 
         } finally {
-            // Always release in-flight lock
+            // Always release in-flight lock mutex
             redisTemplate.delete(redisLockKey);
         }
     }
@@ -477,7 +803,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             byte[] hash = digest.digest(data);
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm unavailable", e);
+            throw new RuntimeException("SHA-256 digest unavailable", e);
         }
     }
 }
@@ -485,34 +811,28 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
 ---
 
-### 3.4 Database-Level Idempotency Patterns (Unique Constraints, Conditional Updates, Upserts)
+### 3.4 Database-Level Idempotency Patterns (Unique Constraints, Conditional Updates, Upserts, Advisory Locks)
 
-In addition to API-level filters, backend databases should enforce structural idempotency:
+In addition to API filter caches, database layers must enforce structural idempotency:
 
-#### 1. Natural Unique Constraints
-Enforce unique database indexes on client-provided IDs:
+#### 1. Unique Constraints & Natural Keys
 ```sql
-ALTER TABLE payments ADD CONSTRAINT uk_payment_idempotency UNIQUE (idempotency_key);
+ALTER TABLE payments ADD CONSTRAINT uk_payment_idempotency_key UNIQUE (idempotency_key);
 ```
-If a duplicate request bypasses the cache, the second `INSERT` statement throws a unique constraint violation (`DataIntegrityViolationException`), which the application catches and translates into a clean idempotent response.
+If a duplicate request passes the cache, the second `INSERT` fails with a unique constraint violation, which Spring catches as `DataIntegrityViolationException`.
 
 #### 2. Conditional State Transitions
 ```sql
--- Idempotent: Executing multiple times changes status only once
+-- Safe to retry: state transitions from PENDING to CANCELLED only once
 UPDATE orders
 SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
 WHERE id = 101 AND status = 'PENDING';
 ```
 
-#### 3. Upsert (Insert on Conflict)
+#### 3. PostgreSQL Advisory Locks for Critical Resource Sections
 ```sql
--- PostgreSQL Upsert: Safe to retry indefinitely
-INSERT INTO user_preferences (user_id, dark_mode, email_notifications)
-VALUES (42, true, false)
-ON CONFLICT (user_id)
-DO UPDATE SET
-    dark_mode = EXCLUDED.dark_mode,
-    email_notifications = EXCLUDED.email_notifications;
+-- Acquire transaction-level application lock
+SELECT pg_advisory_xact_lock(hashtext('order_checkout_' || 'ORD-101'));
 ```
 
 ---
@@ -523,37 +843,66 @@ DO UPDATE SET
 
 ### 4.1 Controller Stereotypes: `@Controller` vs `@RestController`
 
-- **`@Controller`**: Standard Spring MVC stereotype returning a view name string resolved by a `ViewResolver` (Thymeleaf, JSP).
-- **`@RestController`**: Meta-annotation combining `@Controller` and `@ResponseBody`. Every method automatically writes return values directly to the HTTP response stream serialized via Jackson.
+- **`@Controller`**: Presentation layer stereotype. Controller methods return a view template name (e.g. `"index"`) resolved by a `ViewResolver` (Thymeleaf, FreeMarker) to render HTML.
+- **`@RestController`**: Meta-annotation combining `@Controller` and `@ResponseBody`. Informs `RequestMappingHandlerAdapter` that method return values serialize directly into the HTTP response stream via Jackson JSON converters.
 
 ---
 
-### 4.2 Routing Mappings (`@GetMapping`, `@PostMapping`, etc.)
+### 4.2 Routing Mappings (`@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`, `@PatchMapping`)
 
 ```java
 @RestController
 @RequestMapping("/api/v1/orders")
 public class OrderController {
 
+    private final OrderService orderService;
+
+    public OrderController(OrderService orderService) {
+        this.orderService = orderService;
+    }
+
     @GetMapping("/{id}")
-    public OrderResponse getOrder(@PathVariable Long id) { ... }
+    public OrderResponse getOrder(@PathVariable Long id) {
+        return orderService.findById(id);
+    }
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
         OrderResponse created = orderService.create(request);
         URI location = URI.create("/api/v1/orders/" + created.id());
-        return ResponseEntity.created(location).body(created);
+        return ResponseEntity.created(location).body(created); // Returns HTTP 201 Created + Location header
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<OrderResponse> replaceOrder(@PathVariable Long id, @Valid @RequestBody UpdateOrderRequest request) {
+        return ResponseEntity.ok(orderService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
+        orderService.delete(id);
+        return ResponseEntity.noContent().build(); // Returns HTTP 204 No Content
     }
 }
 ```
 
 ---
 
-### 4.3 Extracting Input: `@PathVariable`, `@RequestParam`, `@RequestBody`
+### 4.3 Extracting Input: `@PathVariable`, `@RequestParam`, `@RequestBody`, `@RequestHeader`, `@CookieValue`
 
-- **`@PathVariable`**: Extracts dynamic URI path segment values (`/orders/{id}`).
-- **`@RequestParam`**: Extracts query string parameters (`/orders?status=PENDING&page=1`).
-- **`@RequestBody`**: Deserializes the JSON HTTP request body into a strongly typed Java DTO record.
+```java
+@GetMapping("/search/{category}")
+public PageResponse<ProductDTO> search(
+        @PathVariable String category,                                    // Path segment: /search/electronics
+        @RequestParam(defaultValue = "0") int page,                       // Query param: ?page=0
+        @RequestParam(defaultValue = "20") int size,                      // Query param: &size=20
+        @RequestHeader("X-Tenant-Id") String tenantId,                    // HTTP header
+        @CookieValue(name = "sessionId", required = false) String session // Cookie
+) {
+    // Process search logic...
+    return PageResponse.empty();
+}
+```
 
 ---
 
@@ -561,85 +910,142 @@ public class OrderController {
 
 ---
 
-### 5.1 Entity vs DTO Separation of Concerns
+### 5.1 Entity vs DTO Separation of Concerns & Mass Assignment Defense
 
-Never expose JPA `@Entity` classes directly via REST controllers:
-1. **Prevents Mass Assignment Vulnerabilities**: Attackers cannot inject unauthorized fields (e.g. `isAdmin = true`).
-2. **Eliminates Infinite Recursion**: Prevents bidirectional JPA relationship loops during Jackson JSON serialization.
-3. **Decouples Database Schema**: The database schema can change without breaking client API contracts.
+> [!CAUTION]
+> Never expose JPA `@Entity` classes directly in REST API controller parameters or return types!
+
+#### Security & Architecture Rationale:
+1. **Prevents Mass Assignment Vulnerabilities (GitHub Incident)**: Attackers can craft malicious JSON payloads containing administrative fields (e.g. `{"isAdmin": true}`). If an `@Entity` is directly bound, Jackson binds the field, elevating privileges.
+2. **Eliminates Infinite Jackson Serialization Loops**: Bidirectional relationships (`@OneToMany` / `@ManyToOne`) cause Jackson to serialize circularly until `StackOverflowError` occurs.
+3. **Decouples API Contracts from Database Relational Schema**: Database tables can be renamed, split, or normalized without breaking external client API contracts.
 
 ---
 
-### 5.2 Bean Validation Annotations (`@NotNull`, `@Size`, `@Email`)
+### 5.2 Bean Validation Annotations (`@NotNull`, `@NotBlank`, `@Size`, `@Pattern`)
 
 ```java
 public record CreateUserRequest(
-    @NotBlank(message = "Username is required")
+    @NotBlank(message = "Username cannot be blank")
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     String username,
 
     @NotBlank(message = "Email is required")
-    @Email(message = "Must be a well-formed email address")
+    @Email(message = "Must be a syntactically valid email address")
     String email,
 
-    @Min(value = 18, message = "User must be at least 18 years old")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,}$", 
+             message = "Password must contain minimum 8 characters with at least one letter and one number")
+    String password,
+
+    @Min(value = 18, message = "Must be 18 or older")
+    @Max(value = 120, message = "Invalid age provided")
     int age
 ) {}
 ```
 
 ---
 
-### 5.3 `@Valid` vs `@Validated` & Group Validation
+### 5.3 `@Valid` vs `@Validated` & Group Validation (`OnCreate`, `OnUpdate`)
 
-- **`@Valid`**: Standard Jakarta EE annotation. Used on controller method parameters to trigger recursive validation of object graphs.
-- **`@Validated`**: Spring-specific annotation. Supports **Validation Groups** (applying different validation rules during creation vs update) and method-level parameter validation on Service beans.
-
----
-
-### 5.4 Custom Constraint Validators
+- **`@Valid`**: Standard Jakarta EE (`jakarta.validation.Valid`) annotation. Placed on controller method arguments to trigger cascade validation.
+- **`@Validated`**: Spring-specific (`org.springframework.validation.annotation.Validated`) annotation. Supports **Validation Groups**, enabling different validation constraints on creation vs update:
 
 ```java
-// 1. Define custom annotation
-@Target({ElementType.FIELD})
-@Retention(RetentionPolicy.RUNTIME)
-@Constraint(validatedBy = PhoneNumberValidator.class)
-public @interface ValidPhoneNumber {
-    String message() default "Invalid phone number format";
-    Class<?>[] groups() default {};
-    Class<? extends Payload>[] payload() default {};
-}
+// 1. Define marker interfaces for validation groups
+public interface OnCreate {}
+public interface OnUpdate {}
 
-// 2. Implement validator logic
-public class PhoneNumberValidator implements ConstraintValidator<ValidPhoneNumber, String> {
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+[1-9]\\d{1,14}$");
+// 2. Apply groups to DTO constraints
+public record UserDto(
+    @Null(groups = OnCreate.class, message = "ID must be null during user creation")
+    @NotNull(groups = OnUpdate.class, message = "ID is required during update")
+    Long id,
 
-    @Override
-    public boolean isValid(String value, ConstraintValidatorContext context) {
-        if (value == null) return false;
-        return PHONE_PATTERN.matcher(value).matches();
+    @NotBlank(groups = {OnCreate.class, OnUpdate.class})
+    String name,
+
+    @NotBlank(groups = OnCreate.class)
+    String temporaryPassword
+) {}
+
+// 3. Activate groups in Controller
+@RestController
+@RequestMapping("/api/v1/users")
+public class UserController {
+
+    @PostMapping
+    public ResponseEntity<?> createUser(@Validated(OnCreate.class) @RequestBody UserDto dto) {
+        // Enforces OnCreate rules
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateUser(@Validated(OnUpdate.class) @RequestBody UserDto dto) {
+        // Enforces OnUpdate rules
+        return ResponseEntity.ok().build();
     }
 }
 ```
 
 ---
 
-# 6. Advanced API Capabilities
-
----
-
-### 6.1 Pagination, Sorting & Dynamic Filtering (`Pageable`)
+### 5.4 Custom Constraint Validators (e.g. ISO Country Code, Business Tax ID)
 
 ```java
-@GetMapping("/api/v1/products")
-public Page<ProductDTO> listProducts(
-    @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-) {
-    return productRepository.findAll(pageable).map(ProductDTO::fromEntity);
+// 1. Declare Custom Annotation
+@Target({ElementType.FIELD, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = IsoCountryCodeValidator.class)
+@Documented
+public @interface ValidCountryCode {
+    String message() default "Invalid ISO-3166-1 alpha-2 country code";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+// 2. Implement ConstraintValidator
+public class IsoCountryCodeValidator implements ConstraintValidator<ValidCountryCode, String> {
+
+    private static final Set<String> ISO_COUNTRIES = Set.of(Locale.getISOCountries());
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        if (value == null) return true; // Let @NotNull handle null checks
+        return ISO_COUNTRIES.contains(value.toUpperCase());
+    }
 }
 ```
 
-Supports requests such as:
-`GET /api/v1/products?page=0&size=20&sort=price,desc&sort=name,asc`
+---
+
+# 6. Advanced API Capabilities & Modern Clients
+
+---
+
+### 6.1 Pagination, Sorting & Cursor/Keyset Pagination
+
+#### Offset Pagination (Standard Spring Data `Pageable`)
+```java
+@GetMapping("/api/v1/products")
+public Page<ProductResponse> getProducts(
+        @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+) {
+    return productRepository.findAll(pageable).map(ProductResponse::fromEntity);
+}
+```
+* **Performance Trap of Offset Pagination**: Executing `OFFSET 1000000 LIMIT 20` forces the database engine to scan and discard 1,000,000 index rows, causing extreme query degradation on deep pages.
+
+#### Production Solution: Keyset / Cursor Pagination
+Keyset pagination uses the last seen item ID and timestamp as a filter condition:
+```sql
+SELECT id, name, price, created_at 
+FROM products 
+WHERE (created_at, id) < ('2026-10-15 14:00:00', 'PROD-9981')
+ORDER BY created_at DESC, id DESC 
+LIMIT 20;
+```
+This query uses a composite index `(created_at, id)` to jump directly to the target leaf node in $O(\log N)$ time, achieving constant latency regardless of page depth.
 
 ---
 
@@ -647,31 +1053,82 @@ Supports requests such as:
 
 | Strategy | Syntax Example | Pros | Cons |
 | :--- | :--- | :--- | :--- |
-| **URI Path** | `/api/v1/orders` vs `/api/v2/orders` | Clear, bookmarkable, easy routing | Clutters URI namespace |
-| **Custom Header** | `X-API-Version: 2` | Clean URIs | Harder to test in browsers directly |
-| **Media Type (Accept)**| `Accept: application/vnd.company.v2+json` | Pure RESTful content negotiation | Complex client configuration |
+| **URI Path** | `/api/v1/orders` vs `/api/v2/orders` | Explicit, easy to route in API gateways | Breaks strict URI resource identity |
+| **Custom Header** | `X-API-Version: 2` | Clean URIs; preserves resource identity | Cannot test easily via standard browser address bar |
+| **Media Type (Accept)**| `Accept: application/vnd.company.v2+json` | Purest RESTful HATEOAS representation | High client configuration complexity |
 
 ---
 
 ### 6.3 OpenAPI 3 / Swagger Documentation (SpringDoc)
 
-Add dependency `springdoc-openapi-starter-webmvc-ui` to automatically expose interactive Swagger UI at `/swagger-ui.html` and the raw OpenAPI 3 JSON specification at `/v3/api-docs`.
+Add the `springdoc-openapi-starter-webmvc-ui` dependency to automatically expose OpenAPI 3 specs:
+* **Interactive UI**: `http://localhost:8080/swagger-ui.html`
+* **Raw JSON Spec**: `http://localhost:8080/v3/api-docs`
+
+```java
+@Operation(summary = "Create an order", description = "Creates a new customer order with idempotency protection")
+@ApiResponses(value = {
+    @ApiResponse(responseCode = "201", description = "Order created successfully"),
+    @ApiResponse(responseCode = "400", description = "Validation constraint failure"),
+    @ApiResponse(responseCode = "409", description = "Concurrent in-flight duplicate request")
+})
+@PostMapping("/api/v1/orders")
+public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest req) { ... }
+```
 
 ---
 
-### 6.4 Cross-Origin Resource Sharing (CORS) Configuration
+### 6.4 Modern HTTP Clients: `RestClient`, `WebClient`, and Spring 6 `@HttpExchange`
+
+Spring 6 / Spring Boot 3 introduces **`RestClient`** (a synchronous, fluent HTTP client) and declarative **HTTP Interfaces (`@HttpExchange`)**:
+
+```java
+// 1. Declare declarative HTTP interface
+public interface PaymentClient {
+    @PostExchange("/charges")
+    ChargeResponse executeCharge(@RequestBody ChargeRequest request);
+
+    @GetExchange("/charges/{id}")
+    ChargeResponse getCharge(@PathVariable String id);
+}
+
+// 2. Configure HTTP Client Proxy
+@Configuration
+public class ClientConfig {
+
+    @Bean
+    public PaymentClient paymentClient(RestClient.Builder builder) {
+        RestClient restClient = builder
+                .baseUrl("https://api.stripe.com/v1")
+                .defaultHeader("Authorization", "Bearer sk_test_123")
+                .build();
+
+        HttpServiceProxyFactory factory = HttpServiceProxyFactory
+                .builderFor(RestClientAdapter.create(restClient))
+                .build();
+
+        return factory.createClient(PaymentClient.class);
+    }
+}
+```
+
+---
+
+### 6.5 Cross-Origin Resource Sharing (CORS) Security Configuration
 
 ```java
 @Configuration
-public class WebCorsConfig implements WebMvcConfigurer {
+public class SecurityCorsConfiguration implements WebMvcConfigurer {
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("https://portal.company.com")
+                .allowedOrigins("https://portal.enterprise.com", "https://checkout.enterprise.com")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
+                .allowedHeaders("Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-Id")
+                .exposedHeaders("X-Correlation-Id", "Location")
                 .allowCredentials(true)
-                .maxAge(3600);
+                .maxAge(3600); // Cache preflight response for 1 hour
     }
 }
 ```
@@ -684,13 +1141,13 @@ public class WebCorsConfig implements WebMvcConfigurer {
 
 ### 7.1 Centralized Exception Handling (`@RestControllerAdvice`)
 
-Intercepts unhandled controller exceptions globally, mapping them to uniform, standardized error representations.
+Centralized exception handlers intercept unhandled controller exceptions, preventing stack traces from leaking to clients and guaranteeing consistent error payloads across all endpoints.
 
 ---
 
 ### 7.2 RFC 9457 Standard Problem Details
 
-Spring Boot 3 natively implements **RFC 9457 (Problem Details for HTTP APIs)**:
+Spring Boot 3 natively supports **RFC 9457 (Problem Details for HTTP APIs)** via `ProblemDetail`:
 
 ```java
 package com.company.exception;
@@ -736,6 +1193,22 @@ public class GlobalExceptionHandler {
 }
 ```
 
+Sample RFC 9457 response returned to client:
+```json
+{
+  "type": "https://api.company.com/errors/validation-error",
+  "title": "Invalid Request Payload",
+  "status": 400,
+  "detail": "Validation failed",
+  "instance": "/api/v1/orders",
+  "invalidFields": {
+    "totalAmount": "must be greater than 0",
+    "customerEmail": "Must be a syntactically valid email address"
+  },
+  "timestamp": "2026-10-16T14:30:00Z"
+}
+```
+
 ---
 
 ### 7.3 REST API Diagnostic cURL Commands Cheatsheet
@@ -751,15 +1224,11 @@ public class GlobalExceptionHandler {
 
 ---
 
----
-
 # 8. API Communication Paradigms: REST vs RPC vs gRPC & Protocol Buffers
 
 ---
 
 ### 8.1 API Communication Paradigms (Resource-Oriented REST vs Action-Oriented RPC)
-
-Enterprise architectures utilize distinct architectural styles for distributed client-to-service and service-to-service communication:
 
 ```mermaid
 flowchart LR
@@ -778,52 +1247,20 @@ flowchart LR
 
     style REST_Paradigm fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style RPC_Paradigm fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-
-    style R_Client fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style R_Server fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Note1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style G_Client fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style G_Server fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Note2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
 ```
-
-- **REST (Representational State Transfer)**: Resource-centric (`/users`, `/orders/{id}`). Relies on standard HTTP semantics (`GET`, `POST`, `PUT`, `DELETE`). Ideal for public-facing APIs, web browsers, and third-party developer integrations.
-- **RPC (Remote Procedure Call)**: Action-centric (`orderService.processOrder(req)`). Abstracts network calls into local procedure invocations. Optimized for low-latency internal microservice communication.
 
 ---
 
 ### 8.2 gRPC Internals: HTTP/2 Transport & Binary Protocol Buffers
 
-gRPC (Google Remote Procedure Call) is an open-source, high-performance RPC framework that addresses key inefficiencies of REST over HTTP/1.1:
-
-#### 1. HTTP/2 Transport Capabilities
-- **Binary Framing**: Unlike HTTP/1.1's human-readable text protocols, HTTP/2 breaks communication into binary frames (`HEADERS`, `DATA`), making parsing exponentially faster with lower CPU overhead.
-- **Multiplexing over Single TCP Connection**: Multiple concurrent bidirectional requests and responses travel across a single TCP connection concurrently, eliminating HTTP/1.1 "Head-of-Line" (HoL) blocking and TCP socket exhaustion.
-- **HPACK Header Compression**: Compresses redundant headers (authorization tokens, user agents) across requests using a shared sliding compression window.
-
-#### 2. Protocol Buffers (Protobuf v3)
-Protocol Buffers is a language-neutral, platform-neutral binary serialization mechanism:
-- **Compact Byte Footprint**: Field names are omitted from the wire; fields are identified by compact integer tags (1, 2, 3), resulting in payloads **3x to 10x smaller than equivalent JSON**.
-- **Strong Typing & Contract Safety**: The `.proto` file serves as the single source of truth across polyglot microservice teams (Java, Go, Python, C++).
-
-```mermaid
-flowchart LR
-    Proto[".proto Contract Definition"] -->|protoc Compiler| JavaClasses["Generated Java Stubs & Message POJOs"]
-    Proto -->|protoc Compiler| GoClasses["Generated Go Client / Server Code"]
-    JavaClasses --> Runtime["gRPC Channel (HTTP/2 Multiplexed Binary Wire)"]
-    GoClasses --> Runtime
-
-    style Proto fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style JavaClasses fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style GoClasses fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style Runtime fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-```
+gRPC (Google Remote Procedure Call) utilizes **HTTP/2** as its underlying transport and **Protocol Buffers (Protobuf v3)** as its interface definition and serialization language:
+* **Binary Framing**: No text parsing overhead. Payloads are compact binary buffers.
+* **Tag-Based Encoding**: Field names are never sent over the wire; fields are mapped to compact integer tags (1, 2, 3).
+* **Strict Interface Contract**: The `.proto` file provides a single source of truth across polyglot microservice teams.
 
 ---
 
-### 8.3 gRPC Communication Modes
-
-gRPC supports four distinct communication patterns:
+### 8.3 gRPC Communication Modes (Unary, Server, Client, Bidirectional Streaming)
 
 ```mermaid
 flowchart LR
@@ -835,48 +1272,30 @@ flowchart LR
 
     subgraph Mode2["2. Server Streaming (1-to-Many)"]
         C2["Client"] -->|Single Request| S2["Server"]
-        S2 -->|Response Chunk 1| C2
-        S2 -->|Response Chunk 2| C2
-        S2 -->|Response Chunk N| C2
+        S2 -->|Stream Chunks| C2
     end
 
     subgraph Mode3["3. Client Streaming (Many-to-1)"]
-        C3["Client"] -->|Request Chunk 1| S3["Server"]
-        C3 -->|Request Chunk 2| S3
-        C3 -->|Request Chunk N| S3
+        C3["Client"] -->|Stream Chunks| S3["Server"]
         S3 -->|Single Aggregated Response| C3
     end
 
     subgraph Mode4["4. Bidirectional Streaming (Full-Duplex)"]
         direction LR
-        C4["Client"] <-->|Concurrent Asynchronous Stream| S4["Server"]
+        C4["Client"] <-->|Full Duplex Concurrent Stream| S4["Server"]
     end
 
     style Mode1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Mode2 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
     style Mode3 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style Mode4 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-
-    style C1 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style C2 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style S2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style C3 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style S3 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style C4 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style S4 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Mode4 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
 ```
-
-1. **Unary RPC**: Classic request-response (e.g., fetch order by ID).
-2. **Server Streaming**: Client sends one request; server streams back a sequence of messages (e.g., live stock quotes, IoT telemetry logs, large file exports).
-3. **Client Streaming**: Client streams a sequence of messages to server; server replies with a single summary (e.g., continuous GPS location updates, chunked large file uploads).
-4. **Bidirectional Streaming**: Both client and server read and write independent streams concurrently over a single HTTP/2 connection (e.g., real-time multiplayer gaming, bidirectional chat, financial trading).
 
 ---
 
-### 8.4 Production gRPC Java Implementation
+### 8.4 Production gRPC Java Implementation (`.proto` Definition, ServiceBase, Stubs)
 
-#### 1. Protobuf Contract Definition (`order_service.proto`)
+#### 1. `.proto` Interface Definition (`order_service.proto`)
 ```protobuf
 syntax = "proto3";
 
@@ -886,7 +1305,6 @@ option java_multiple_files = true;
 option java_package = "com.company.orders.grpc";
 option java_outer_classname = "OrderProto";
 
-// Service Interface definition
 service OrderGrpcService {
     // Unary RPC
     rpc GetOrder (OrderRequest) returns (OrderResponse);
@@ -912,42 +1330,31 @@ message AuditLogEntry {
 }
 ```
 
-#### 2. Java gRPC Server Implementation
+#### 2. Java Server Implementation
 ```java
-package com.company.orders.grpc;
-
-import io.grpc.stub.StreamObserver;
-import net.devh.boot.grpc.server.service.GrpcService;
-import org.springframework.stereotype.Service;
-
-@GrpcService // Spring Boot gRPC Starter annotation
+@GrpcService
 public class OrderGrpcServiceImpl extends OrderGrpcServiceGrpc.OrderGrpcServiceImplBase {
 
     @Override
     public void getOrder(OrderRequest request, StreamObserver<OrderResponse> responseObserver) {
-        String orderId = request.getOrderId();
-
-        // Business Logic retrieval
         OrderResponse response = OrderResponse.newBuilder()
-                .setOrderId(orderId)
+                .setOrderId(request.getOrderId())
                 .setCustomerId("CUST-9901")
                 .setAmount(250.75)
                 .setStatus("CONFIRMED")
                 .build();
 
-        // Send response and complete invocation
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
     public void streamOrderAuditLogs(OrderRequest request, StreamObserver<AuditLogEntry> responseObserver) {
-        // Stream multiple entries back to the client
         for (int i = 1; i <= 3; i++) {
             AuditLogEntry log = AuditLogEntry.newBuilder()
                     .setEventId("EVT-" + i)
-                    .setTimestamp("2026-10-03T22:30:00Z")
-                    .setMessage("State transitioned to STEP_" + i)
+                    .setTimestamp(Instant.now().toString())
+                    .setMessage("Order transitioned to STEP_" + i)
                     .build();
             responseObserver.onNext(log);
         }
@@ -956,51 +1363,22 @@ public class OrderGrpcServiceImpl extends OrderGrpcServiceGrpc.OrderGrpcServiceI
 }
 ```
 
-#### 3. Java gRPC Client Implementation (Stubs)
-gRPC provides three client stub variants:
-- **`BlockingStub`**: Synchronous, blocking execution (simplest for standard threads).
-- **`Stub` (Async)**: Non-blocking, callback-based (`StreamObserver`).
-- **`FutureStub`**: Returns Google Guava `ListenableFuture` / `CompletableFuture`.
-
+#### 3. Java Client Implementation
 ```java
-package com.company.orders.client;
-
-import com.company.orders.grpc.*;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import org.springframework.stereotype.Service;
-
-import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
-
 @Service
 public class OrderGrpcClient {
 
-    private final ManagedChannel channel;
     private final OrderGrpcServiceGrpc.OrderGrpcServiceBlockingStub blockingStub;
 
     public OrderGrpcClient() {
-        // Create an HTTP/2 Channel with TLS (or plaintext for local dev)
-        this.channel = ManagedChannelBuilder.forAddress("order-service.internal", 9090)
-                .usePlaintext() // Production uses .useTransportSecurity() with mTLS
-                .keepAliveTime(30, TimeUnit.SECONDS)
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("order-service.internal", 9090)
+                .usePlaintext() // Production uses TLS / mTLS
                 .build();
         this.blockingStub = OrderGrpcServiceGrpc.newBlockingStub(channel);
     }
 
     public OrderResponse fetchOrder(String orderId) {
-        OrderRequest request = OrderRequest.newBuilder().setOrderId(orderId).build();
-        return blockingStub.getOrder(request);
-    }
-
-    public void printAuditLogs(String orderId) {
-        OrderRequest request = OrderRequest.newBuilder().setOrderId(orderId).build();
-        // Server streaming response returned as standard Java Iterator!
-        Iterator<AuditLogEntry> logIterator = blockingStub.streamOrderAuditLogs(request);
-        while (logIterator.hasNext()) {
-            AuditLogEntry entry = logIterator.next();
-            System.out.println("Received Log: " + entry.getMessage());
-        }
+        return blockingStub.getOrder(OrderRequest.newBuilder().setOrderId(orderId).build());
     }
 }
 ```
@@ -1023,7 +1401,46 @@ public class OrderGrpcClient {
 
 ---
 
-# 9. Summary Comparison & Engineering Reference Matrix
+# 9. Production Troubleshooting Playbook
+
+### Incident 1: Broken Browser CORS Preflight (`403 Forbidden` on `OPTIONS`)
+* **Symptom**: Web frontend throws `Access to XMLHttpRequest at '...' from origin '...' has been blocked by CORS policy: Response to preflight request doesn't pass access control check`.
+* **Root Cause**: Spring Security intercepts the `OPTIONS` preflight request and rejects it as unauthenticated before it reaches the CORS filter.
+* **Remedy**:
+  Ensure Spring Security explicitly permits all `OPTIONS` requests:
+  ```java
+  http.cors(Customizer.withDefaults())
+      .authorizeHttpRequests(auth -> auth
+          .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+          ...
+      );
+  ```
+
+### Incident 2: Infinite Jackson JSON Serialization (`StackOverflowError`)
+* **Symptom**: `GET /api/v1/departments/1` crashes with `java.lang.StackOverflowError` in `JacksonHttpMessageConverter`.
+* **Root Cause**: JPA entities with bidirectional relationships (`Department` $\leftrightarrow$ `Employee`) serializing each other indefinitely.
+* **Remedy**:
+  1. **Best Practice**: Map entities to DTO records before serialization.
+  2. If annotating entities directly: place `@JsonManagedReference` on the parent and `@JsonBackReference` on the child.
+
+### Incident 3: Connection Reset by Peer Under High Concurrency
+* **Symptom**: Upstream load balancers return `502 Bad Gateway` during peak traffic bursts.
+* **Root Cause**: Tomcat `accept-count` backlog queue is exceeded or keep-alive timeouts do not match load balancer idle timeouts.
+* **Remedy**:
+  Tune embedded server settings in `application.yml`:
+  ```yaml
+  server:
+    tomcat:
+      threads:
+        max: 400
+        min-spare: 50
+      accept-count: 200
+      connection-timeout: 20000ms
+  ```
+
+---
+
+# 10. Summary Comparison & Engineering Reference Matrix
 
 | HTTP Method / Protocol | Safety Guarantees | Idempotence Guarantees | Spring MVC Controller Idiom | Production Engineering Rule |
 | :--- | :---: | :---: | :--- | :--- |
@@ -1038,7 +1455,7 @@ public class OrderGrpcClient {
 
 ---
 
-# 10. References & Further Reading
+# 11. References & Further Reading
 
 - [RFC 9110: HTTP Semantics Specification](https://www.rfc-editor.org/rfc/rfc9110.html) — Authoritative HTTP standards.
 - [RFC 9457: Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html) — Standardized JSON machine-readable error bodies.

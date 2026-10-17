@@ -1,6 +1,6 @@
 # 13. Azure Data Engineering & DataOps DevOps
 
-A comprehensive production-grade guide to Microsoft Azure data platform services (ADLS Gen2, Data Factory, Synapse Analytics, Databricks, Event Hubs), enterprise cloud security and networking, and end-to-end DataOps engineering (Docker, Kubernetes, Terraform IaC, CI/CD automation, testing, and zero-downtime deployment strategies).
+A comprehensive, production-grade guide to Microsoft Azure data platform services (ADLS Gen2, Azure Data Factory, Synapse Analytics, Azure Databricks, Event Hubs, Stream Analytics, Cosmos DB, Key Vault, and Microsoft Fabric), enterprise cloud security and zero-trust networking (Entra ID, Managed Identities, Private Endpoints, Hub-and-Spoke VNets), and end-to-end DataOps engineering (Docker, Kubernetes, Terraform IaC, Azure DevOps CI/CD automation, pytest with Testcontainers, synthetic data generation, and blue-green zero-downtime deployments).
 
 ---
 
@@ -8,20 +8,29 @@ A comprehensive production-grade guide to Microsoft Azure data platform services
 
 ```mermaid
 flowchart TD
-    subgraph IngestionLayer ["Ingestion & Movement"]
-        ADF["Azure Data Factory (ADF)<br/>(Metadata-driven Copy Pipelines & Self-Hosted IR)"]
-        EventHub["Azure Event Hubs / IoT Hub<br/>(Real-time telemetry ingestion)"]
+    subgraph IngestionLayer ["1. Ingestion & Movement"]
+        ADF["Azure Data Factory (ADF)<br/>(Metadata-Driven Copy Pipelines, Self-Hosted Integration Runtime (SHIR), Tumbling Window Backfills)"]
+        EventHub["Azure Event Hubs / IoT Hub<br/>(Kafka Protocol Ingestion, Event Hubs Capture to Avro, Sub-Second Real-Time Feeds)"]
     end
-    subgraph StorageLayer ["Lakehouse Persistence"]
-        ADLS["Azure Data Lake Storage (ADLS Gen2)<br/>(Hierarchical Namespace: Bronze / Silver / Gold)"]
-        KeyVault["Azure Key Vault<br/>(Managed identities & encrypted secrets)"]
+
+    subgraph StorageLayer ["2. Data Lakehouse Persistence (ADLS Gen2)"]
+        ADLS["Azure Data Lake Storage Gen2 (HNS Enabled)<br/>(Bronze Container (Raw Landing / Append Log), Silver Container (Cleansed / Enriched Delta), Gold Container (Aggregated Star Schemas), POSIX ACLs + ABFSS Protocol)"]
+        KeyVault["Azure Key Vault<br/>(HSM-Backed Key Protection, Managed Identity Integration, Databricks Secret Scopes)"]
     end
-    subgraph ComputeLayer ["Analytics & Processing Engines"]
-        Databricks["Azure Databricks Lakehouse<br/>(Autoscaling clusters, Delta Lake & Unity Catalog)"]
-        Synapse["Azure Synapse Analytics<br/>(Serverless SQL pools & Dedicated DW)"]
+
+    subgraph ComputeLayer ["3. Analytics & Processing Engines"]
+        Databricks["Azure Databricks Lakehouse<br/>(VNet Injection & Autoscaling Clusters, Unity Catalog 3-Level Governance, Delta Lake Liquid Clustering & CDF)"]
+        Synapse["Azure Synapse Analytics<br/>(Dedicated SQL Pools (60 MPP Distributions), Serverless SQL (OPENROWSET over Lake), Synapse Spark & Lake Database)"]
+        Fabric["Microsoft Fabric (SaaS Analytics)<br/>(OneLake Multi-Cloud Open Storage, Direct Lake Mode in Power BI)"]
     end
-    subgraph DataOpsPlatform ["DataOps & Release Engineering"]
-        CICD["Terraform IaC & Azure DevOps CI/CD<br/>(Automated unit testing, linting & blue-green deploys)"]
+
+    subgraph SecurityLayer ["4. Zero-Trust Security & Cloud Networking"]
+        Entra["Microsoft Entra ID (Azure AD)<br/>(System & User Managed Identities, Azure RBAC Role Assignments)"]
+        PrivateLink["Azure Private Link & Private Endpoints<br/>(Hub-and-Spoke Virtual Network (VNet), Zero Public IP Ingress / Egress)"]
+    end
+
+    subgraph DataOpsPlatform ["5. DataOps & Release Engineering"]
+        CICD["Terraform IaC & Azure DevOps CI/CD<br/>(Terraform Remote State in Blob (Lease Locks), Multi-Stage Pipelines (Lint -> Test -> Staging -> Prod), Blue-Green Table/View Swaps & Shadow Testing)"]
     end
 
     ADF --> ADLS
@@ -30,19 +39,26 @@ flowchart TD
     KeyVault -.-> Databricks
     ADLS <--> Databricks
     ADLS <--> Synapse
-    CICD --> ADF
-    CICD --> Databricks
+    ADLS <--> Fabric
+    Entra -.-> ADF & Databricks & Synapse
+    PrivateLink -.-> ADLS & KeyVault & Databricks
+    CICD --> ADF & Databricks & Synapse
 
     style IngestionLayer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style StorageLayer fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style ComputeLayer fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style SecurityLayer fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
     style DataOpsPlatform fill:#0f172a,stroke:#ec4899,stroke-width:1.5px,color:#f472b6
+
     style ADF fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style EventHub fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style ADLS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style KeyVault fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style Databricks fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style Synapse fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Fabric fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Entra fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
+    style PrivateLink fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
     style CICD fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#fff
 ```
 
@@ -50,192 +66,217 @@ flowchart TD
 
 ## Table of Contents
 1. [End-to-End Enterprise Data Architecture on Microsoft Azure](#1-end-to-end-enterprise-data-architecture-on-microsoft-azure)
-   - [1.1 Architecture Blueprint & Security Fundamentals](#11-architecture-blueprint-security-fundamentals)
+   - [1.1 Enterprise Architecture Blueprint & Security Fundamentals](#11-enterprise-architecture-blueprint--security-fundamentals)
    - [1.2 Infrastructure as Code: Complete Terraform Deployment](#12-infrastructure-as-code-complete-terraform-deployment)
    - [1.3 Production PySpark Medallion Pipeline on Azure Databricks](#13-production-pyspark-medallion-pipeline-on-azure-databricks)
 2. [Core Azure Data Platform Services](#2-core-azure-data-platform-services)
    - [2.1 Enterprise Lakehouse Reference Architecture on Azure](#21-enterprise-lakehouse-reference-architecture-on-azure)
-   - [2.2 ADLS Gen2](#22-adls-gen2)
+   - [2.2 ADLS Gen2: Hierarchical Namespace (HNS) Internals & POSIX ACLs](#22-adls-gen2-hierarchical-namespace-hns-internals--posix-acls)
    - [2.3 Azure Data Factory (ADF) Overview](#23-azure-data-factory-adf-overview)
-   - [2.4 Azure Synapse Analytics](#24-azure-synapse-analytics)
-   - [2.5 Azure Databricks](#25-azure-databricks)
-   - [2.6 Azure Event Hubs](#26-azure-event-hubs)
-   - [2.7 Azure Stream Analytics](#27-azure-stream-analytics)
-   - [2.8 Azure SQL Database](#28-azure-sql-database)
-   - [2.9 Azure Cosmos DB](#29-azure-cosmos-db)
-   - [2.10 Azure Key Vault](#210-azure-key-vault)
-   - [2.11 Azure Monitor & Log Analytics](#211-azure-monitor-log-analytics)
+   - [2.4 Azure Synapse Analytics: Dedicated vs. Serverless SQL Pools](#24-azure-synapse-analytics-dedicated-vs-serverless-sql-pools)
+   - [2.5 Azure Databricks: Lakehouse, Unity Catalog & VNet Injection](#25-azure-databricks-lakehouse-unity-catalog--vnet-injection)
+   - [2.6 Azure Event Hubs: Real-Time Stream Ingestion & Capture](#26-azure-event-hubs-real-time-stream-ingestion--capture)
+   - [2.7 Azure Stream Analytics: Real-Time Windowing SQL](#27-azure-stream-analytics-real-time-windowing-sql)
+   - [2.8 Azure SQL Database & Hyperscale Architecture](#28-azure-sql-database--hyperscale-architecture)
+   - [2.9 Azure Cosmos DB: Multi-Model Distributed NoSQL](#29-azure-cosmos-db-multi-model-distributed-nosql)
+   - [2.10 Azure Key Vault & Hardware Security Modules (HSM)](#210-azure-key-vault--hardware-security-modules-hsm)
+   - [2.11 Azure Monitor, Log Analytics & KQL Queries](#211-azure-monitor-log-analytics--kql-queries)
+   - [2.12 Microsoft Fabric: Lakehouse vs. Warehouse Architecture & OneLake](#212-microsoft-fabric-lakehouse-vs-warehouse-architecture--onelake)
 3. [Identity, Security & Cloud Networking](#3-identity-security-cloud-networking)
-   - [3.1 Microsoft Entra ID (Azure AD)](#31-microsoft-entra-id-azure-ad)
-   - [3.2 Service Principals & App Registrations](#32-service-principals-app-registrations)
-   - [3.3 Managed Identities](#33-managed-identities)
-   - [3.4 Role-Based Access Control (RBAC)](#34-role-based-access-control-rbac)
-   - [3.5 Key Vault Secret Scopes Integration](#35-key-vault-secret-scopes-integration)
-   - [3.6 Virtual Networks (VNets) & Network Security Groups (NSGs)](#36-virtual-networks-vnets-network-security-groups-nsgs)
-   - [3.7 Private Endpoints & Azure Private Link](#37-private-endpoints-azure-private-link)
+   - [3.1 Microsoft Entra ID (Azure AD) Fundamentals](#31-microsoft-entra-id-azure-ad-fundamentals)
+   - [3.2 Service Principals & App Registrations](#32-service-principals--app-registrations)
+   - [3.3 Managed Identities: System-Assigned vs. User-Assigned](#33-managed-identities-system-assigned-vs-user-assigned)
+   - [3.4 Role-Based Access Control (Azure RBAC)](#34-role-based-access-control-azure-rbac)
+   - [3.5 Databricks Secret Scopes with Azure Key Vault](#35-databricks-secret-scopes-with-azure-key-vault)
+   - [3.6 Hub-and-Spoke VNets & Network Security Groups (NSGs)](#36-hub-and-spoke-vnets--network-security-groups-nsgs)
+   - [3.7 Private Endpoints & Azure Private Link](#37-private-endpoints--azure-private-link)
 4. [Azure Data Factory (ADF) Deep-Dive](#4-azure-data-factory-adf-deep-dive)
-   - [4.1 Pipelines, Activities & Control Flow](#41-pipelines-activities-control-flow)
-   - [4.2 Core Activities](#42-core-activities)
-   - [4.3 Mapping Data Flows](#43-mapping-data-flows)
-   - [4.4 Integration Runtimes (IR)](#44-integration-runtimes-ir)
-   - [4.5 Linked Services vs Datasets](#45-linked-services-vs-datasets)
-   - [4.6 Triggers](#46-triggers)
-   - [4.7 Parameters vs Variables](#47-parameters-vs-variables)
-   - [4.8 Monitoring & Alerts](#48-monitoring-alerts)
+   - [4.1 Pipelines, Activities & Control Flow Mechanics](#41-pipelines-activities--control-flow-mechanics)
+   - [4.2 Core Activities (Copy, Lookup, Get Metadata, ForEach)](#42-core-activities-copy-lookup-get-metadata-foreach)
+   - [4.3 Mapping Data Flows & Spark Execution Translation](#43-mapping-data-flows--spark-execution-translation)
+   - [4.4 Integration Runtimes (Azure IR vs. Self-Hosted IR vs. SSIS)](#44-integration-runtimes-azure-ir-vs-self-hosted-ir-vs-ssis)
+   - [4.5 Linked Services vs. Datasets](#45-linked-services-vs-datasets)
+   - [4.6 Triggers (Schedule vs. Tumbling Window vs. Storage Events)](#46-triggers-schedule-vs-tumbling-window-vs-storage-events)
+   - [4.7 Parameters vs. Variables (Dynamic Content Expressions)](#47-parameters-vs-variables-dynamic-content-expressions)
+   - [4.8 ADF Monitoring, Alerting & SLA Tracking](#48-adf-monitoring-alerting--sla-tracking)
 5. [Azure Synapse Analytics Deep-Dive](#5-azure-synapse-analytics-deep-dive)
-   - [5.1 Synapse Dedicated SQL Pools (MPP Architecture)](#51-synapse-dedicated-sql-pools-mpp-architecture)
-   - [5.2 Data Distribution Strategies](#52-data-distribution-strategies)
-   - [5.3 Synapse Serverless SQL Pools (OPENROWSET)](#53-synapse-serverless-sql-pools-openrowset)
-   - [5.4 Synapse Spark Pools](#54-synapse-spark-pools)
-   - [5.5 Synapse Pipelines](#55-synapse-pipelines)
-6. [DataOps, CI/CD & Version Control](#6-dataops-cicd-version-control)
+   - [5.1 Synapse Dedicated SQL Pools: Massively Parallel Processing (MPP)](#51-synapse-dedicated-sql-pools-massively-parallel-processing-mpp)
+   - [5.2 Data Distribution Strategies (Hash vs. Replicated vs. Round Robin)](#52-data-distribution-strategies-hash-vs-replicated-vs-round-robin)
+   - [5.3 Synapse Serverless SQL Pools (`OPENROWSET` over Data Lake)](#53-synapse-serverless-sql-pools-openrowset-over-data-lake)
+   - [5.4 Synapse Spark Pools & Lake Databases](#54-synapse-spark-pools--lake-databases)
+   - [5.5 Synapse Pipelines vs. Standalone ADF](#55-synapse-pipelines-vs-standalone-adf)
+6. [DataOps, CI/CD & Version Control](#6-dataops-cicd--version-control)
    - [6.1 The DataOps CI/CD Lifecycle](#61-the-dataops-cicd-lifecycle)
-   - [6.2 Git Branching Strategies](#62-git-branching-strategies)
-   - [6.3 Automated Pre-Commit Hooks](#63-automated-pre-commit-hooks)
+   - [6.2 Git Branching Strategies for Data Engineering](#62-git-branching-strategies-for-data-engineering)
+   - [6.3 Automated Pre-Commit Hooks (SQLFluff, Black, Gitleaks)](#63-automated-pre-commit-hooks-sqlfluff-black-gitleaks)
 7. [Containers & Cloud Infrastructure as Code](#7-containers-cloud-infrastructure-as-code)
-   - [7.1 Docker for Data Engineering](#71-docker-for-data-engineering)
-   - [7.2 Kubernetes for Data](#72-kubernetes-for-data)
-   - [7.3 Infrastructure as Code (Terraform)](#73-infrastructure-as-code-terraform)
-   - [7.4 Multi-Environment Promotion](#74-multi-environment-promotion)
-8. [Testing & Release Engineering for Data Pipelines](#8-testing-release-engineering-for-data-pipelines)
-   - [8.1 Unit Testing Transformation Logic with pytest](#81-unit-testing-transformation-logic-with-pytest)
-   - [8.2 Integration Testing with Testcontainers](#82-integration-testing-with-testcontainers)
-   - [8.3 End-to-End Pipeline Testing](#83-end-to-end-pipeline-testing)
-   - [8.4 Synthetic Test Data Generation with Faker](#84-synthetic-test-data-generation-with-faker)
-   - [8.5 Blue-Green Deployments for Data Pipelines](#85-blue-green-deployments-for-data-pipelines)
-   - [8.6 Canary Deployments & Shadow Pipelines](#86-canary-deployments-shadow-pipelines)
-9. [References & Further Reading](#9-references-further-reading)
+   - [7.1 Docker for Data Engineering: Multi-Stage Containerization](#71-docker-for-data-engineering-multi-stage-containerization)
+   - [7.2 Kubernetes for Data: Spark-on-K8s & Airflow KubernetesExecutor](#72-kubernetes-for-data-spark-on-k8s--airflow-kubernetesexecutor)
+   - [7.3 Infrastructure as Code: Terraform Architecture & State Locking](#73-infrastructure-as-code-terraform-architecture--state-locking)
+   - [7.4 Multi-Environment Promotion (`dev` $\rightarrow$ `stage` $\rightarrow$ `prod`)](#74-multi-environment-promotion-dev-rightarrow-stage-rightarrow-prod)
+8. [Testing & Release Engineering for Data Pipelines](#8-testing--release-engineering-for-data-pipelines)
+   - [8.1 Unit Testing Transformation Logic with `pytest`](#81-unit-testing-transformation-logic-with-pytest)
+   - [8.2 Integration Testing with Testcontainers & Azurite](#82-integration-testing-with-testcontainers--azurite)
+   - [8.3 End-to-End Pipeline Testing & Regression Baselines](#83-end-to-end-pipeline-testing--regression-baselines)
+   - [8.4 Synthetic Test Data Generation with `Faker`](#84-synthetic-test-data-generation-with-faker)
+   - [8.5 Blue-Green Deployments for Zero-Downtime Pipeline Releases](#85-blue-green-deployments-for-zero-downtime-pipeline-releases)
+   - [8.6 Canary Deployments & Shadow Pipelines](#86-canary-deployments--shadow-pipelines)
+9. [Azure Production Engineering Summary & Operational Governance](#9-azure-production-engineering-summary--operational-governance)
+10. [References & Further Reading](#10-references--further-reading)
 
 ---
 
 # 1. End-to-End Enterprise Data Architecture on Microsoft Azure
 
+---
+
+### 1.1 Enterprise Architecture Blueprint & Security Fundamentals
+
+In an enterprise Microsoft Azure data platform, isolation, governance, and zero-trust security are foundational requirements:
+
 ```mermaid
 flowchart TD
-    subgraph Ingestion_Layer["1. Ingestion & Streaming"]
-        Devices["IoT Devices / Apps"] -->|Kafka Protocol / AMQP| EH["Azure Event Hubs<br/>(Partitioned Event Streaming)"]
-        EH -->|Capture Feature| ADLS_Raw["ADLS Gen2: Bronze / Raw Container"]
-        EH -->|Stream Analytics / Databricks| Spark_Stream["Azure Databricks / Synapse Spark"]
+    subgraph HubNetwork ["Hub Virtual Network (10.0.0.0/16)"]
+        Firewall["Azure Firewall / NVA<br/>(Central Egress & Filtering)"]
+        Bastion["Azure Bastion / Jumpbox"]
+        PrivateDNS["Azure Private DNS Zones<br/>(privatelink.dfs.core.windows.net, privatelink.vaultcore.azure.net, privatelink.azuredatabricks.net)"]
     end
 
-    subgraph Storage_Layer["2. Data Lakehouse Storage (ADLS Gen2)"]
-        ADLS_Raw --> ADLS_Curated["ADLS Gen2: Silver & Gold Containers<br/>(HNS Enabled, ABFSS Protocol)"]
+    subgraph IngestionSpoke ["Spoke VNet: Ingestion & Movement (10.1.0.0/16)"]
+        ADF_IR["Azure Data Factory (ADF)<br/>Managed Virtual Network IR"]
+        SHIR_VM["Self-Hosted IR VM<br/>(Local On-Prem Connectivity)"]
     end
 
-    subgraph Batch_Orchestration["3. Orchestration & ETL"]
-        ADF["Azure Data Factory (ADF)<br/>(Pipelines, Integration Runtimes)"] -->|Triggers & Orchestrates| Spark_Stream
-        ADF -->|Copy Activity| ADLS_Raw
-        Spark_Stream -->|Writes Parquet/Delta| ADLS_Curated
+    subgraph ComputeSpoke ["Spoke VNet: Lakehouse Compute (10.2.0.0/16)"]
+        subgraph DatabricksVNetInjection ["Azure Databricks VNet Injection"]
+            DB_Public["Public Subnet (No Public IPs)"]
+            DB_Private["Private Subnet (Container Host)"]
+        end
     end
 
-    subgraph Serving_Layer["4. Analytics & Serving"]
-        ADLS_Curated --> Synapse_Serverless["Synapse Serverless SQL Pool<br/>(Ad-hoc Lake Queries)"]
-        ADLS_Curated --> Synapse_Dedicated["Synapse Dedicated SQL Pool<br/>(Enterprise Data Warehouse)"]
-        Synapse_Dedicated --> PBI["Power BI / Reporting Dashboards"]
+    subgraph PaaSServices ["Isolated Azure PaaS Services (Zero Public Internet Access)"]
+        ADLS_PaaS[("ADLS Gen2 Storage<br/>(Private Endpoint: 10.1.2.4)")]
+        AKV_PaaS[("Azure Key Vault<br/>(Private Endpoint: 10.1.2.5)")]
+        Synapse_PaaS[("Synapse Dedicated SQL<br/>(Private Endpoint: 10.1.2.6)")]
     end
 
-    subgraph Asynchronous_Messaging["5. Application Decoupling"]
-        App["Microservices / Web Apps"] -->|Commands & Transactions| SB["Azure Service Bus<br/>(Queues / Topics / Dead-lettering)"]
-        SB -->|Trigger| AF["Azure Functions (Serverless)<br/>(Event-Driven Processing)"]
-        AF -->|Write Metadata| SQ["Azure Storage Queues<br/>(Simple Background Backlog)"]
-    end
+    HubNetwork <-->|VNet Peering| IngestionSpoke
+    HubNetwork <-->|VNet Peering| ComputeSpoke
 
-    subgraph Security_Governance["6. Security, Identity & Networking"]
-        Entra["Microsoft Entra ID (RBAC)"] -.->|OAuth Tokens| ADF
-        Entra -.->|Managed Identity| AF
-        AKV["Azure Key Vault<br/>(Secrets & Keys)"] -.->|Secret Lookup| ADF
-        PE["Azure Private Endpoints & VNets"] -.->|Private Link Isolation| ADLS_Curated
-        Mon["Azure Monitor & Log Analytics"] -.->|Metrics & Alerts| ADF
-    end
+    ADF_IR -->|Private Link Connection| ADLS_PaaS
+    ADF_IR -->|Private Link Connection| AKV_PaaS
+    DB_Private -->|Private Link Connection| ADLS_PaaS
+    DB_Private -->|Private Link Connection| AKV_PaaS
+    DB_Private -->|Private Link Connection| Synapse_PaaS
 
-    style Ingestion_Layer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Storage_Layer fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
-    style Batch_Orchestration fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-    style Serving_Layer fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style Asynchronous_Messaging fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style Security_Governance fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
+    style HubNetwork fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style IngestionSpoke fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style ComputeSpoke fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style PaaSServices fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style DatabricksVNetInjection fill:#1e293b,stroke:#f59e0b,stroke-width:1px,stroke-dasharray: 4 4,color:#fff
 
-    style Devices fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style EH fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ADLS_Raw fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Spark_Stream fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style ADLS_Curated fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style ADF fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Synapse_Serverless fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Synapse_Dedicated fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style PBI fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style App fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style SB fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style AF fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style SQ fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Entra fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style AKV fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style PE fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style Mon fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
+    style Firewall fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Bastion fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style PrivateDNS fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ADF_IR fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style SHIR_VM fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style DB_Public fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style DB_Private fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style ADLS_PaaS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style AKV_PaaS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Synapse_PaaS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
-### 1.1 Architecture Blueprint & Security Fundamentals
-In an enterprise Azure data platform, isolation, governance, and zero-trust security are paramount:
-1. **Network Isolation (Hub-and-Spoke VNet Topology)**:
-   - **Hub VNet**: Hosts shared network appliances, Azure Firewall, ExpressRoute/VPN gateways, and Private DNS Zones.
-   - **Spoke VNets**: Segregate Data Ingestion (ADF, Event Hubs) and Compute (Azure Databricks with VNet injection).
-   - **Zero Public Access**: All public blob endpoints and workspace URLs are disabled. Communication flows strictly across **Azure Private Endpoints** using private IP addresses.
-2. **Identity & Secrets (Zero-Credential Management)**:
-   - Authentication relies entirely on **Microsoft Entra ID Managed Identities**. Pipelines never store plaintext connection strings or API keys in configuration files.
-   - Azure Key Vault stores third-party credentials and uses Azure Role-Based Access Control (RBAC) to grant read access only to authorized service principals.
-3. **Medallion Lakehouse with Delta Lake & Unity Catalog**:
-   - **Bronze**: Exact raw copy of transactional sources, partitioned by ingestion date.
-   - **Silver**: Cleansed, validated, conformed Delta tables with schema enforcement, deletion vectors, and SCD Type 2 tracking.
-   - **Gold**: Business-level aggregations and star schemas optimized for reporting and machine learning.
-   - **Unity Catalog**: Centralized governance over all data assets, row-level filtering, column-level masking, and end-to-end data lineage.
+#### Core Enterprise Security Principles
+1. **Network Isolation via Hub-and-Spoke Topology:**
+   - **Hub VNet:** Houses centralized network inspection appliances, Azure Firewall, ExpressRoute gateways connecting on-premises datacenters, and Azure Private DNS Zones.
+   - **Spoke VNets:** Workload-specific subnets (e.g., Ingestion Spoke for ADF, Analytics Spoke for Azure Databricks with VNet injection).
+   - **Zero Public Access:** Storage accounts, Key Vaults, and database instances have `public_network_access_enabled = false`. Ingress and egress occur exclusively via **Azure Private Endpoints** using private RFC 1918 IP addresses.
+2. **Zero-Credential Management (Managed Identities):**
+   - No plaintext passwords, database connection strings, or access tokens exist in pipeline source code or configuration files.
+   - Authentication across services is handled natively via **Microsoft Entra ID System-Assigned Managed Identities** and **User-Assigned Managed Identities**.
+   - Azure Key Vault stores external third-party API credentials, accessible only through Entra ID Role-Based Access Control (RBAC).
+3. **Medallion Lakehouse Governance with Unity Catalog:**
+   - **Bronze:** Append-only landing zone preserving 100% of raw source schema fidelity.
+   - **Silver:** Conformed, cleansed Delta Lake tables with schema enforcement, deletion vectors, and SCD Type 2 history.
+   - **Gold:** Curated, dimensional business marts (star schemas) optimized for Power BI and low-latency serving.
+   - **Unity Catalog:** Provides a unified 3-level namespace (`catalog.schema.table`), fine-grained Row-Level Security (RLS), dynamic Column-Level Masking (CLS), and automated audit lineage.
 
 ---
 
 ### 1.2 Infrastructure as Code: Complete Terraform Deployment
-The following production Terraform script provisions the core storage, networking private endpoints, and Key Vault:
+
+The following enterprise Terraform blueprint provisions a secure Resource Group, Spoke Virtual Network, Subnets, ADLS Gen2 Storage Account with Hierarchical Namespace (HNS), Private Endpoints, and an RBAC-governed Azure Key Vault:
 
 ```hcl
-# main.tf - Enterprise Azure Data Platform Infrastructure
+# main.tf - Enterprise Azure Data Platform Infrastructure as Code
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.80.0"
+      version = "~> 3.85.0"
     }
+  }
+  # Remote backend using Azure Blob Storage with Lease-Based State Locking
+  backend "azurerm" {
+    resource_group_name  = "rg-terraform-state"
+    storage_account_name = "sttfstateenterpriseprod"
+    container_name       = "tfstate"
+    key                  = "data-platform-prod.terraform.tfstate"
   }
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy    = false
+      recover_soft_deleted_key_vaults = true
+    }
+  }
 }
 
-# Resource Group
+# 1. Resource Group
 resource "azurerm_resource_group" "rg" {
   name     = "rg-enterprise-data-prod-eastus2"
   location = "East US 2"
   tags = {
     Environment = "Production"
-    Team        = "DataEngineering"
+    Team        = "DataPlatform"
     ManagedBy   = "Terraform"
   }
 }
 
-# Secure ADLS Gen2 Storage Account (Hierarchical Namespace Enabled)
+# 2. Spoke Virtual Network & Subnets
+resource "azurerm_virtual_network" "vnet" {
+  name                = "vnet-data-spoke-prod"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  address_space       = ["10.2.0.0/16"]
+}
+
+resource "azurerm_subnet" "snet_private_endpoints" {
+  name                 = "snet-private-endpoints"
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.2.1.0/24"]
+}
+
+# 3. Secure ADLS Gen2 Storage Account (HNS Enabled + Zero Public Access)
 resource "azurerm_storage_account" "adls" {
-  name                     = "stadlsprodeastus2"
-  resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
-  account_tier             = "Standard"
-  account_replication_type = "ZRS" # Zone-Redundant Storage
-  account_kind             = "StorageV2"
-  is_hns_enabled           = true  # Enables ADLS Gen2 Hierarchical Namespace
-  min_tls_version          = "TLS1_2"
-  public_network_access_enabled = false # Zero public IP access
+  name                          = "stadlsprodeastus2"
+  resource_group_name           = azurerm_resource_group.rg.name
+  location                      = azurerm_resource_group.rg.location
+  account_tier                  = "Standard"
+  account_replication_type      = "ZRS" # Zone-Redundant Storage
+  account_kind                  = "StorageV2"
+  is_hns_enabled                = true  # Enables ADLS Gen2 Hierarchical Namespace
+  min_tls_version               = "TLS1_2"
+  public_network_access_enabled  = false # Prohibits public internet traversal
 
   network_rules {
     default_action = "Deny"
-    bypass         = ["AzureServices"]
+    bypass         = ["AzureServices", "Logging", "Metrics"]
   }
 }
 
@@ -255,15 +296,32 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "gold" {
   storage_account_id = azurerm_storage_account.adls.id
 }
 
-# Azure Key Vault with RBAC
+# 4. Azure Key Vault with Azure RBAC Authorization
 resource "azurerm_key_vault" "kv" {
-  name                       = "kv-dataprod-eastus2-01"
-  location                   = azurerm_resource_group.rg.location
-  resource_group_name        = azurerm_resource_group.rg.name
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
-  sku_name                   = "standard"
-  enable_rbac_authorization = true
-  purge_protection_enabled   = true
+  name                          = "kv-dataprod-eastus2-01"
+  location                      = azurerm_resource_group.rg.location
+  resource_group_name           = azurerm_resource_group.rg.name
+  tenant_id                     = data.azurerm_client_config.current.tenant_id
+  sku_name                      = "standard"
+  enable_rbac_authorization    = true # Modern RBAC model (No legacy access policies)
+  purge_protection_enabled      = true
+  soft_delete_retention_days    = 90
+  public_network_access_enabled = false
+}
+
+# 5. Private Endpoint for ADLS Gen2 DFS Sub-Resource
+resource "azurerm_private_endpoint" "pe_adls_dfs" {
+  name                = "pe-adls-dfs-prod"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.snet_private_endpoints.id
+
+  private_service_connection {
+    name                           = "psc-adls-dfs"
+    private_connection_resource_id = azurerm_storage_account.adls.id
+    subresource_names              = ["dfs"]
+    is_manual_connection           = false
+  }
 }
 
 data "azurerm_client_config" "current" {}
@@ -272,43 +330,49 @@ data "azurerm_client_config" "current" {}
 ---
 
 ### 1.3 Production PySpark Medallion Pipeline on Azure Databricks
-The following production script runs on Azure Databricks with Unity Catalog, ingesting raw JSON from ADLS Gen2 Bronze, asserting data quality rules, and executing an idempotent ACID `MERGE` into Delta Silver:
+
+The following production script runs inside an Azure Databricks cluster governed by Unity Catalog. It reads raw JSON events from the ADLS Gen2 Bronze container using the secure ABFSS protocol, performs schema enforcement and quality filtering, and executes an idempotent ACID `MERGE` into Delta Silver:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, current_timestamp, to_date
+from pyspark.sql.functions import col, current_timestamp, to_date, sha2, concat_ws
 from delta.tables import DeltaTable
 
+# Initialize Spark session
 spark = SparkSession.builder.appName("AzureEnterpriseBronzeToSilver").getOrCreate()
 
-# Path configuration using ABFSS (Azure Blob File System Secure) driver
+# Path configuration using ABFSS driver (Azure Blob File System Secure)
 STORAGE_ACCOUNT = "stadlsprodeastus2"
-BRONZE_PATH = f"abfss://bronze@{STORAGE_ACCOUNT}.dfs.core.windows.net/raw_transactions/"
-SILVER_TABLE = "prod_catalog.silver_sales.transactions"
+BRONZE_URI = f"abfss://bronze@{STORAGE_ACCOUNT}.dfs.core.windows.net/raw_transactions/"
+SILVER_TABLE_NAME = "enterprise_prod.silver_sales.transactions"
 
-# 1. Read Raw Bronze Data
-df_raw = spark.read.format("json").load(BRONZE_PATH)
+# 1. Read Raw Streaming / Batch JSON Files from ADLS Gen2 Bronze
+df_raw = spark.read.format("json").load(BRONZE_URI)
 
-# 2. Transformation & Data Cleansing
+# 2. Defensive Data Cleansing & Deduplication
+# Generate deterministic row hash for duplicate payload detection
 df_cleansed = df_raw \
     .filter(col("transaction_id").isNotNull()) \
     .filter(col("amount") > 0.0) \
     .withColumn("amount", col("amount").cast("decimal(18,2)")) \
     .withColumn("event_date", to_date(col("event_timestamp"))) \
-    .withColumn("ingested_at", current_timestamp())
+    .withColumn("row_hash", sha2(concat_ws("||", col("transaction_id"), col("amount"), col("status")), 256)) \
+    .withColumn("_ingested_at", current_timestamp())
 
-# 3. Idempotent Upsert (MERGE) into Delta Silver Table
-delta_silver = DeltaTable.forName(spark, SILVER_TABLE)
+# 3. Idempotent ACID Upsert (MERGE) into Delta Silver Table
+delta_silver = DeltaTable.forName(spark, SILVER_TABLE_NAME)
 
 delta_silver.alias("target").merge(
     source=df_cleansed.alias("source"),
     condition="target.transaction_id = source.transaction_id AND target.event_date = source.event_date"
 ).whenMatchedUpdate(
+    condition="target.row_hash != source.row_hash",  # Only update if payload actually changed
     set={
         "amount": col("source.amount"),
         "customer_id": col("source.customer_id"),
         "status": col("source.status"),
-        "ingested_at": col("source.ingested_at")
+        "row_hash": col("source.row_hash"),
+        "_ingested_at": col("source._ingested_at")
     }
 ).whenNotMatchedInsert(
     values={
@@ -317,14 +381,13 @@ delta_silver.alias("target").merge(
         "amount": col("source.amount"),
         "status": col("source.status"),
         "event_date": col("source.event_date"),
-        "ingested_at": col("source.ingested_at")
+        "row_hash": col("source.row_hash"),
+        "_ingested_at": col("source._ingested_at")
     }
 ).execute()
 
-print(f"Successfully processed Bronze -> Silver for table: {SILVER_TABLE}")
+print(f"Successfully processed Bronze -> Silver for table: {SILVER_TABLE_NAME}")
 ```
-
----
 
 ---
 
@@ -334,138 +397,264 @@ print(f"Successfully processed Bronze -> Silver for table: {SILVER_TABLE}")
 
 ### 2.1 Enterprise Lakehouse Reference Architecture on Azure
 
+The modern enterprise Lakehouse on Azure unifies data warehouse governance with data lake scalability:
+
 ```mermaid
-flowchart TD
-    subgraph IngestionLayer ["Ingestion Sources"]
-        OnPrem[On-Premises SQL / SAP]
-        SaaS[Salesforce / REST APIs]
-        IoT[IoT Telemetry]
+flowchart LR
+    subgraph Sources ["Upstream Sources"]
+        DB[(OLTP RDBMS)]
+        APIs["REST SaaS APIs"]
+        Streaming["IoT / Clickstreams"]
     end
 
-    subgraph Orchestration ["Orchestration & Ingest"]
-        ADF["Azure Data Factory (SHIR for On-Prem)"]
-        EventHubs["Azure Event Hubs (Real-Time Ingest)"]
+    subgraph Ingestion ["Ingestion Tier"]
+        ADF["Azure Data Factory<br/>(Copy Activity / SHIR)"]
+        EventHub["Azure Event Hubs<br/>(Partitioned Log)"]
+        DB & APIs --> ADF
+        Streaming --> EventHub
     end
 
-    subgraph StorageLayer ["Data Lakehouse Medallion (ADLS Gen2)"]
-        Bronze["Bronze (Raw Ingest)"] --> Silver["Silver (Curated Delta)"] --> Gold["Gold (Business Marts)"]
+    subgraph MedallionStorage ["ADLS Gen2 Storage (Delta Lake Format)"]
+        Bronze[("Bronze Container<br/>(Raw Append)")]
+        Silver[("Silver Container<br/>(Cleaned / Filtered)")]
+        Gold[("Gold Container<br/>(Aggregated Marts)")]
+        ADF --> Bronze
+        EventHub --> Bronze
+        Bronze --> Silver --> Gold
     end
 
-    subgraph ComputeLayer ["Processing & Transformation Engines"]
-        Databricks["Azure Databricks (Spark / Delta)"]
-        SynapseDedicated["Synapse Dedicated SQL (MPP EDW)"]
-        SynapseServerless["Synapse Serverless SQL (Ad-Hoc)"]
+    subgraph ServingTier ["Analytics & Serving Tier"]
+        Synapse["Synapse Dedicated SQL<br/>(MPP DWUs)"]
+        Serverless["Synapse Serverless SQL<br/>(Ad-hoc OPENROWSET)"]
+        PBI["Power BI<br/>(Direct Lake Mode)"]
+        Cosmos[("Cosmos DB<br/>(Operational Apps)")]
+        
+        Gold --> Synapse --> PBI
+        Gold --> Serverless --> PBI
+        Gold --> Cosmos
     end
 
-    subgraph ConsumptionLayer ["Consumption & Serving"]
-        PowerBI[Power BI Reports]
-        Cosmos["Cosmos DB (Low-Latency Apps)"]
-    end
+    style Sources fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Ingestion fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style MedallionStorage fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style ServingTier fill:#0f172a,stroke:#ec4899,stroke-width:1.5px,color:#fbcfe8
 
-    OnPrem & SaaS --> ADF --> Bronze
-    IoT --> EventHubs --> Databricks
-    Bronze --> Databricks --> Silver --> Databricks --> Gold
-    Gold --> SynapseDedicated --> PowerBI
-    Gold --> SynapseServerless --> PowerBI
-    Gold --> Cosmos
-
-    style IngestionLayer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Orchestration fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style StorageLayer fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
-    style ComputeLayer fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
-    style ConsumptionLayer fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-
-    style OnPrem fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style SaaS fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style IoT fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ADF fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style EventHubs fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Bronze fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Silver fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style DB fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style APIs fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Streaming fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ADF fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style EventHub fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Bronze fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Silver fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style Gold fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Databricks fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style SynapseDedicated fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style SynapseServerless fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style PowerBI fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Cosmos fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Synapse fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#fff
+    style Serverless fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#fff
+    style PBI fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#fff
+    style Cosmos fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#fff
 ```
 
 ---
 
-### 2.2 ADLS Gen2
-The scalable, secure data lake foundation combining Hierarchical Namespace (HNS) performance with low-cost Blob Storage.
+### 2.2 ADLS Gen2: Hierarchical Namespace (HNS) Internals & POSIX ACLs
+
+#### Hierarchical Namespace (HNS) vs. Flat Object Storage
+In standard object storage (Amazon S3 or Azure Blob Storage without HNS), directories do not physically exist. A path like `bronze/year=2026/month=03/part-01.parquet` is merely a single long string key.
+- **The $O(N)$ Rename Bottleneck:** When an Apache Spark job commits a batch, it writes to a `_temporary/` directory and renames it to the target directory. In flat object storage, renaming a directory with 10,000 files requires **copying all 10,000 objects one by one** over HTTP and then deleting the old ones ($O(N)$ network I/O).
+- **The $O(1)$ Atomic HNS Solution:** In ADLS Gen2 with HNS enabled, directories are true filesystem nodes. Renaming a directory modifies a single pointer in the metadata catalog in milliseconds ($O(1)$ operation), eliminating data movement and enabling atomic job commits.
+
+```mermaid
+flowchart LR
+    subgraph FlatBlob ["Flat Namespace: O(N) Slow Directory Rename"]
+        direction LR
+        D1["Directory: /temp_orders/ (10,000 files)"] --> Copy["Must copy each file individually over HTTP!"]
+        Copy --> Delete["Must delete 10,000 original files!"]
+        Delete --> Result1["Duration: 15+ Minutes (Risk of partial failure!)"]
+    end
+
+    subgraph HNS_ADLS ["ADLS Gen2 HNS: O(1) Instant Metadata Pointer Update"]
+        direction LR
+        D2["Directory Node: /temp_orders/"] --> Pointer["Atomic metadata pointer swap:<br/>/temp_orders/ -> /orders/"]
+        Pointer --> Result2["Duration: 40 Milliseconds! (Zero data copied!)"]
+    end
+
+    style FlatBlob fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style HNS_ADLS fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style D1 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Copy fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style Delete fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style Result1 fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style D2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Pointer fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Result2 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### POSIX Access Control Lists (ACLs)
+ADLS Gen2 supports Linux-style POSIX ACLs in addition to Azure RBAC:
+- **Access ACLs:** Enforce read (`r`), write (`w`), and execute (`x`) permissions on specific existing files and directories.
+- **Default ACLs:** Templates applied to a parent directory that automatically inherit down to all newly created child files and subdirectories.
 
 ---
-
-#### ADLS Gen2 vs. Azure Blob Storage Comparison Matrix
-
-| Architectural Dimension | Azure Blob Storage (Flat Namespace) | Azure Data Lake Storage Gen2 (HNS Enabled) |
-| :--- | :--- | :--- |
-| **Namespace Model** | Flat object namespace. Directories are virtual strings separated by forward slashes (`/`). | True **Hierarchical Namespace (HNS)**. Directories are first-class filesystem objects. |
-| **Directory Operations** | Renaming a directory requires copying every single object within it (O(N) operation). | Atomic metadata operation (O(1) operation). Fast and zero-copy. |
-| **Big Data Workload Speed** | Slow for Spark / Hadoop: multi-part writes and directory renames cause high I/O latency. | **High performance:** Native ABFSS driver optimizes batch write commitments. |
-| **Access Control (ACLs)** | Azure RBAC at container level; Shared Access Signatures (SAS tokens). | **POSIX-compliant Access Control Lists (ACLs)** + Azure RBAC down to file/directory level. |
-| **Storage Pricing** | Standard object storage rates (Hot, Cool, Cold, Archive tiers). | Same storage cost as Blob Storage; slight transactional charge for HNS operations. |
 
 ### 2.3 Azure Data Factory (ADF) Overview
-A fully managed, serverless cloud data integration and orchestration ETL/ELT service with 100+ native connectors.
+
+Azure Data Factory is a serverless, hybrid data integration service capable of visual ELT orchestration, data movement across 100+ native connectors, and dispatching distributed transformations to Databricks and Synapse.
 
 ---
 
-### 2.4 Azure Synapse Analytics
-A unified analytics service that brings together data integration (ADF pipelines), enterprise data warehousing (Dedicated SQL Pools), and big data processing (Serverless SQL and Apache Spark).
+### 2.4 Azure Synapse Analytics: Dedicated vs. Serverless SQL Pools
+
+| Architectural Dimension | Synapse Dedicated SQL Pool | Synapse Serverless SQL Pool |
+| :--- | :--- | :--- |
+| **Compute Model** | Provisioned MPP cluster (1 Control node + up to 60 Compute nodes) | Serverless query execution engine distributed on-demand |
+| **Primary Workload** | Enterprise Data Warehousing (EDW), fixed SLAs, high concurrency | Ad-hoc lake exploration, querying Parquet/CSV/Delta directly |
+| **Storage Architecture** | Decoupled into **exactly 60 underlying storage distributions** | Queries data directly in-place on ADLS Gen2 (`OPENROWSET`) |
+| **Billing / Cost Model** | Hourly provisioned capacity measured in DWUs (e.g. DW100c to DW30000c) | Pay-per-query (\$5.00 per TB of data processed/scanned) |
+| **Data Modifications** | Full DDL/DML (`INSERT`, `UPDATE`, `DELETE`, `MERGE`, CTAS) | **Read-Only** queries; writes require `CREATE EXTERNAL TABLE AS SELECT` (CETAS) |
 
 ---
 
-#### Synapse SQL Pools Comparison Matrix
+### 2.5 Azure Databricks: Lakehouse, Unity Catalog & VNet Injection
 
-| Synapse Component | Compute Engine | Primary Use Case | Scaling / Pricing Model |
-| :--- | :--- | :--- | :--- |
-| **Serverless SQL Pool** | Distributed query processing over data lake files (`OPENROWSET`). | Ad-hoc data exploration, querying Parquet/CSV/Delta directly in ADLS without provisioning servers. | Pay-per-query (\$5 per TB of data scanned). Zero idle compute cost. |
-| **Dedicated SQL Pool** | Massively Parallel Processing (MPP) distributed relational engine (Control + 60 Compute nodes). | Enterprise enterprise data warehousing, high-concurrency production reporting, fixed SLAs. | Provisioned scale units (DWU - Data Warehouse Units, e.g., DW100c to DW30000c). Hourly billing. |
-
-### 2.5 Azure Databricks
-First-party Microsoft-managed Apache Spark Lakehouse platform natively integrated with Microsoft Entra ID, Azure Monitor, and Azure Key Vault.
+Azure Databricks is a first-party Microsoft cloud service that provides a collaborative Apache Spark engine:
+- **VNet Injection:** Databricks clusters run inside the customer’s private Azure Virtual Network across two subnets: **Public Subnet** (coordinates control plane communication; public IPs can be completely disabled) and **Private Subnet** (inter-worker executor shuffle communication).
+- **Unity Catalog:** Centralized data governance layer across all Databricks workspaces in a tenant. Implements a 3-level namespace: `catalog.schema.table`.
 
 ---
 
-### 2.6 Azure Event Hubs
-A big-data streaming platform and event ingestion service capable of receiving and processing millions of events per second with native Kafka wire-protocol compatibility.
+### 2.6 Azure Event Hubs: Real-Time Stream Ingestion & Capture
+
+Azure Event Hubs provides high-throughput streaming event ingestion with native Apache Kafka protocol wire compatibility.
+- **Event Hubs Capture:** An automated feature that streams incoming event batches directly into ADLS Gen2 as compressed **Avro** files without writing code.
+- **Partitioned Consumer Model:** Multiple independent consumer groups read from the same partitioned log at different offsets without impacting one another.
 
 ---
 
-#### Azure Messaging Services Comparison Matrix
+### 2.7 Azure Stream Analytics: Real-Time Windowing SQL
 
-| Feature / Dimension | Azure Event Hubs | Azure Service Bus | Azure Storage Queues |
-| :--- | :--- | :--- | :--- |
-| **Primary Intent** | High-throughput **event streaming ingestion** (telemetry, logs, clickstreams). | Enterprise **business message brokering** (orders, financial commands, workflows). | Simple, lightweight task queuing between microservices. |
-| **Paradigm** | Append-only partitioned consumer log (Kafka-compatible). | AMQP message broker with transactional topics and subscriptions. | First-In, First-Out (FIFO) basic polling queue. |
-| **Throughput / Scalability** | Millions of events/sec; partitioned consumer model. | Up to tens of thousands msgs/sec; session handling and deduplication. | Up to 2,000 msgs/sec per storage queue. |
-| **Ordering Guarantees** | Strict order guaranteed **per partition key**. | Strict FIFO ordering using **Message Sessions**. | Best-effort; duplicate processing possible. |
-| **Max Message Size** | 1 MB (standard) / 100 MB (dedicated tier). | 100 MB (Premium tier) / 256 KB (Standard). | 64 KB per message payload. |
+Azure Stream Analytics (ASA) executes complex temporal queries over real-time streaming data using a SQL-based language:
 
-### 2.7 Azure Stream Analytics
-A serverless real-time event processing engine that executes streaming SQL queries over real-time Event Hubs and IoT Hub feeds with sub-second latency.
+| Window Function Paradigm | Temporal Overlap Semantics | State Output Trigger Condition | Memory State Retention | Canonical Real-World Scenario |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tumbling Window** | Fixed, non-overlapping contiguous intervals (e.g., every 5 minutes). | Emits exactly once at the close of every distinct window interval. | Flushes state completely after each window closes; minimal memory footprint. | 5-minute rolling average server telemetry metrics; hourly sales summaries. |
+| **Hopping Window** | Fixed duration, overlapping intervals (e.g., 5-minute window hopping every 1 minute). | Emits on every hop interval, summarizing the trailing window duration. | Holds multiple overlapping window states simultaneously in memory. | Moving averages for stock price momentum or algorithmic trading triggers. |
+| **Sliding Window** | Evaluates only when an event enters or exits the time duration. | Emits whenever an event arrives, provided at least one event resides in window. | Keeps precise event arrival timestamps in memory buffer. | Alerting when more than 5 failed login attempts occur within any 10-minute span. |
+| **Session Window** | Variable duration; groups events by continuous user activity. | Closes and emits only when inactivity gap exceeds timeout threshold. | Variable state duration; expands dynamically until inactivity gap expires. | Tracking user web clickstream sessions; session ends after 15 minutes of inactivity. |
 
----
-
-### 2.8 Azure SQL Database
-A fully managed Platform-as-a-Service (PaaS) relational database engine running the latest stable version of Microsoft SQL Server with automatic patching, backups, and hyper-scale compute.
-
----
-
-### 2.9 Azure Cosmos DB
-A globally distributed, multi-model NoSQL database providing single-digit millisecond response times, 99.999% SLA availability, and multi-region active-active replication (Core SQL, MongoDB, Cassandra APIs).
-
----
-
-### 2.10 Azure Key Vault
-A secure cloud service for managing cryptographic keys, application passwords, database connection strings, and certificates with Hardware Security Module (HSM) backing.
+#### Code Example: Real-Time Fraud Aggregation via Tumbling Window
+```sql
+-- Stream Analytics Query: Detects card transactions exceeding $10,000 in a 5-minute tumbling window
+SELECT 
+    System.Timestamp() AS window_end_time,
+    card_number,
+    COUNT(*) AS transaction_count,
+    SUM(transaction_amount) AS total_spent
+FROM EventHubInput TIMESTAMP BY transaction_time
+GROUP BY 
+    card_number, 
+    TumblingWindow(minute, 5)
+HAVING SUM(transaction_amount) > 10000.00;
+```
 
 ---
 
-### 2.11 Azure Monitor & Log Analytics
-A centralized observability platform that collects metrics and telemetry logs from all Azure data services, querying logs via **Kusto Query Language (KQL)** to generate operational dashboards and alert notifications.
+### 2.8 Azure SQL Database & Hyperscale Architecture
+
+Azure SQL Database Hyperscale utilizes a distributed tiered architecture that decouples compute from storage:
+- **Compute Tier:** Primary read-write replica + up to 30 independent read-scale replicas.
+- **Page Servers:** Distributed storage caching tier serving database pages over high-speed RDMA.
+- **Log Service:** Ultra-low latency distributed Write-Ahead Log engine enabling near-instantaneous backups and restores regardless of database size (scales up to 100 TB).
+
+---
+
+### 2.9 Azure Cosmos DB: Multi-Model Distributed NoSQL
+
+Azure Cosmos DB is a globally distributed, multi-model NoSQL database with single-digit millisecond response times and multi-region active-active replication.
+- **Request Units (RU/s):** Normalized currency measuring CPU, memory, and IOPS consumed per database operation (a 1 KB point read costs 1 RU).
+- **The 5 Consistency Levels:**
+  1. *Strong:* Linearizability; zero stale data; highest latency.
+  2. *Bounded Staleness:* Stale reads bounded by time ($T$) or versions ($K$).
+  3. *Session:* Monotonic reads within the user's session (Default).
+  4. *Consistent Prefix:* Preserves causal update sequence.
+  5. *Eventual:* Lowest latency, highest availability; out-of-order convergence.
+
+---
+
+### 2.10 Azure Key Vault & Hardware Security Modules (HSM)
+
+Azure Key Vault centrally stores and encrypts secrets, passwords, certificates, and encryption keys.
+- **Standard SKU:** Software-protected keys backed by FIPS 140-2 Level 2 compliance.
+- **Premium SKU:** Dedicated Hardware Security Modules (HSM) with FIPS 140-2 Level 3 validation.
+- **Databricks Secret Scopes:** Maps Key Vault secrets directly into Databricks notebooks (`dbutils.secrets.get()`), redacting plaintext passwords from console logs automatically.
+
+---
+
+### 2.11 Azure Monitor, Log Analytics & KQL Queries
+
+Azure Monitor aggregates metrics and execution logs into Log Analytics workspaces. Data engineers use **Kusto Query Language (KQL)** to write operational observability alerts:
+
+```kusto
+// KQL Query: Identify all ADF pipeline failures in the last 24 hours with error messages
+ADFPipelineRun
+| where TimeGenerated >= ago(24h)
+| where Status == "Failed"
+| project 
+    TimeGenerated, 
+    PipelineName, 
+    RunId, 
+    ErrorMessage = FailureMessage, 
+    ExecutionDurationMinutes = DurationMs / 60000
+| order by TimeGenerated desc
+```
+
+---
+
+### 2.12 Microsoft Fabric: Lakehouse vs. Warehouse Architecture & OneLake
+
+Microsoft Fabric is an all-in-one SaaS analytics platform built on **OneLake** using open **Delta Parquet** format:
+
+```mermaid
+flowchart TD
+    subgraph OneLakeHub ["Microsoft OneLake (Unified Multi-Tenant Delta Lake)"]
+        LH_Store[("Lakehouse Store<br/>(Tables/ (Delta Parquet tables); Files/ (Raw CSV, JSON, Images))")]
+        WH_Store[("Warehouse Store<br/>(Tables/ (Strict Relational Delta))")]
+    end
+
+    subgraph FabricEngines ["Fabric Compute Engines"]
+        SparkEng["Apache Spark Engine<br/>(Code-first Python / PySpark)"]
+        TSQLEng["Synapse Distributed T-SQL<br/>(SQL-first ACID Transactions)"]
+    end
+
+    subgraph DirectLakeServing ["Power BI Serving Layer"]
+        DirectLake["Power BI Direct Lake Mode<br/>(Loads Delta Parquet column vectors straight to VertiPaq RAM cache!)"]
+    end
+
+    SparkEng -->|Read / Write| LH_Store
+    TSQLEng -->|Read / Write Multi-Table ACID| WH_Store
+    TSQLEng -.->|Read-Only SQL Analytics Endpoint| LH_Store
+    LH_Store --> DirectLake
+    WH_Store --> DirectLake
+
+    style OneLakeHub fill:#0f172a,stroke:#06b6d4,stroke-width:2px,color:#67e8f9
+    style FabricEngines fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style DirectLakeServing fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+
+    style LH_Store fill:#1e293b,stroke:#06b6d4,stroke-width:1.5px,color:#fff
+    style WH_Store fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style SparkEng fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style TSQLEng fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DirectLake fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### Fabric Lakehouse vs. Fabric Warehouse Comparison
+
+| Architectural Trait | Fabric Lakehouse | Fabric Warehouse |
+| :--- | :--- | :--- |
+| **Primary Persona** | Data Engineers, Data Scientists, Spark developers | Enterprise SQL Developers, BI Architects |
+| **Compute Engines** | Apache Spark (Notebooks) + SQL Analytics Endpoint (Read-Only) | Distributed T-SQL (Synapse Distributed Query Engine) |
+| **Data Scope** | **Structured, Semi-Structured & Unstructured** (JSON, Images) | **Structured Tabular Data Only** |
+| **Folder Layout in OneLake** | Dual: `Tables/` (Delta tables) and `Files/` (raw folder tree) | Single: `Tables/` (Managed Delta Parquet tables only) |
+| **Transaction Scope** | Single-table ACID via Delta Lake commit log | **Multi-table cross-statement ACID transactions** |
+| **Power BI Integration** | Direct Lake mode | Direct Lake mode + DirectQuery + Import |
 
 ---
 
@@ -473,114 +662,68 @@ A centralized observability platform that collects metrics and telemetry logs fr
 
 ---
 
-### 3.1 Microsoft Entra ID (Azure AD)
+### 3.1 Microsoft Entra ID (Azure AD) Fundamentals
 
-#### Definition
-Microsoft Entra ID is the multi-tenant cloud-based identity and access management service that centrally secures authentication across all Azure data resources.
+Microsoft Entra ID is the central identity provider in Azure, issuing cryptographically signed JSON Web Tokens (OAuth 2.0 / OIDC) that authenticate users, automated services, and applications.
 
 ---
 
 ### 3.2 Service Principals & App Registrations
 
-#### Definition
-A Service Principal is an identity created for applications, automated CI/CD pipelines, and external tools to access specific Azure resources (equivalent to a service account).
+A **Service Principal** represents an application identity within an Entra ID tenant. Used in CI/CD pipelines (Terraform, GitHub Actions, Azure DevOps) to deploy infrastructure automatically without human intervention.
+- *Security Best Practice:* Authenticate Service Principals using **X.509 Certificates** or **Federated OIDC Credentials** rather than long-lived client secret strings.
 
 ---
 
-### 3.3 Managed Identities
+### 3.3 Managed Identities: System-Assigned vs. User-Assigned
 
-#### Definition
-Managed Identities eliminate the risk of hardcoding secrets or credentials in code by providing an automatically managed Entra ID identity for Azure resources.
-- **System-Assigned:** Created directly on an Azure resource instance (e.g., an ADF factory or Synapse workspace). Deleted automatically if the resource is deleted.
-- **User-Assigned:** An independent standalone resource that can be assigned to multiple VMs or Databricks clusters.
+Managed Identities eliminate the risk of credential leaks by providing an automatically managed Entra ID identity for Azure resources:
+- **System-Assigned Managed Identity:** Tied directly to the lifecycle of a specific resource instance (e.g., Azure Data Factory). If the ADF instance is deleted, the identity is automatically deleted.
+- **User-Assigned Managed Identity:** Created as an independent Azure resource. Can be assigned to multiple compute resources (e.g., shared across 10 Databricks worker VMs).
 
-```mermaid
-flowchart LR
-    ADF["Azure Data Factory (System Managed Identity)"] -->|1. Request OAuth Token| Entra["Microsoft Entra ID"]
-    Entra -->|2. Issue JWT Token| ADF
-    ADF -->|3. Access ADLS Gen2| ADLS[("ADLS Gen2 Container")]
-    ADLS -->|4. RBAC Check: Storage Blob Data Contributor| OK["Success: Zero Credentials in Code!"]
-
-    style ADF fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Entra fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ADLS fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style OK fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-```
+#### How Managed Identity Operates Under the Hood
+Compute instances request access tokens locally from the non-routable Azure Instance Metadata Service (IMDS) at `http://169.254.169.254/metadata/identity/oauth2/token`. Azure validates the host VM's identity and returns a short-lived bearer token without any password ever being stored on disk!
 
 ---
 
-#### Azure Managed Identity vs. Service Principal Comparison Matrix
+### 3.4 Role-Based Access Control (Azure RBAC)
 
-| Security Dimension | Azure Managed Identity (System / User-Assigned) | Azure Service Principal (App Registration) |
-| :--- | :--- | :--- |
-| **Credential Management** | **100% Azure-Managed.** Credentials, keys, and tokens are rotated automatically by Azure. Zero secrets stored in configuration. | **Customer-Managed.** Requires generating client secrets (max 2-year lifetime) or certificates and rotating them manually. |
-| **Secret Leak Risk** | **Zero.** Tokens are fetched directly from internal Azure instance metadata service (`http://169.254.169.254/`). | Risk of accidental git commits or exposure in CI/CD pipeline variables. |
-| **Multi-Cloud / On-Prem** | Restricted to Azure compute resources (VMs, Databricks, Functions, AKS). | Can authenticate from anywhere: AWS, on-prem servers, GitHub Actions, local machines. |
-| **Recommended Usage** | Azure-to-Azure service communication (e.g. ADF -> ADLS Gen2, Databricks -> Key Vault). | CI/CD automated deployments (Terraform, GitHub Actions) and hybrid workloads. |
+Azure RBAC enforces authorization using the principle of least privilege across four scope levels:
 
-### 3.4 Role-Based Access Control (RBAC)
+$$\text{Management Group} \longrightarrow \text{Subscription} \longrightarrow \text{Resource Group} \longrightarrow \text{Resource}$$
 
-#### Core Built-in Roles for Data Engineering
-- **Storage Blob Data Contributor:** Read, write, and delete blobs in ADLS Gen2.
-- **Storage Blob Data Reader:** Read-only access to blobs.
-- **Key Vault Secrets User:** Read secret contents from Azure Key Vault.
-- **Data Factory Contributor:** Author and deploy ADF pipelines.
+#### Core Built-in Roles for Data Engineers
+- `Storage Blob Data Contributor`: Full read, write, and delete permissions on ADLS Gen2 containers.
+- `Storage Blob Data Reader`: Read-only access to lakehouse files.
+- `Key Vault Secrets User`: Read secret values from Azure Key Vault without administrative permissions.
+- `Data Factory Contributor`: Author, edit, and trigger ADF pipelines.
 
 ---
 
-### 3.5 Key Vault Secret Scopes Integration
+### 3.5 Databricks Secret Scopes with Azure Key Vault
 
-#### Secure Credential Pattern in Azure Databricks
 ```python
-# Databricks Python: Retrieve secrets securely from Azure Key Vault
-db_password = dbutils.secrets.get(scope="akv-prod-secrets", key="SalesDbPassword")
+# Secure Credential Pattern in Azure Databricks
+# The secret value is never displayed in plaintext and is automatically redacted from logs
+db_password = dbutils.secrets.get(scope="akv-prod-secrets", key="SalesDatabasePassword")
 ```
 
 ---
 
-### 3.6 Virtual Networks (VNets) & Network Security Groups (NSGs)
+### 3.6 Hub-and-Spoke VNets & Network Security Groups (NSGs)
 
-#### Definition
-- **VNet (Virtual Network):** Isolates cloud infrastructure inside a private IP address space (e.g. `10.0.0.0/16`).
-- **NSG (Network Security Group):** Acts as a virtual firewall controlling inbound and outbound traffic rules at the subnet level.
+- **VNet (Virtual Network):** Isolates infrastructure inside a private RFC 1918 IP address space (e.g., `10.2.0.0/16`).
+- **Network Security Group (NSG):** Stateful Layer 4 packet filter containing inbound and outbound security rules (5-tuple: source IP, source port, destination IP, destination port, protocol).
+- **VNet Peering:** Connects the Hub VNet to Spoke VNets over Microsoft's high-speed private backbone network with ultra-low latency and zero internet routing.
 
 ---
-
-#### Azure Secure Networking Reference Matrix
-
-| Networking Component | Purpose & Architecture | Security Best Practice |
-| :--- | :--- | :--- |
-| **Virtual Network (VNet)** | Private, isolated IP address space in Azure (RFC 1918). Enables VMs and clusters to communicate securely. | Plan CIDR blocks carefully to prevent overlapping ranges with on-prem networks. |
-| **Network Security Group (NSG)** | Stateful packet filter containing Layer 4 firewall rules (5-tuple: source/dest IP & port, protocol). | Apply least-privilege inbound rules; place deny-all default rules at lowest priority. |
-| **Azure Private Link / Endpoint** | Projects a private IP from your VNet directly onto an Azure PaaS service (Storage, Synapse, SQL DB). | Disable public network access on ADLS Gen2 and force all ingestion through Private Endpoints. |
 
 ### 3.7 Private Endpoints & Azure Private Link
 
-#### Architecture
-Private Endpoints project a private IP from your VNet directly onto PaaS services (ADLS Gen2, Synapse, SQL DB), disabling public internet routing.
-
-```mermaid
-flowchart LR
-    subgraph PrivateVNet ["Customer Virtual Network (10.1.0.0/16)"]
-        DatabricksNode["Databricks Worker (10.1.1.4)"]
-        PE["Private Endpoint (10.1.2.5)"]
-        DatabricksNode -->|Internal VNet Traffic| PE
-    end
-
-    subgraph AzurePrivateLink ["Azure Private Link Backbone"]
-        PE --> ADLS[("ADLS Gen2 Storage Account")]
-    end
-
-    PublicInternet[Public Internet Hacker] -.->|BLOCKED 403 Forbidden!| ADLS
-
-    style PrivateVNet fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style AzurePrivateLink fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
-
-    style DatabricksNode fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style PE fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style ADLS fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style PublicInternet fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
-```
+Private Endpoints assign a private IP address from your VNet subnet directly to PaaS services (ADLS Gen2, Key Vault, Synapse):
+- Public internet access is disabled: `public_network_access_enabled = false`.
+- DNS resolution is overridden using Azure Private DNS Zones (e.g., `stadlsprodeastus2.privatelink.dfs.core.windows.net` $\rightarrow$ `10.2.1.4`).
+- Traffic flows strictly through the private network switch, neutralizing data exfiltration risks.
 
 ---
 
@@ -588,106 +731,88 @@ flowchart LR
 
 ---
 
-### 4.1 Pipelines, Activities & Control Flow
+### 4.1 Pipelines, Activities & Control Flow Mechanics
 
-#### Definition
-An ADF **Pipeline** is a logical grouping of **Activities** that together perform a unit of work. Control flow activities (`IfCondition`, `ForEach`, `Until`, `Switch`) orchestrate sequential and parallel execution.
+An ADF **Pipeline** coordinates a sequence of **Activities**:
+- **Execution Dependencies:** Connect activities using `Succeeded`, `Failed`, `Completed`, or `Skipped` condition links.
+- **Control Flow:** `ForEach` iterates over dynamic arrays in parallel (up to 50 concurrent batches); `IfCondition` branches logic based on runtime parameters.
 
 ---
 
-### 4.2 Core Activities
-
-1. **Copy Activity:** Highly optimized data movement engine transferring data between 100+ heterogeneous sources and sinks.
-2. **Lookup Activity:** Reads a configuration record or query result from a database or file.
-3. **Get Metadata Activity:** Inspects storage to retrieve file size, child items (file lists), exists flag, and structure.
-4. **ForEach Activity:** Iterates over an array in parallel or sequentially.
-5. **Execute Pipeline:** Modularly calls a child pipeline with parameters.
+### 4.2 Core Activities (Copy, Lookup, Get Metadata, ForEach)
 
 ```mermaid
 flowchart TD
-    Lookup["1. Lookup Activity (Get List of Active Tables)"] --> ForEach["2. ForEach Activity (Parallel Execution)"]
+    Lookup["1. Lookup Activity<br/>(Queries: SELECT table_name FROM pipeline_catalog WHERE is_active = 1)"] --> ForEach["2. ForEach Activity<br/>(Executes up to 20 tables in parallel)"]
     
-    subgraph Iteration ["Inside ForEach Loop"]
-        Copy["3. Copy Activity (Source DB -> ADLS Parquet)"] --> Databricks["4. Databricks Notebook Activity (Cleanse Delta)"]
+    subgraph InnerLoop ["Inside ForEach Parallel Container"]
+        Copy["3. Copy Activity<br/>(Pulls source table -> writes Parquet to ADLS Bronze)"] --> Databricks["4. Databricks Notebook Activity<br/>(Cleanses Parquet -> Merges to Delta Silver)"]
     end
 
-    ForEach --> Iteration
-
-    style Iteration fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    ForEach --> InnerLoop
+    InnerLoop --> SuccessLog["5. Webhook / Log Activity<br/>(Records execution watermark)"]
 
     style Lookup fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style ForEach fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style InnerLoop fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
     style Copy fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Databricks fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Databricks fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style SuccessLog fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---
 
-### 4.3 Mapping Data Flows
+### 4.3 Mapping Data Flows & Spark Execution Translation
 
-#### Definition
-Mapping Data Flows provide visually designed data transformations (joins, aggregates, conditional splits) in ADF that the runtime translates into optimized **Apache Spark code** running on a managed Databricks/Spark cluster behind the scenes.
+Mapping Data Flows allow visual construction of ETL transformations without writing code:
+- When triggered, ADF provisions an ephemeral **Azure Databricks / Spark cluster** behind the scenes.
+- The visual DAG (Join, Aggregate, Conditional Split) is compiled into optimized Scala / Spark Catalyst expressions and executed across Spark executors.
 
 ---
 
-### 4.4 Integration Runtimes (IR)
+### 4.4 Integration Runtimes (Azure IR vs. Self-Hosted IR vs. SSIS)
 
-#### Types of Integration Runtimes
-| Integration Runtime | Hosting Environment | Primary Use Case |
+| Integration Runtime | Hosting Infrastructure | Primary Production Use Case |
 | :--- | :--- | :--- |
-| **Azure IR** | Fully managed Azure cloud | Cloud-to-cloud data movement and Data Flows |
-| **Self-Hosted IR (SHIR)** | On-premises VM or private VNet | Securely accessing on-premises data behind corporate firewalls |
-| **Azure-SSIS IR** | Managed VMs running SQL Server | Lift-and-shift legacy SSIS packages to the cloud |
+| **Azure IR** | Fully managed, serverless cloud compute | Cloud-to-cloud data movement, external SaaS APIs, Mapping Data Flows |
+| **Self-Hosted IR (SHIR)** | Customer-managed VM on-prem or in a private VNet | Securely extracting data from on-prem databases (Oracle, SAP, SQL Server) behind corporate firewalls |
+| **Azure-SSIS IR** | Managed cluster of Azure VMs | Re-hosting legacy SQL Server Integration Services (SSIS) packages in the cloud |
 
-```mermaid
-flowchart LR
-    subgraph OnPremisesDataCenter ["Corporate On-Premises Data Center"]
-        OnPremSQL[(Oracle / SQL Server ERP)]
-        SHIR["Self-Hosted Integration Runtime (SHIR Agent)"]
-        OnPremSQL <-->|Local LAN Access| SHIR
-    end
-
-    subgraph CloudVNet ["Azure Cloud"]
-        SHIR -->|Encrypted HTTPS Outbound Port 443 Only| ADF["Azure Data Factory"]
-        ADF --> ADLS[("ADLS Gen2 Lakehouse")]
-    end
-
-    style OnPremisesDataCenter fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style CloudVNet fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
-
-    style OnPremSQL fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style SHIR fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style ADF fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style ADLS fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-```
+#### Self-Hosted IR Network Security Architecture
+The SHIR agent VM initiates **outbound connections only over HTTPS Port 443** to the Azure cloud. **Zero inbound firewall ports need to be opened** on the corporate perimeter firewall, satisfying strict enterprise infosec policies.
 
 ---
 
-### 4.5 Linked Services vs Datasets
+### 4.5 Linked Services vs. Datasets
 
-- **Linked Service:** Connection string / authentication credentials to a data store or compute engine (e.g., connection details to a PostgreSQL database).
-- **Dataset:** A named view of the data pointing to a specific table, file, or folder path within the Linked Service (e.g., `customers.parquet` on ADLS Gen2).
-
----
-
-### 4.6 Triggers
-
-1. **Schedule Trigger:** Standard wall-clock scheduler (e.g., run every 2 hours).
-2. **Tumbling Window Trigger:** Operates on contiguous, non-overlapping time slices. Supports dependency tracking (cannot run 2:00 PM slice until 1:00 PM slice finishes) and automated historical backfilling.
-3. **Event-Based Trigger:** Automatically fires in response to storage events (`BlobCreated`, `BlobDeleted`) via Azure Event Grid.
+- **Linked Service:** Defines the connection string, authentication method, and network path to a data source or compute target (analogous to a connection string).
+- **Dataset:** Points to a specific data structure (table, file name, folder path) within the Linked Service.
 
 ---
 
-### 4.7 Parameters vs Variables
+### 4.6 Triggers (Schedule vs. Tumbling Window vs. Storage Events)
 
-- **Parameters:** External inputs passed into a pipeline or dataset at runtime (read-only within execution).
-- **Variables:** Internal state stored within a pipeline run that can be updated dynamically via `Set Variable` or `Append Variable`.
+1. **Schedule Trigger:** Standard recurring clock trigger (e.g., execute daily at 02:00 AM).
+2. **Tumbling Window Trigger:** Fires over contiguous, non-overlapping historical time slices. Essential for historical backfills and maintaining task dependencies (e.g., window 12:00-13:00 cannot run until window 11:00-12:00 completes).
+3. **Storage Event Trigger:** Listens to Azure Event Grid events (`Microsoft.Storage.BlobCreated`) to trigger instant processing when a file lands in ADLS Gen2.
 
 ---
 
-### 4.8 Monitoring & Alerts
+### 4.7 Parameters vs. Variables (Dynamic Content Expressions)
 
-The ADF Monitor hub visualizes pipeline runs, activity status, Gantt execution timelines, and logs metrics to Azure Log Analytics to trigger email/SMS alerts when pipeline failures occur.
+- **Parameters:** External, read-only arguments passed into the pipeline at runtime:
+  ```json
+  "@pipeline().parameters.TargetEnvironment"
+  ```
+- **Variables:** Internal, mutable state updated dynamically during execution via `Set Variable` or `Append Variable` activities.
+
+---
+
+### 4.8 ADF Monitoring, Alerting & SLA Tracking
+
+ADF integrates natively with Azure Monitor:
+- Tracks pipeline run metrics: `PipelineRunSucceededRate`, `ActivityDuration`, `DataRead`, `DataWritten`.
+- Diagnostic settings forward execution logs to Azure Log Analytics workspaces, triggering PagerDuty / email alerts when SLAs are breached.
 
 ---
 
@@ -695,39 +820,35 @@ The ADF Monitor hub visualizes pipeline runs, activity status, Gantt execution t
 
 ---
 
-### 5.1 Synapse Dedicated SQL Pools (MPP Architecture)
+### 5.1 Synapse Dedicated SQL Pools: Massively Parallel Processing (MPP)
 
-#### Definition
-Dedicated SQL Pools utilize a **Massively Parallel Processing (MPP)** architecture designed to run high-performance analytical queries across terabytes and petabytes of data.
+Synapse Dedicated SQL Pool implements a classic MPP architecture that scales analytical queries across 60 underlying storage distributions:
 
 ```mermaid
 flowchart TD
-    subgraph ClientControl ["1. Client & Coordination Layer (The Brain)"]
-        direction LR
-        Client["Client Applications<br/>(Power BI, SSMS, Synapse Studio)"] -->|"T-SQL Query Connection"| ControlNode["Control Node<br/>• Distributed Query Engine (DQE)<br/>• Parses SQL & generates parallel MPP execution plan"]
+    subgraph ControlLayer ["1. Control Node (The Brain)"]
+        ClientApp["Client Queries (Power BI, SSMS)"] -->|"T-SQL Connection"| ControlNode["Control Node<br/>(Distributed Query Engine (DQE), Generates parallel MPP execution plans)"]
     end
 
-    subgraph ComputeTier ["2. MPP Compute Layer (The Muscle — Scales with DWUs)"]
-        direction LR
-        C1["Compute Node 1<br/>(Processes assigned distributions)"] <-->|"DMS: Data Movement Service<br/>(High-speed shuffle & broadcast)"| C2["Compute Node 2<br/>(Processes assigned distributions)"]
-        C2 <-->|"DMS Interconnect"| CN["Compute Node N<br/>(Up to 60 nodes at DW30000c)"]
+    subgraph ComputeLayer ["2. Compute Nodes (The Muscle — Scales with DWUs)"]
+        C1["Compute Node 1"] <-->|"Data Movement Service (DMS)"| C2["Compute Node 2"]
+        C2 <-->|"DMS Interconnect"| CN["Compute Node N (Up to 60 Compute VMs)"]
     end
 
-    subgraph StorageTier ["3. Decoupled Storage Layer (Exactly 60 Fixed Distributions)"]
-        direction LR
-        D1["Distributions 1..20<br/>(Azure Storage buckets)"] ~~~ D2["Distributions 21..40<br/>(Azure Storage buckets)"] ~~~ D3["Distributions 41..60<br/>(Azure Storage buckets)"]
+    subgraph StorageLayer ["3. Storage Distributions (Exactly 60 Buckets)"]
+        D1["Distributions 1..20"] ~~~ D2["Distributions 21..40"] ~~~ D3["Distributions 41..60"]
     end
 
-    ControlNode -->|"Dispatches parallel sub-queries"| C1 & C2 & CN
-    C1 -->|"Direct Remote I/O"| D1
-    C2 -->|"Direct Remote I/O"| D2
-    CN -->|"Direct Remote I/O"| D3
+    ControlNode --> C1 & C2 & CN
+    C1 --> D1
+    C2 --> D2
+    CN --> D3
 
-    style ClientControl fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style ComputeTier fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style StorageTier fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    style ControlLayer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ComputeLayer fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style StorageLayer fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
 
-    style Client fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ClientApp fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style ControlNode fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
     style C1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style C2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
@@ -737,119 +858,75 @@ flowchart TD
     style D3 fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
 ```
 
-#### How Dedicated SQL Works
-- A Dedicated SQL pool divides data into **exactly 60 underlying storage distributions**.
-- When you scale compute (measured in **DWUs - Data Warehouse Units**, e.g., DW100c to DW30000c), Synapse allocates more compute VMs to divide the work of scanning the 60 distributions.
-
 ---
 
-### 5.2 Data Distribution Strategies
+### 5.2 Data Distribution Strategies (Hash vs. Replicated vs. Round Robin)
 
-Every table created in a Dedicated SQL Pool must declare its physical distribution strategy across the 60 storage buckets:
+Every table created in a Dedicated SQL Pool must explicitly declare its physical distribution across the 60 storage buckets:
 
-| Distribution Strategy | Mechanism | Best Used For |
+| Distribution Strategy | Mechanism | Recommended Table Type |
 | :--- | :--- | :--- |
-| **Hash Distribution** | Uses a deterministic hash of a single column to assign rows to 1 of 60 buckets. | **Large Fact Tables (>2GB)**. Choose high-cardinality join key (e.g., `customer_id`) to avoid data skew. |
-| **Round Robin Distribution** | Distributes rows evenly in a circular sequence across all 60 buckets. | **Staging Tables**; fast ingestion without needing key analysis. |
-| **Replicated Distribution** | Replicates a complete copy of the entire table to **every single compute node**. | **Small Dimension Tables (<2GB)**. Eliminates data movement (DMS) during joins with fact tables. |
+| **`HASH(column)`** | Uses a deterministic hashing algorithm on a single key to assign rows to 1 of 60 buckets. | **Large Fact Tables ($>2\text{ GB}$).** Choose high-cardinality join key to prevent data skew. |
+| **`REPLICATE`** | Stores a complete physical copy of the entire table on **every single compute node**. | **Small Dimension Tables ($<2\text{ GB}$).** Eliminates network Data Movement Service (DMS) shuffles during joins. |
+| **`ROUND_ROBIN`** | Distributes incoming rows sequentially in a circular buffer across all 60 distributions. | **Staging Tables**; fastest possible data loading without key hashing overhead. |
 
-```mermaid
-flowchart TD
-    subgraph HashDist ["Hash Distribution: Large Fact Tables (>2GB)"]
-        direction LR
-        InFact["Fact Sales Rows"] --> HashFn["Deterministic Hash<br/>(order_id % 60)"] --> Buckets["60 Storage Buckets<br/>(Dist 1, Dist 2, ..., Dist 60)"]
-    end
-
-    subgraph ReplDist ["Replicated Distribution: Small Dimension Tables (<2GB)"]
-        direction LR
-        Dim["dim_date (10 MB)"] --> Distribute["Broadcast Replicate<br/>(Full cached copy)"] --> Compute["Every Compute Node<br/>(Zero network DMS joins)"]
-    end
-
-    HashDist ~~~ ReplDist
-
-    style HashDist fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style ReplDist fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-
-    style InFact fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style HashFn fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Buckets fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
-    style Dim fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Distribute fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Compute fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
-```
-
-#### Code Example (Synapse Table Creation)
+#### Production DDL Example in Synapse Dedicated SQL
 ```sql
--- Hash Distributed Fact Table across Azure Synapse 60 Control-to-Compute nodes
-CREATE TABLE warehouse.fact_orders (
-    order_id BIGINT NOT NULL,               -- Unique transaction identifier
-    customer_id BIGINT NOT NULL,            -- Hash distribution column key
-    order_date_key INT NOT NULL,            -- Surrogate integer date key referencing dim_date
-    order_amount DECIMAL(12, 2) NOT NULL    -- Monetary transaction value
+-- Hash Distributed Fact Table with Clustered Columnstore Index
+CREATE TABLE edw.fact_financial_transactions (
+    transaction_id BIGINT NOT NULL,
+    customer_id BIGINT NOT NULL,              -- High-cardinality distribution hash key
+    transaction_date_key INT NOT NULL,
+    amount DECIMAL(18, 2) NOT NULL
 )
 WITH (
-    -- Distributes table across 60 compute nodes using deterministic hash of customer_id
     DISTRIBUTION = HASH(customer_id),
-    -- Compresses columnar data into high-density 1-million-row rowgroups for rapid analytical scanning
-    CLUSTERED COLUMNSTORE INDEX
+    CLUSTERED COLUMNSTORE INDEX               -- Maximizes compression into 1M row rowgroups
 );
 
--- Replicated Dimension Table (Zero shuffle data movement when joined with fact tables!)
-CREATE TABLE warehouse.dim_date (
-    order_date_key INT NOT NULL,            -- Primary surrogate key
-    calendar_date DATE NOT NULL,            -- Gregorian calendar date
-    calendar_year INT NOT NULL              -- Calendar year integer
+-- Replicated Dimension Table (Zero network shuffle during star schema joins)
+CREATE TABLE edw.dim_customers (
+    customer_id BIGINT NOT NULL,
+    customer_name VARCHAR(100) NOT NULL,
+    region_code VARCHAR(10) NOT NULL
 )
 WITH (
-    -- Stores a full copy of this dimension table on every compute node; eliminates network shuffle!
     DISTRIBUTION = REPLICATE,
-    -- Columnar index maximizes compression and analytical query read throughput
     CLUSTERED COLUMNSTORE INDEX
 );
 ```
 
-#### References
-- [Microsoft Learn: Distributed Tables in Synapse](https://learn.microsoft.com/en-us/azure/synapse-analytics/sql-data-warehouse/sql-data-warehouse-tables-distribute)
-- [GeeksforGeeks: Azure Synapse Analytics](https://www.geeksforgeeks.org/azure-synapse-analytics/)
-
 ---
 
-### 5.3 Synapse Serverless SQL Pools (`OPENROWSET`)
+### 5.3 Synapse Serverless SQL Pools (`OPENROWSET` over Data Lake)
 
-#### Definition
-Serverless SQL Pools provide a pay-per-query query engine ($5 per TB scanned) that queries data files (Parquet, Delta Lake, CSV) directly on ADLS Gen2 storage **without needing to spin up or maintain a dedicated database cluster**.
+Synapse Serverless SQL allows querying data files directly in ADLS Gen2 without provisioning or managing a cluster:
 
-#### Code Example (Querying Parquet directly on ADLS)
 ```sql
--- Serverless SQL Pool: Ad-hoc querying directly over data lake Parquet files without ingesting into tables
+-- Query Parquet files directly in ADLS Gen2 with Serverless SQL
 SELECT 
-    customer_id,                                    -- Customer dimension key
-    COUNT(order_id) AS total_orders,                -- Aggregate total purchase count
-    SUM(order_amount) AS gross_revenue              -- Aggregate sum of customer spending
+    customer_id,
+    COUNT(order_id) AS total_orders,
+    SUM(order_amount) AS gross_spend
 FROM OPENROWSET(
-    -- Wildcard scan over Parquet files in ADLS Gen2 data lake container
-    BULK 'https://datalakeprod.dfs.core.windows.net/curated/orders/*.parquet',
-    FORMAT = 'PARQUET'                             -- Vectorized columnar Parquet reader
+    BULK 'https://stadlsprodeastus2.dfs.core.windows.net/curated/sales/orders/*.parquet',
+    FORMAT = 'PARQUET'
 ) AS [orders]
-GROUP BY customer_id;                               -- Aggregate metrics per customer
+GROUP BY customer_id;
 ```
 
-#### References
-- [Microsoft Learn: How to use OPENROWSET in Serverless SQL](https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/how-to-openrowset)
+---
+
+### 5.4 Synapse Spark Pools & Lake Databases
+
+Synapse Spark Pools provide managed auto-scaling Apache Spark clusters integrated with Synapse Studio notebooks, sharing metadata catalogs natively with SQL pools via **Lake Databases**.
 
 ---
 
-### 5.4 Synapse Spark Pools
-Fully managed, auto-scaling Apache Spark compute clusters integrated natively with the Synapse studio notebook environment.
+### 5.5 Synapse Pipelines vs. Standalone ADF
 
----
-
-### 5.5 Synapse Pipelines
-Provides the exact same pipeline orchestration engine, data flow designer, and monitoring capabilities as Azure Data Factory embedded directly within the Synapse Workspace.
-
----
-
----
+Synapse Pipelines share the identical core codebase, JSON specification, and execution runtime as Azure Data Factory. 
+- *Key Difference:* ADF supports cross-service enterprise orchestration with Git integration at the factory level, whereas Synapse Pipelines are embedded within the Synapse workspace environment.
 
 ---
 
@@ -859,61 +936,83 @@ Provides the exact same pipeline orchestration engine, data flow designer, and m
 
 ### 6.1 The DataOps CI/CD Lifecycle
 
-#### Definition
-DataOps applies DevOps practices (automated testing, continuous integration, version control, and declarative deployments) to data engineering pipelines to improve quality and reduce cycle times.
+DataOps brings agile software engineering rigor to data platform delivery:
 
 ```mermaid
 flowchart LR
-    subgraph Stage1 ["Stage 1: Continuous Integration (CI & Validation)"]
-        direction LR
-        Dev["1. Developer Commit<br/>(Feature branch pull request)"] --> Lint["2. Lint & Format<br/>(sqlfluff, black, ruff)"] --> Unit["3. Unit Testing<br/>(pytest with mocked schemas)"]
+    subgraph CI_Stage ["Continuous Integration (CI)"]
+        PR["1. Feature Pull Request"] --> Lint["2. Linting (sqlfluff, ruff)"]
+        Lint --> Unit["3. pytest Unit Tests"]
+        Unit --> Contract["4. Data Contract Tests"]
     end
 
-    subgraph Stage2 ["Stage 2: Continuous Deployment (CD & Release)"]
-        direction LR
-        Build["4. Package & Build<br/>(Docker image / Databricks asset bundle)"] --> TestInt["5. Integration Tests<br/>(Ephemeral database validation)"] --> Deploy["6. Deploy to Production<br/>(Automated Service Principal pipeline)"]
+    subgraph CD_Stage ["Continuous Deployment (CD)"]
+        Merge["5. Merge to Main"] --> TFPlan["6. Terraform Plan / Validate"]
+        TFPlan --> DeployDev["7. Automated Deploy to Dev"]
+        DeployDev --> Smoke["8. Smoke Tests & Staging"]
+        Smoke --> Approval{"9. Manual Gate / Approval"}
+        Approval -- Approved --> DeployProd["10. Blue-Green Swap to Prod"]
     end
 
-    Unit --> Build
+    CI_Stage --> CD_Stage
 
-    style Stage1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Stage2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style Dev fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style CI_Stage fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style CD_Stage fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+
+    style PR fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Lint fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Unit fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Build fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style TestInt fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Deploy fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Contract fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Merge fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style TFPlan fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style DeployDev fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Smoke fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Approval fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style DeployProd fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
-#### References
-- [DataCamp: What is DataOps?](https://www.datacamp.com/tutorial/what-is-dataops)
-- [GeeksforGeeks: DevOps Pipeline Architecture](https://www.geeksforgeeks.org/devops-lifecycle/)
+---
+
+### 6.2 Git Branching Strategies for Data Engineering
+
+- **Trunk-Based Development (Recommended):** Developers work on short-lived feature branches (`feature/add-tax-calculation`) and merge into `main` multiple times per day. Automated CI test suites prevent regressions. Ideal for fast-moving analytics engineering and dbt projects.
+- **GitFlow:** Strict branching model with `feature` $\rightarrow$ `develop` $\rightarrow$ `release` $\rightarrow$ `main`. Best suited for regulated enterprise data platforms requiring multi-week formal UAT audit windows.
+
+```mermaid
+gitGraph
+    commit id: "v1.0.0-prod"
+    branch develop
+    checkout develop
+    commit id: "dev-init"
+    branch feature/silver-orders
+    checkout feature/silver-orders
+    commit id: "add-dbt-model"
+    commit id: "add-schema-test"
+    checkout develop
+    merge feature/silver-orders id: "pr-merged-dev"
+    branch release/v1.1.0
+    checkout release/v1.1.0
+    commit id: "uat-regression-pass"
+    checkout main
+    merge release/v1.1.0 id: "v1.1.0-release" tag: "v1.1.0"
+    checkout develop
+    merge release/v1.1.0 id: "sync-develop"
+```
 
 ---
 
-### 6.2 Git Branching Strategies
+### 6.3 Automated Pre-Commit Hooks (SQLFluff, Black, Gitleaks)
 
-| Strategy | Workflow | Best Used For |
-| :--- | :--- | :--- |
-| **Trunk-Based Development** (Modern Standard) | Developers push short-lived branches into `main` multiple times daily; automated CI tests enforce health. | Agile data teams, dbt projects, high-velocity CI/CD. |
-| **GitFlow** | Multiple long-lived branches (`feature` $\rightarrow$ `develop` $\rightarrow$ `release` $\rightarrow$ `main`). | Rigid enterprise release cycles with formal audit gates. |
+Pre-commit hooks validate code locally on the developer's workstation before a git commit is allowed:
 
----
-
-### 6.3 Automated Pre-Commit Hooks
-
-#### Definition
-Pre-commit hooks are automated scripts that execute locally before `git commit` succeeds, enforcing code formatting, SQL style consistency, and preventing credential leaks.
-
-#### Configuration (`.pre-commit-config.yaml`)
 ```yaml
+# .pre-commit-config.yaml
 repos:
   - repo: https://github.com/sqlfluff/sqlfluff
     rev: 2.3.5
     hooks:
       - id: sqlfluff-lint
-        args: [--dialect, postgres]
+        args: [--dialect, databricks]
   - repo: https://github.com/psf/black
     rev: 23.9.1
     hooks:
@@ -921,7 +1020,7 @@ repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.0
     hooks:
-      - id: gitleaks # Prevents committing API keys or passwords!
+      - id: gitleaks  # Blocks committing API keys, tokens, or private certificates
 ```
 
 ---
@@ -930,99 +1029,64 @@ repos:
 
 ---
 
-### 7.1 Docker for Data Engineering
+### 7.1 Docker for Data Engineering: Multi-Stage Containerization
 
-#### Definition
-Docker packages data transformation code, language interpreters, system C-libraries, and database drivers into an immutable, portable container image, eliminating "it works on my machine" failures.
+Multi-stage Docker builds isolate build-time dependencies, producing minimal, secure production container images:
 
-#### Multi-Stage Production Dockerfile for PySpark
 ```dockerfile
-# Stage 1: Builder stage to isolate and compile Python dependencies
+# Stage 1: Build & Dependency Isolation
 FROM python:3.11-slim AS builder
-WORKDIR /app
-# Copy only requirements file to leverage Docker layer caching
+WORKDIR /install
 COPY requirements.txt .
-# Install packages into user directory, disabling cache to minimize intermediate image bloat
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Stage 2: Minimal runtime production container containing OpenJDK for Spark execution
-FROM openjdk:17-slim
+# Stage 2: Minimal Production Runtime with Java JRE for PySpark
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-# Copy only compiled Python site-packages from the builder stage
-COPY --from=builder /root/.local /root/.local
-# Copy application source code into the production image
+
+# Install minimal Python runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-compiled Python packages from builder stage
+COPY --from=builder /install /usr/local
 COPY src/ /app/src/
-# Expose user-installed Python binaries in PATH
-ENV PATH=/root/.local/bin:$PATH
-# Define default immutable entrypoint for pipeline invocation
-ENTRYPOINT ["python", "src/main_pipeline.py"]
+
+ENV PYTHONPATH="/app"
+ENTRYPOINT ["python3", "src/pipeline_entrypoint.py"]
 ```
 
 ---
 
-### 7.2 Kubernetes for Data
+### 7.2 Kubernetes for Data: Spark-on-K8s & Airflow KubernetesExecutor
 
-#### 1. Apache Spark on Kubernetes
-Replaces legacy YARN clusters. The `Spark-on-K8s` operator listens for `SparkApplication` custom resources (CRDs), spinning up an ephemeral Driver Pod which dynamically requests Worker Executor Pods. When the job finishes, pods terminate immediately (true scale-to-zero).
-
-```mermaid
-flowchart LR
-    subgraph ControlPlane ["Control Plane & CRD Controller"]
-        direction LR
-        Submit["User: kubectl apply -f spark_app.yaml"] --> K8sAPI["Kubernetes API Server"]
-        K8sAPI --> SparkOperator["Spark K8s Operator<br/>(Watches SparkApplication CRD)"]
-    end
-
-    subgraph PodFleet ["Workload Pod Orchestration"]
-        direction LR
-        DriverPod["Driver Pod<br/>(Job Master & SparkContext)"]
-        ExecPod1["Executor Pod 1<br/>(Core Worker)"]
-        ExecPod2["Executor Pod 2<br/>(Core Worker)"]
-        DriverPod -->|Dynamic Task Allocation| ExecPod1 & ExecPod2
-    end
-
-    SparkOperator -->|Provisions Pod| DriverPod
-
-    style ControlPlane fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style PodFleet fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style Submit fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style K8sAPI fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style SparkOperator fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style DriverPod fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style ExecPod1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style ExecPod2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-```
-
-#### 2. Apache Airflow on Kubernetes (`KubernetesExecutor`)
-Every single task in an Airflow DAG launches inside its own isolated Kubernetes Pod with dedicated CPU/RAM requests, custom Docker images, and independent environment variables.
+1. **Apache Spark on Kubernetes (Spark-on-K8s):**
+   - The Spark K8s Operator manages `SparkApplication` custom resources (CRDs).
+   - An ephemeral Driver Pod launches and dynamically provisions Worker Executor Pods.
+   - When computation completes, executor pods terminate immediately, achieving true **scale-to-zero** cost efficiency.
+2. **Apache Airflow `KubernetesExecutor`:**
+   - Every individual DAG task runs inside its own isolated Docker container pod.
+   - Eliminates package dependency conflicts between different data engineering teams.
 
 ---
 
-### 7.3 Infrastructure as Code (Terraform)
+### 7.3 Infrastructure as Code: Terraform Architecture & State Locking
 
-#### Definition
-Terraform provisions and manages cloud data infrastructure (cloud storage buckets, IAM permissions, database instances, networking rules) declaratively in version-controlled `.tf` configuration files.
-
-#### Code Example (Terraform ADLS Gen2 Data Lake)
-```hcl
-resource "azurerm_storage_account" "datalake" {
-  name                     = "enterpriselakehouseprod"
-  resource_group_name      = "rg-data-platform"
-  location                 = "eastus"
-  account_tier             = "Standard"
-  account_replication_type = "GRS"
-  is_hns_enabled           = true # Enables ADLS Gen2 Hierarchical Namespace
-}
-```
+In production, Terraform state files are stored in an Azure Blob Storage container with **Lease-Based Locking**:
+- When `terraform apply` executes, Terraform acquires an exclusive lease lock on the state blob.
+- Concurrent pipeline executions are blocked, preventing corrupted infrastructure state.
 
 ---
 
-### 7.4 Multi-Environment Promotion
+### 7.4 Multi-Environment Promotion (`dev` $\rightarrow$ `stage` $\rightarrow$ `prod`)
 
-Enterprise DataOps isolates data across three distinct environments:
-1. **Development (`dev`):** Developers test against synthetic data or sanitized sample tables.
-2. **Staging (`stage`):** Full integration testing, automated dbt tests, and performance benchmarking on recent production clones.
-3. **Production (`prod`):** Strictly locked down; access restricted to automated CI/CD service principals.
+| Environment | Data Scope | Access Permissions | Compute Sizing |
+| :--- | :--- | :--- | :--- |
+| **Development (`dev`)** | Synthetic data or sanitized samples | Developers have Contributor access | Minimal single-node or autoscaling clusters |
+| **Staging (`stage`)** | Full production snapshot clone | Automated CI/CD service principals + QA testers | Sized identical to production for load testing |
+| **Production (`prod`)** | Live enterprise transactional data | **Zero human interactive access**; CI/CD SPN only | Enterprise resilient multi-node clusters |
 
 ---
 
@@ -1032,139 +1096,161 @@ Enterprise DataOps isolates data across three distinct environments:
 
 ### 8.1 Unit Testing Transformation Logic with `pytest`
 
-#### Best Practice
-Extract business transformation logic into pure, stateless Python functions independent of Spark or database sessions, allowing lightning-fast local testing.
+Pure business transformations should be extracted into stateless Python functions to allow instant execution in local CI test suites:
 
 ```python
-# test_transformations.py - Unit test suite for data pipeline business logic
 import pytest
 
-def calculate_net_revenue(gross: float, tax_rate: float, discount: float) -> float:
-    """Calculates net revenue applying promotional discount and regional tax rate."""
-    if gross < 0:
-        # Defensive validation: reject negative gross revenues
-        raise ValueError("Gross revenue cannot be negative")
-    # Compute net: (Gross - Discount) * (1 + Tax) rounded to 2 decimal places
-    return round((gross - discount) * (1.0 + tax_rate), 2)
+def calculate_customer_tier(total_spend: float, tenure_months: int) -> str:
+    """Classifies customers into loyalty tiers based on lifetime spend and tenure."""
+    if total_spend < 0:
+        raise ValueError("Total spend cannot be negative")
+    if total_spend >= 10000.0 and tenure_months >= 12:
+        return "PLATINUM"
+    elif total_spend >= 5000.0:
+        return "GOLD"
+    elif total_spend >= 1000.0:
+        return "SILVER"
+    return "BRONZE"
 
-def test_calculate_net_revenue_valid():
-    """Assert standard happy path: ($100 - $10) * 1.10 = $99.00."""
-    assert calculate_net_revenue(100.0, 0.10, 10.0) == 99.0
+def test_calculate_customer_tier_platinum():
+    assert calculate_customer_tier(12500.0, 18) == "PLATINUM"
 
-def test_calculate_net_revenue_negative():
-    """Assert error handling: negative gross amounts must raise ValueError."""
-    with pytest.raises(ValueError, match="Gross revenue cannot be negative"):
-        calculate_net_revenue(-50.0, 0.10, 0.0)
+def test_calculate_customer_tier_negative_spend():
+    with pytest.raises(ValueError, match="Total spend cannot be negative"):
+        calculate_customer_tier(-100.0, 5)
 ```
 
 ---
 
-### 8.2 Integration Testing with Testcontainers
+### 8.2 Integration Testing with Testcontainers & Azurite
 
-#### Definition
-Testcontainers is a Python library that spins up real, ephemeral Docker containers (e.g., a real PostgreSQL database or LocalStack S3) during integration test runs, executing tests against real database engines and tearing them down automatically.
+**Testcontainers** spins up real Docker containers during integration test runs:
+- Spins up the **Microsoft Azure Storage Azurite Emulator** container in Docker.
+- Tests upload, read, and write operations against the local emulator container.
+- Tears down the container automatically upon test completion.
+
+```python
+import pytest
+from testcontainers.core.container import DockerContainer
+from azure.storage.blob import BlobServiceClient
+
+@pytest.fixture(scope="session")
+def azurite_container():
+    """Spins up local Azurite Azure Storage Emulator inside Docker for testing."""
+    with DockerContainer("mcr.microsoft.com/azure-storage/azurite").with_bind_ports(10000, 10000) as container:
+        yield container
+
+def test_adls_upload_integration(azurite_container):
+    connection_string = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+    client = BlobServiceClient.from_connection_string(connection_string)
+    container_client = client.create_container("test-bronze")
+    
+    blob_client = container_client.get_blob_client("test_data.parquet")
+    blob_client.upload_blob(b"PAR1_MOCK_BYTES", overwrite=True)
+    
+    assert blob_client.exists() == True
+```
 
 ---
 
-### 8.3 End-to-End Pipeline Testing
+### 8.3 End-to-End Pipeline Testing & Regression Baselines
 
-Validates the full pipeline flow: ingesting synthetic files, triggering transformations, and asserting final Gold-layer analytical aggregates.
+End-to-end integration tests execute pipelines against isolated test environments, comparing output datasets against historical golden baselines using statistical diffing.
 
 ---
 
 ### 8.4 Synthetic Test Data Generation with `Faker`
 
-#### Code Example
 ```python
 from faker import Faker
 import pandas as pd
 
-# Initialize synthetic data generator with consistent seed for test reproducibility
 fake = Faker()
 Faker.seed(42)
 
-def generate_mock_customers(n: int = 1000) -> pd.DataFrame:
-    """Generates synthetic customer demographic records for CI/CD pipeline integration tests."""
-    records = []
-    for _ in range(n):
-        records.append({
-            "customer_id": fake.uuid4(),                  # RFC 4122 compliant UUID
-            "name": fake.name(),                          # Realistic human name
-            "email": fake.email(),                        # Syntactically valid email address
-            "country": fake.country_code(),               # ISO 3166-1 alpha-2 country code
-            "signup_date": fake.date_this_decade()        # Synthetic date within current decade
+def generate_mock_transactions(count: int = 500) -> pd.DataFrame:
+    """Generates synthetic e-commerce transaction data for automated integration tests."""
+    data = []
+    for _ in range(count):
+        data.append({
+            "transaction_id": fake.uuid4(),
+            "customer_id": fake.random_int(min=1000, max=9999),
+            "amount": round(fake.pyfloat(left_digits=3, right_digits=2, positive=True), 2),
+            "status": fake.random_element(elements=("COMPLETED", "PENDING", "CANCELLED")),
+            "event_timestamp": fake.date_time_this_month().isoformat()
         })
-    return pd.DataFrame(records)
+    return pd.DataFrame(data)
 
-# Generate batch of 500 mock customer profiles
-df_mock = generate_mock_customers(500)
-# Export synthetic fixture to CSV for automated pipeline integration tests
-df_mock.to_csv("test_data_customers.csv", index=False)
-print(f"Generated {len(df_mock)} mock customer rows for CI test suite.")
+# Generate synthetic dataset
+df_synthetic = generate_mock_transactions(100)
+print(f"Generated {len(df_synthetic)} synthetic records for CI pipeline tests.")
 ```
 
 ---
 
+### 8.5 Blue-Green Deployments for Zero-Downtime Pipeline Releases
 
----
-
-### 8.5 Blue-Green Deployments for Data Pipelines
-
-#### Definition
-Blue-Green deployments eliminate downtime and prevent publishing broken data to executive dashboards. 
-- **Blue (Active):** Currently serving production queries.
-- **Green (Idle):** New pipeline version writes to a new staging table.
-- Once data quality tests pass on Green, a single atomic view swap or pointer change routes all user queries to Green.
+Blue-Green deployment ensures zero downtime and eliminates broken dashboard queries during pipeline updates:
 
 ```mermaid
-flowchart LR
-    subgraph ActiveState ["1. Active Blue State"]
+flowchart TD
+    subgraph GreenStaging ["2. Deploy Green Pipeline in Parallel"]
         direction LR
-        BI1[PowerBI Dashboard] --> View1["Public View: 'v_orders'"]
-        View1 --> BlueTable[(Table: orders_v1 - Blue)]
+        NewPipeline[v2 Pipeline Code] --> GreenTable[(orders_v2 - Green)]
+        GreenTable --> DQCheck{"Data Quality Tests Pass?"}
     end
 
-    subgraph GreenDeploy ["2. Deploy Green Pipeline in Parallel"]
-        NewPipeline[v2 Pipeline Code] --> GreenTable[(Table: orders_v2 - Green)]
-        GreenTable --> Tests{"Data Quality Tests Pass?"}
+    subgraph AtomicSwitch ["3. Instant Atomic Pointer Cutover"]
+        direction LR
+        DQCheck -- Passed! --> SwapSQL["CREATE OR REPLACE VIEW v_orders AS SELECT * FROM orders_v2;"]
+        SwapSQL --> SwappedBI["BI Queries Instantly Directed to Green! (Zero Downtime)"]
     end
 
-    subgraph AtomicCutover ["3. Instant Atomic Pointer Swap"]
-        Tests -- Pass! --> Swap["CREATE OR REPLACE VIEW v_orders AS SELECT * FROM orders_v2;"]
-        Swap --> Cutover["BI Queries Instantly Route to Green Table (Zero Downtime!)"]
+    subgraph BlueActive ["1. Active Blue Production (Live BI Queries)"]
+        BI_Live[Power BI Dashboard] --> PublicView["Public View: v_orders"]
+        PublicView --> BlueTable[(orders_v1 - Blue)]
     end
 
-    style ActiveState fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style GreenDeploy fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style AtomicCutover fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style BlueActive fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style GreenStaging fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style AtomicSwitch fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
 
-    style BI1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style View1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style BI_Live fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style PublicView fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style BlueTable fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style NewPipeline fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style GreenTable fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Tests fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Swap fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Cutover fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style DQCheck fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style SwapSQL fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style SwappedBI fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
 ```
 
 ---
 
 ### 8.6 Canary Deployments & Shadow Pipelines
 
-- **Shadow Pipeline:** The new pipeline version runs concurrently in parallel with the live production pipeline, consuming live data streams. Outputs are programmatically diffed; once zero regression is verified over 48 hours, the old pipeline is decommissioned.
-- **Canary Pipeline:** Routes 5% of incoming customer traffic to the new data model, monitoring for query latency or error spikes before rolling out to 100%.
-
-#### References
-- [GeeksforGeeks: Blue Green Deployment](https://www.geeksforgeeks.org/what-is-blue-green-deployment/)
-- [DataCamp: CI/CD for Machine Learning and Data](https://www.datacamp.com/tutorial/ci-cd-for-machine-learning)
+- **Shadow Pipeline:** The new pipeline version runs concurrently against live streaming data in parallel with the production pipeline. Output metrics are compared automatically for 48 hours to guarantee zero regression before cutover.
+- **Canary Release:** Routes 5% of read queries or downstream batch runs to the new model, monitoring error logs and query latency before rolling out to 100% of enterprise users.
 
 ---
 
+# 9. Azure Production Engineering Summary & Operational Governance
+
+- **Network Isolation & Hub-Spoke Security:** Enterprise Azure data architectures must disable public internet endpoints on ADLS Gen2, Synapse, and Azure Key Vault, routing all intra-cloud traffic across private endpoints linked to hub-and-spoke virtual networks. Azure Databricks workspaces must utilize VNet injection with Secure Cluster Connectivity (No Public IP) to ensure worker nodes communicate entirely within private network perimeters.
+- **Identity-First Security & Credential Elimination:** All services and pipeline orchestrators must authenticate via Microsoft Entra ID (formerly Azure AD) System-Assigned or User-Assigned Managed Identities. Static tokens, connection strings, and passwords in pipeline definitions are prohibited; when external secrets are necessary, access Azure Key Vault using Azure RBAC roles (`Key Vault Secrets User`).
+- **Lakehouse & Analytical Warehouse Optimization:** Enable ADLS Gen2 Hierarchical Namespace (HNS) for $O(1)$ atomic rename performance during Spark job commits. In Azure Synapse Dedicated SQL Pools, distribute large fact tables ($> 2\text{ GB}$) using hash distribution across 60 compute nodes on high-cardinality join keys, while replicating small dimension tables ($< 2\text{ GB}$) to eliminate data movement service (DMS) shuffle latency.
+- **Delta Lake ACID & Merge Efficiency:** Enforce ACID `MERGE` operations on Delta Lake tables with row-level hashing (`SHA-256`) to avoid updating untouched records. Schedule automated compaction (`OPTIMIZE`) and purge deleted tombstones (`VACUUM`) according to negotiated business retention policies.
+- **DataOps Automation & Progressive Delivery:** Automate continuous integration with pre-commit credential scanning (`gitleaks`), SQL linting (`sqlfluff`), and containerized integration tests using Testcontainers against Azurite emulators. Enforce Terraform remote state locking with Azure Blob Storage leases, and promote schema updates through shadow pipelines and zero-downtime blue-green table swaps.
+
 ---
 
-# 9. References & Further Reading
+# 10. References & Further Reading
 
-- [Official Documentation & Design Principles Guide](https://docs.microsoft.com/en-us/azure/architecture/)
-- [High Performance Distributed Data Architecture Patterns](https://martinfowler.com/articles/patterns-of-distributed-systems/)
+- [Microsoft Learn: Azure Architecture Center (Data Platform Architecture)](https://learn.microsoft.com/en-us/azure/architecture/)
+- [Microsoft Learn: Azure Data Lake Storage Gen2 Introduction](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
+- [Microsoft Learn: Azure Synapse Dedicated SQL Pool Design Guidance](https://learn.microsoft.com/en-us/azure/synapse-analytics/sql-data-warehouse/sql-data-warehouse-tables-distribute)
+- [Databricks Documentation: Azure Databricks Architecture & Unity Catalog](https://docs.databricks.com/en/index.html)
+- [Microsoft Fabric Documentation & OneLake Architecture](https://learn.microsoft.com/en-us/fabric/)
+- [HashiCorp Terraform azurerm Provider Documentation](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
 - [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)

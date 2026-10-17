@@ -9,23 +9,23 @@ A comprehensive, production-grade guide to workflow orchestration and analytics 
 ```mermaid
 flowchart TD
     subgraph AirflowControlPlane ["Airflow Workflow Control Plane (Orchestration Layer)"]
+        direction TD
         Scheduler["Airflow Scheduler<br/>(Evaluates DAG cron/datasets & dependencies)"]
         Executor["Celery / Kubernetes Executor<br/>(Spawns isolated task worker containers)"]
         Sensors["Deferrable Operators & Sensors<br/>(Async event trigger polling without slot holding)"]
     end
     subgraph ComputeEngine ["dbt Transformation Layer (Pushdown Compute)"]
+        direction TD
         dbtModels["dbt Models & Jinja Macros<br/>(Compiles modular SQL DAGs into warehouse targets)"]
         Incremental["Incremental Models & Quality Gates<br/>(MERGE logic, schema tests & singular assertions)"]
     end
     subgraph WarehouseSink ["Cloud Data Lakehouse / Warehouse"]
+        direction TD
         Lakehouse["Delta Lake / Snowflake / BigQuery<br/>(In-engine distributed SQL physical execution)"]
     end
 
-    Scheduler --> Executor
-    Executor --> dbtModels
-    Sensors --> Scheduler
-    dbtModels --> Incremental
-    Incremental --> Lakehouse
+    AirflowControlPlane --> ComputeEngine
+    ComputeEngine --> WarehouseSink
 
     style AirflowControlPlane fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style ComputeEngine fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
@@ -68,7 +68,10 @@ flowchart TD
    - [2.9 dbt Packages](#29-dbt-packages)
    - [2.10 Exposures & the dbt Semantic Layer](#210-exposures-the-dbt-semantic-layer-metric-standardization)
    - [2.11 `dbt build` vs `dbt run` & CLI Operations Cheatsheet](#211-dbt-build-vs-dbt-run-cli-operations-cheatsheet)
-3. [References & Further Reading](#3-references-further-reading)
+3. [Summary Comparison & Engineering Reference Matrix](#3-summary-comparison--engineering-reference-matrix)
+   - [3.1 Orchestration vs. Transformation: Airflow vs. dbt vs. Modern Alternatives](#31-orchestration-vs-transformation-airflow-vs-dbt-vs-modern-alternatives)
+   - [3.2 Production Pipeline Orchestration & Transformation Invariants](#32-production-pipeline-orchestration--transformation-invariants)
+4. [References & Further Reading](#4-references--further-reading)
 
 ---
 
@@ -77,9 +80,9 @@ flowchart TD
 In modern production data platforms, enterprise workloads separate the **orchestration layer** (scheduling, dependency management, sensor polling, cluster provisioning, alerting) from the **transformation layer** (in-warehouse compute, SQL logic, incremental merges). Apache Airflow provides a robust, Python-native control plane to schedule and monitor complex workflow graphs, while transformation engines like dbt execute pushdown compute within cloud warehouses.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph AirflowControlPlane["Apache Airflow: Workflow Orchestration & Control Plane"]
-        direction TD
+        direction LR
         A[Trigger: Event / Cron] --> B[Sensor: S3/Kafka Arrival]
         B --> C[Operator: Spin Up Compute / Ingest]
         C --> D[dbt Cloud / Core Run Operator]
@@ -161,13 +164,15 @@ In distributed orchestration, pipelines frequently wait for external preconditio
 For hands-on coverage, consult GeeksforGeeks' [Airflow DAGs and Operators](https://www.geeksforgeeks.org/airflow-dags-and-operators/) and DataCamp's [Building an ETL Pipeline with Airflow](https://www.datacamp.com/tutorial/airflow-tutorial).
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Standard_Sensor["Standard Sensor (Worker Slot Starvation)"]
+        direction LR
         Slot1["Worker Slot 1 (Occupied / Blocked)"] -->|Poke every 60s| S3_1["S3 Bucket"]
         Slot1 -.->|Worker cannot run real ETL tasks!| Blocked["Resource Waste"]
     end
 
     subgraph Deferrable_Operator["Deferrable Operator (Zero Slot Utilization)"]
+        direction LR
         Worker["Worker initializes task"] -->|Suspends itself & releases worker slot| Trig["Airflow Triggerer (AsyncIO Loop)"]
         Trig -->|Async poll via HTTP/Boto3| S3_2["S3 Bucket"]
         Trig -->|Condition Met! Fires Event| ResumedWorker["New Worker Slot allocated to finish job"]
@@ -1325,7 +1330,7 @@ renamed_and_cast AS (
 SELECT * FROM renamed_and_cast
 ```
 
-> For SQL Common Table Expression (CTE) syntax, inlining vs materialization semantics, and modular query patterns, see [02. Advanced SQL](02_advanced_sql.md#22-common-table-expressions-ctes--materialization-semantics). For foundational SQL data types, safe conversions, and string functions, see [01. SQL Fundamentals](01_sql_fundamentals.md#2-data-types-casting--defensive-conversions).
+> For SQL Common Table Expression (CTE) syntax, inlining vs materialization semantics, and modular query patterns, see [02. Advanced SQL](02_advanced_sql.md#23-common-table-expressions-ctes-inlining-vs-optimization-fences). For foundational SQL data types, safe conversions, and string functions, see [01. SQL Fundamentals](01_sql_fundamentals.md#2-data-types-casting--defensive-conversions).
 
 ---
 
@@ -1394,7 +1399,7 @@ SELECT * FROM final_fact
 - **`merge` (Snowflake, BigQuery, Databricks)**: Executes an ANSI SQL `MERGE INTO target USING source ON target.unique_key = source.unique_key`. Updates matched records and inserts unmatched rows atomically.
 - **`delete+insert` (Redshift, PostgreSQL)**: Deletes records matching the unique key in the target table, then inserts new rows. Ideal for warehouses lacking native partition-level `MERGE` performance.
 
-> For underlying MERGE and UPSERT SQL mechanics, deduplicating CDC staging feeds, and handling non-unique join key constraints, see [02. Advanced SQL](02_advanced_sql.md#51-merge--upsert--change-data-capture-cdc-patterns).
+> For underlying MERGE and UPSERT SQL mechanics, deduplicating CDC staging feeds, and handling non-unique join key constraints, see [02. Advanced SQL](02_advanced_sql.md#51-merge--upsert-mechanics--change-data-capture-cdc).
 
 ---
 
@@ -1655,13 +1660,41 @@ dbt docs generate && dbt docs serve --port 8081
 
 ---
 
-# 3. References & Further Reading
+---
 
-- [GeeksforGeeks: Apache Airflow Tutorial](https://www.geeksforgeeks.org/apache-airflow/)
-- [GeeksforGeeks: Airflow DAG Architecture & TaskFlow API](https://www.geeksforgeeks.org/introduction-to-airflow-dag/)
-- [DataCamp: Introduction to Apache Airflow in Python](https://www.datacamp.com/courses/introduction-to-airflow-in-python)
-- [DataCamp: Introduction to dbt (Data Build Tool)](https://www.datacamp.com/courses/introduction-to-dbt)
-- [Apache Airflow Official Documentation](https://airflow.apache.org/docs/)
-- [Astronomer Cosmos: Running dbt in Airflow](https://astronomer.github.io/astronomer-cosmos/)
-- [dbt Official Documentation](https://docs.getdbt.com/)
-- [dbt Packages Hub](https://hub.getdbt.com/)
+# 3. Summary Comparison & Engineering Reference Matrix
+
+### 3.1 Orchestration vs. Transformation: Airflow vs. dbt vs. Modern Alternatives
+
+In production data engineering platforms, pipeline reliability depends on maintaining clear separation between the workflow orchestrator (coordinating task lifecycles, sensors, and heterogeneous compute) and the transformation engine (compiling SQL and executing pushdown logic inside data warehouses).
+
+| Capability / Dimension | Apache Airflow | dbt (Core / Cloud) | Dagster | Prefect (2.x / 3.x) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Primary Architectural Role** | **Workflow Orchestrator & Control Plane** | **SQL-First In-Warehouse Transformation Engine** | **Asset-Based Data Orchestrator** | **Code-As-Workflows Application Orchestrator** |
+| **Execution Abstraction** | Task-based Directed Acyclic Graphs (`DAG`) | Software-Defined SQL/Python Models & DAG Lineage | Software-Defined Assets (`@asset`) with explicit data dependencies | Dynamic functional workflows (`@flow`, `@task`) |
+| **Compute Placement** | Orchestrates external compute (EKS, Dataproc, Snowflake) or runs Python operators locally | Pure pushdown: 100% of SQL compute runs inside target warehouse/lakehouse | Hybrid: In-memory Python transformations or delegated warehouse compute | Hybrid: Code runs on ephemeral infrastructure (Work Pools, Docker, K8s) |
+| **State & Lineage Tracking** | Metadata DB (PostgreSQL) records task instance states, retries, and run logs | Compiles `manifest.json` documenting full column and model dependency lineage | Native data asset cataloging with automated partitioned materialization tracking | Dynamic task run states and parameters tracked in Prefect Cloud/Server |
+| **Testing & Quality Gates** | Custom Python operators, Great Expectations, or SQLCheckOperators | Built-in generic & singular data assertions (`not_null`, `unique`, `relationships`, `accepted_values`) | Built-in asset checks (`@asset_check`) executed immediately after materialization | Custom test tasks or integrated data validation libraries |
+| **Failure Recovery & Retries** | Automatic retry policies with exponential backoff; manual task/DAG clearing via UI | Re-run failed models via `dbt retry` or state-modified flags (`state:modified+`) | Re-materialize failed assets or stale upstream dependencies | Dynamic task retries with customizable hooks and pause-for-input states |
+| **Recommended Production Pairing** | **Pair with dbt via Astronomer Cosmos** for enterprise data platforms. | **Core transformation standard** inside Snowflake, BigQuery, Databricks, Redshift. | Standalone orchestration for teams prioritizing asset-driven data pipelines. | Modern Python data engineering applications, event-driven pipelines, ML workflows. |
+
+---
+
+### 3.2 Production Pipeline Orchestration & Transformation Invariants
+
+- **Separation of Concerns (Orchestration vs. Execution):** Never execute heavy data transformations directly within Airflow workers or the Airflow scheduler process. Airflow workers must act strictly as lightweight dispatchers triggering pushdown compute (e.g., triggering dbt runs, Databricks jobs, or BigQuery queries) to prevent executor OOM failures and scheduler heartbeat starvation.
+- **Astronomer Cosmos for Granular dbt Lineage:** When deploying dbt models within Airflow, use **Astronomer Cosmos** instead of monolithic `BashOperator(bash_command="dbt run")` calls. Cosmos parses your dbt `manifest.json` and renders each individual dbt model as a native Airflow task, providing fine-grained observability, selective task retries, and parallel task scheduling.
+- **Idempotency & Deterministic Data Intervals:** All Airflow DAGs and dbt incremental models must be strictly idempotent. Design tasks using Airflow's deterministic logical date variables (`data_interval_start`, `data_interval_end`) rather than runtime wall-clock timestamps (`datetime.now()`) to guarantee identical, repeatable results during historical backfills.
+- **Incremental Model Unique Key Contracts:** Every dbt incremental model using `incremental_strategy = 'merge'` must explicitly define a `unique_key`. Omitting the unique key forces dbt into append-only behavior, causing duplicate row explosions whenever downstream pipeline retries or backfills are triggered.
+- **Testing in the CI/CD Lifecycle (Slim CI):** Enforce `dbt build` instead of `dbt run` in production pipelines to run unit and data quality tests concurrently with model execution. In development and pull request CI pipelines, leverage Slim CI (`dbt test --select state:modified+ --state ./target-base`) to evaluate only modified models and their immediate downstream dependencies, reducing CI runtime and cloud warehouse compute costs by up to $80\%$.
+
+---
+
+# 4. References & Further Reading
+
+- [Apache Airflow Official Documentation](https://airflow.apache.org/docs/) — Complete architecture, TaskFlow API, and executor configurations.
+- [dbt Official Documentation](https://docs.getdbt.com/) — Model transformations, materialization strategies, incremental logic, and Jinja macros.
+- [Astronomer Cosmos: The Bridge Between Airflow and dbt](https://astronomer.github.io/astronomer-cosmos/) — Dynamic translation of dbt projects into Airflow task groups.
+- [Data Pipeline Design Patterns: Separation of Orchestration and Transformation](https://martinfowler.com/articles/data-monolith-to-mesh.html) — Enterprise patterns for distributed data platforms.
+- [dbt Packages Hub](https://hub.getdbt.com/) — Community packages including `dbt-utils`, `dbt-expectations`, and `codegen`.
+- [Apache Airflow DAG Architecture & Best Practices](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html) — Production guidelines on top-level code performance, pools, and SLAs.

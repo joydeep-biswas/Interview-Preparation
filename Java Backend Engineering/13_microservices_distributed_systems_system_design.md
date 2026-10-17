@@ -97,7 +97,7 @@ flowchart TD
 3. [Distributed Transactions & Event-Driven Patterns](#3-distributed-transactions-event-driven-patterns)
    - [3.1 Two-Phase Commit (2PC) vs Saga Pattern](#31-two-phase-commit-2pc-vs-saga-pattern)
    - [3.2 Saga Choreography vs Saga Orchestration](#32-saga-choreography-vs-saga-orchestration)
-   - [3.3 Production Saga Orchestrator Implementation with Compensating Transactions](#33-production-saga-orchestrator-implementation-with-compensating-transactions)
+   - [3.3 Production Saga Orchestrator Implementation with Persistent State Machine](#33-production-saga-orchestrator-implementation-with-persistent-state-machine)
    - [3.4 The Transactional Outbox Pattern & CDC with Debezium](#34-the-transactional-outbox-pattern-cdc-with-debezium)
    - [3.5 CQRS (Command Query Responsibility Segregation) Architecture](#35-cqrs-command-query-responsibility-segregation-architecture)
    - [3.6 Event Sourcing Fundamentals & Aggregate Snapshots](#36-event-sourcing-fundamentals-aggregate-snapshots)
@@ -649,57 +649,207 @@ sequenceDiagram
 
 ---
 
-### 3.3 Production Saga Orchestrator Implementation with Compensating Transactions
+---
+
+### 3.3 Production Saga Orchestrator Implementation with Persistent State Machine
+
+A production-grade Saga Orchestrator cannot simply rely on in-memory procedural calls; if the orchestrator pod crashes midway through a transaction, uncompensated distributed state will be orphaned indefinitely. A resilient orchestrator must persist its execution state machine to durable storage at each step boundary.
+
+```mermaid
+stateDiagram-v2
+    [*] --> SAGA_STARTED: Client Submits Order
+    SAGA_STARTED --> ORDER_PENDING: 1. Create Pending Order
+    ORDER_PENDING --> PAYMENT_AUTHORIZED: 2. Authorize Payment
+    ORDER_PENDING --> ORDER_FAILED: Order Creation Fails
+
+    PAYMENT_AUTHORIZED --> INVENTORY_RESERVED: 3. Reserve Stock
+    PAYMENT_AUTHORIZED --> COMPENSATING_PAYMENT: Stock Out / Fail
+    
+    COMPENSATING_PAYMENT --> PAYMENT_REFUNDED: Refund Customer
+    PAYMENT_REFUNDED --> COMPENSATING_ORDER: Cancel Pending Order
+    COMPENSATING_ORDER --> SAGA_FAILED: Terminal Failure State
+
+    INVENTORY_RESERVED --> ORDER_COMPLETED: 4. Finalize Order
+    ORDER_COMPLETED --> SAGA_SUCCESS: Terminal Success State
+```
+
+#### Production Saga Schema DDL (PostgreSQL)
+
+```sql
+CREATE TABLE saga_instance (
+    saga_id UUID PRIMARY KEY,
+    saga_type VARCHAR(64) NOT NULL,
+    current_state VARCHAR(64) NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE saga_step_log (
+    step_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    saga_id UUID NOT NULL REFERENCES saga_instance(saga_id) ON DELETE CASCADE,
+    step_name VARCHAR(64) NOT NULL,
+    step_status VARCHAR(32) NOT NULL, -- PENDING, COMPLETED, COMPENSATED, FAILED
+    error_message TEXT,
+    executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_saga_lookup ON saga_instance (saga_type, current_state);
+```
+
+#### Production Saga Orchestrator Java Implementation
 
 ```java
-package com.company.saga;
+package com.company.saga.orchestrator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
-public record OrderSagaContext(UUID orderId, UUID customerId, double amount, String itemId) {}
+public record OrderSagaPayload(UUID orderId, UUID customerId, double amount, String itemId, int quantity) {}
+
+public enum SagaState {
+    STARTED,
+    ORDER_PENDING,
+    PAYMENT_AUTHORIZED,
+    INVENTORY_RESERVED,
+    COMPENSATING_PAYMENT,
+    COMPENSATING_ORDER,
+    COMPLETED,
+    FAILED
+}
 
 @Service
-public class OrderSagaOrchestrator {
+public class ResilientOrderSagaOrchestrator {
 
+    private static final Logger log = LoggerFactory.getLogger(ResilientOrderSagaOrchestrator.class);
+
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
     private final OrderServiceClient orderService;
     private final PaymentServiceClient paymentService;
     private final InventoryServiceClient inventoryService;
 
-    public OrderSagaOrchestrator(OrderServiceClient orderService,
-                                 PaymentServiceClient paymentService,
-                                 InventoryServiceClient inventoryService) {
+    public ResilientOrderSagaOrchestrator(JdbcTemplate jdbcTemplate,
+                                          ObjectMapper objectMapper,
+                                          OrderServiceClient orderService,
+                                          PaymentServiceClient paymentService,
+                                          InventoryServiceClient inventoryService) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
         this.orderService = orderService;
         this.paymentService = paymentService;
         this.inventoryService = inventoryService;
     }
 
-    public boolean executeOrderSaga(OrderSagaContext ctx) {
-        // Step 1: Create Order in PENDING state
-        orderService.createPendingOrder(ctx.orderId(), ctx.customerId(), ctx.amount());
-
-        // Step 2: Authorize Payment
-        boolean paymentSuccess = paymentService.charge(ctx.orderId(), ctx.amount());
-        if (!paymentSuccess) {
-            // Compensation: Cancel Order
-            orderService.cancelOrder(ctx.orderId(), "Payment failed");
-            return false;
+    public UUID startSaga(OrderSagaPayload payload) {
+        UUID sagaId = UUID.randomUUID();
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            jdbcTemplate.update(
+                "INSERT INTO saga_instance (saga_id, saga_type, current_state, payload, updated_at) VALUES (?, ?, ?, ?::jsonb, ?)",
+                sagaId, "ORDER_FULFILLMENT", SagaState.STARTED.name(), jsonPayload, Instant.now()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to persist initial Saga state", e);
         }
 
-        // Step 3: Reserve Inventory
-        boolean inventoryReserved = inventoryService.reserveItem(ctx.orderId(), ctx.itemId());
-        if (!inventoryReserved) {
-            // Trigger Compensations in reverse order:
-            paymentService.refund(ctx.orderId(), ctx.amount());
-            orderService.cancelOrder(ctx.orderId(), "Inventory out of stock");
-            return false;
+        // Execute Saga state machine transitions asynchronously or synchronously
+        executeNextTransition(sagaId, payload);
+        return sagaId;
+    }
+
+    public void executeNextTransition(UUID sagaId, OrderSagaPayload payload) {
+        try {
+            // Step 1: Create Order in Pending State
+            transitionState(sagaId, SagaState.ORDER_PENDING);
+            recordStep(sagaId, "CREATE_PENDING_ORDER", "PENDING");
+            orderService.createPendingOrder(payload.orderId(), payload.customerId(), payload.amount());
+            recordStep(sagaId, "CREATE_PENDING_ORDER", "COMPLETED");
+
+            // Step 2: Authorize Payment
+            recordStep(sagaId, "AUTHORIZE_PAYMENT", "PENDING");
+            boolean paymentSuccess = paymentService.charge(payload.orderId(), payload.amount());
+            if (!paymentSuccess) {
+                recordStep(sagaId, "AUTHORIZE_PAYMENT", "FAILED", "Insufficient funds or gateway decline");
+                triggerCompensations(sagaId, payload, SagaState.COMPENSATING_ORDER);
+                return;
+            }
+            transitionState(sagaId, SagaState.PAYMENT_AUTHORIZED);
+            recordStep(sagaId, "AUTHORIZE_PAYMENT", "COMPLETED");
+
+            // Step 3: Reserve Inventory
+            recordStep(sagaId, "RESERVE_INVENTORY", "PENDING");
+            boolean stockReserved = inventoryService.reserveStock(payload.orderId(), payload.itemId(), payload.quantity());
+            if (!stockReserved) {
+                recordStep(sagaId, "RESERVE_INVENTORY", "FAILED", "Stock unavailable");
+                // Inventory failed: Compensate Payment first, then Cancel Order
+                triggerCompensations(sagaId, payload, SagaState.COMPENSATING_PAYMENT);
+                return;
+            }
+            transitionState(sagaId, SagaState.INVENTORY_RESERVED);
+            recordStep(sagaId, "RESERVE_INVENTORY", "COMPLETED");
+
+            // Step 4: Finalize Order Fulfillment
+            orderService.markOrderConfirmed(payload.orderId());
+            transitionState(sagaId, SagaState.COMPLETED);
+            log.info("Saga {} successfully completed for order {}", sagaId, payload.orderId());
+
+        } catch (Exception ex) {
+            log.error("Unhandled exception during saga {} execution. Triggering fallback compensation", sagaId, ex);
+            triggerCompensations(sagaId, payload, SagaState.COMPENSATING_PAYMENT);
+        }
+    }
+
+    private void triggerCompensations(UUID sagaId, OrderSagaPayload payload, SagaState fromState) {
+        log.warn("Initiating compensating transactions for Saga {} starting from {}", sagaId, fromState);
+
+        if (fromState == SagaState.COMPENSATING_PAYMENT) {
+            transitionState(sagaId, SagaState.COMPENSATING_PAYMENT);
+            try {
+                paymentService.refund(payload.orderId(), payload.amount());
+                recordStep(sagaId, "REFUND_PAYMENT", "COMPENSATED");
+            } catch (Exception e) {
+                log.error("CRITICAL: Failed to compensate payment for order {}. Flagged for manual SRE intervention.", payload.orderId(), e);
+                recordStep(sagaId, "REFUND_PAYMENT", "FAILED", e.getMessage());
+            }
         }
 
-        // Step 4: Finalize Order
-        orderService.completeOrder(ctx.orderId());
-        return true;
+        // Always compensate order back to CANCELLED
+        transitionState(sagaId, SagaState.COMPENSATING_ORDER);
+        try {
+            orderService.cancelOrder(payload.orderId(), "Saga aborted due to downstream dependency failure");
+            recordStep(sagaId, "CANCEL_ORDER", "COMPENSATED");
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to cancel order {}. SRE alerted.", payload.orderId(), e);
+            recordStep(sagaId, "CANCEL_ORDER", "FAILED", e.getMessage());
+        }
+
+        transitionState(sagaId, SagaState.FAILED);
+    }
+
+    private void transitionState(UUID sagaId, SagaState state) {
+        jdbcTemplate.update(
+            "UPDATE saga_instance SET current_state = ?, updated_at = ? WHERE saga_id = ?",
+            state.name(), Instant.now(), sagaId
+        );
+    }
+
+    private void recordStep(UUID sagaId, String stepName, String status) {
+        recordStep(sagaId, stepName, status, null);
+    }
+
+    private void recordStep(UUID sagaId, String stepName, String status, String errorMessage) {
+        jdbcTemplate.update(
+            "INSERT INTO saga_step_log (saga_id, step_name, step_status, error_message, executed_at) VALUES (?, ?, ?, ?, ?)",
+            sagaId, stepName, status, errorMessage, Instant.now()
+        );
     }
 }
 ```
@@ -708,32 +858,62 @@ public class OrderSagaOrchestrator {
 
 ### 3.4 The Transactional Outbox Pattern & CDC with Debezium
 
-The **Dual-Write Problem** occurs when an application writes to a database and publishes to Kafka in two separate steps: if the app crashes between the database commit and the Kafka publish, data becomes permanently inconsistent.
+The **Dual-Write Problem** is one of the most dangerous anti-patterns in distributed systems. It occurs when an application writes to a database and publishes to a message broker (e.g. Kafka) in two separate operations:
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    actor Client as Customer Client
+    participant App as Order Microservice
+    participant DB as PostgreSQL Database
+    participant Kafka as Apache Kafka Cluster
+    participant Downstream as Payment & Shipping Services
+
+    Client->>App: POST /api/v1/orders
+    App->>DB: 1. INSERT INTO orders ... (Committed locally)
+    DB-->>App: OK (Row persisted in DB)
+
+    App--xKafka: 2. kafkaProducer.send(OrderCreatedEvent)
+    Note over App,Kafka: Network Timeout / Broker Crash / JVM Kill!
+    Note over Downstream: Downstream never receives event! Fatal data inconsistency!
+```
+
+If we flip the order and publish to Kafka first, a database constraint violation will leave downstream services processing a phantom order that doesn't exist.
+
+#### The Transactional Outbox Solution
+
+Instead of publishing directly to Kafka, the application writes both the business entity (`orders`) and an outbox event record (`outbox_events`) into the **same database within a single local ACID transaction**. A dedicated Change Data Capture (CDC) agent (Debezium) monitors the database's Write-Ahead Log (WAL) and streams events to Kafka with at-least-once delivery guarantees.
 
 ```mermaid
 flowchart LR
     subgraph Microservice["Order Microservice"]
-        App["Business Logic"]
+        App["Order Application Service"]
     end
 
     subgraph RelationalDB["PostgreSQL Database (ACID Boundary)"]
-        App -->|"1. Atomic Transaction (INSERT)"| OrdersTable["orders table"]
-        App -->|"1. Atomic Transaction (INSERT)"| OutboxTable["outbox_events table"]
+        App -->|"1. Single ACID Transaction (INSERT)"| OrdersTable["orders table"]
+        App -->|"1. Single ACID Transaction (INSERT)"| OutboxTable["outbox_events table"]
     end
 
-    subgraph CDC_Pipeline["Asynchronous CDC Engine"]
+    subgraph CDC_Pipeline["Zero-Overhead CDC Engine"]
         PostgresWAL["PostgreSQL Write-Ahead Log (WAL)"]
-        Debezium["Debezium CDC Connector"]
+        Debezium["Debezium CDC Connector (pgoutput)"]
         PostgresWAL --> Debezium
         Debezium -->|2. Reliable Stream Publish| KafkaTopic["Kafka Topic: 'order-events'"]
     end
 
-    OrdersTable --- PostgresWAL
-    OutboxTable --- PostgresWAL
+    OrdersTable -.-> PostgresWAL
+    OutboxTable -.-> PostgresWAL
+
+    subgraph Downstream_Tiers["Downstream Microservices"]
+        KafkaTopic -->|"3. At-Least-Once Consumption"| PaymentConsumer["Payment Microservice<br/>(Idempotent Deduplication)"]
+    end
 
     style Microservice fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style RelationalDB fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
     style CDC_Pipeline fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Downstream_Tiers fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
 
     style App fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style OrdersTable fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
@@ -741,21 +921,166 @@ flowchart LR
     style PostgresWAL fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style Debezium fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style KafkaTopic fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style PaymentConsumer fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
-#### Production PostgreSQL Outbox DDL
+#### Production PostgreSQL Outbox DDL & Sharding-Friendly Design
 
 ```sql
+-- Outbox Table: Optimized for WAL Streaming and Fast Cleanup
 CREATE TABLE outbox_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     aggregate_type VARCHAR(64) NOT NULL,
     aggregate_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     payload JSONB NOT NULL,
+    trace_id VARCHAR(128),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Index for optional fallback polling worker (if CDC is down)
 CREATE INDEX idx_outbox_created_at ON outbox_events (created_at);
+```
+
+#### Atomic Outbox Publisher in Spring Boot
+
+```java
+package com.company.outbox;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Service
+public class OrderServiceWithOutbox {
+
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
+
+    public OrderServiceWithOutbox(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
+    }
+
+    @Transactional
+    public UUID createOrder(UUID customerId, double totalAmount, String itemId) {
+        UUID orderId = UUID.randomUUID();
+
+        // 1. Insert domain entity into orders table
+        jdbcTemplate.update(
+            "INSERT INTO orders (id, customer_id, total_amount, status, created_at) VALUES (?, ?, ?, ?, ?)",
+            orderId, customerId, totalAmount, "CREATED", Instant.now()
+        );
+
+        // 2. Insert event into outbox_events table within THE SAME DATABASE TRANSACTION
+        try {
+            var eventPayload = new OrderCreatedEvent(orderId, customerId, totalAmount, itemId, Instant.now());
+            String jsonPayload = objectMapper.writeValueAsString(eventPayload);
+
+            jdbcTemplate.update(
+                "INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload, created_at) " +
+                "VALUES (?, ?, ?, ?, ?::jsonb, ?)",
+                UUID.randomUUID(), "Order", orderId.toString(), "OrderCreated", jsonPayload, Instant.now()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to serialize Outbox event", e);
+        }
+
+        // Commit guarantees both Order and OutboxEvent are durably stored together!
+        return orderId;
+    }
+
+    public record OrderCreatedEvent(UUID orderId, UUID customerId, double totalAmount, String itemId, Instant timestamp) {}
+}
+```
+
+#### Production Debezium PostgreSQL Connector Configuration
+
+```json
+{
+  "name": "order-outbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "plugin.name": "pgoutput",
+    "database.hostname": "postgres-order-db.internal",
+    "database.port": "5432",
+    "database.user": "debezium_cdc",
+    "database.password": "${file:/secrets/db-credentials.properties:cdc_password}",
+    "database.dbname": "order_db",
+    "database.server.name": "order_service",
+    "table.include.list": "public.outbox_events",
+    "tombstones.on.delete": "false",
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.route.topic.replacement": "${routedByValue}.events",
+    "transforms.outbox.table.fields.additional.placement": "trace_id:header:traceparent"
+  }
+}
+```
+
+#### Idempotent Consumer Implementation in Downstream Services
+
+Because Debezium and Kafka guarantee **at-least-once delivery**, consumers will occasionally receive duplicate messages during network retries or consumer group rebalances. Consumers must implement an idempotent deduplication filter:
+
+```java
+package com.company.consumer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Component
+public class IdempotentPaymentConsumer {
+
+    private static final Logger log = LoggerFactory.getLogger(IdempotentPaymentConsumer.class);
+    private final JdbcTemplate jdbcTemplate;
+
+    public IdempotentPaymentConsumer(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @KafkaListener(topics = "Order.events", groupId = "payment-service-group")
+    @Transactional
+    public void consumeOrderEvent(String eventJson) {
+        // Extract eventId from message header or payload
+        UUID eventId = extractEventId(eventJson);
+
+        // Insert into processed_events table using primary key constraint for deduplication
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO processed_events (event_id, consumer_group, processed_at) VALUES (?, ?, ?)",
+                eventId, "payment-service-group", Instant.now()
+            );
+        } catch (DuplicateKeyException ex) {
+            log.warn("Duplicate event detected with ID: {}. Skipping execution safely.", eventId);
+            return; // Idempotently ignore already processed message!
+        }
+
+        // Execute core business mutation
+        processPaymentBusinessLogic(eventJson);
+    }
+
+    private UUID extractEventId(String json) {
+        // Parse ID from payload
+        return UUID.randomUUID(); 
+    }
+
+    private void processPaymentBusinessLogic(String json) {
+        log.info("Processing payment for verified new event payload");
+    }
+}
 ```
 
 ---
@@ -1098,136 +1423,591 @@ flowchart TD
 
 ### 5.1 Global URL Shortener (TinyURL) Design
 
+A URL shortener accepts long URLs (e.g. `https://example.com/products/electronics/laptops/123456?ref=summer_promo`) and produces a concise, readable link (e.g. `https://tiny.url/7aBc9Z`). When a client accesses the short link, the service redirects them to the original destination.
+
+#### 5.1.1 Requirements & Scale Estimation
+
+**Functional Requirements:**
+1. Given a long URL, generate a unique, short alias (e.g. 7 characters).
+2. Given a short alias, redirect the user to the original URL with minimal latency (<10ms p99).
+3. Optional custom alias support (e.g. `tiny.url/my-custom-promo`).
+4. Links expire after a default TTL (e.g. 2 years) or user-specified duration.
+5. Click analytics (access count, country, referrer, user agent).
+
+**Non-Functional Requirements:**
+1. **High Availability**: 99.99% uptime; URL redirection must not fail.
+2. **Read-Heavy Workload**: Read to write ratio is estimated at 100:1.
+3. **Low Latency**: Redirection must be near-instantaneous via CDN and distributed caching.
+
+**Mathematical Capacity Estimation (5-Year Horizon):**
+- **Traffic Estimation**:
+  - New URLs created: $100 \text{ Million}$ per month.
+  - Write QPS: $\frac{100 \times 10^6}{30 \times 24 \times 3600} \approx 40 \text{ writes/sec}$.
+  - Read QPS ($100:1$ ratio): $40 \times 100 = 4,000 \text{ reads/sec}$ average ($8,000$ peak).
+- **Storage Estimation**:
+  - Average record size: Long URL (500 bytes) + Short Code (7 bytes) + Metadata (100 bytes) $\approx 600 \text{ bytes}$.
+  - 5-Year URL records: $100 \times 10^6 \times 12 \times 5 = 6 \text{ Billion records}$.
+  - Total 5-Year Database Storage: $6 \times 10^9 \times 600 \text{ bytes} \approx 3.6 \text{ TB}$.
+- **Memory Estimation for Caching (Pareto 80/20 Rule):**
+  - Daily read requests: $4,000 \times 86,400 \approx 345 \text{ Million reads/day}$.
+  - Caching top 20% of daily requests: $0.20 \times 345 \times 10^6 \times 600 \text{ bytes} \approx 41.4 \text{ GB RAM}$.
+  - A 3-node Redis cluster with 32 GB RAM per node easily accommodates this with room for growth.
+
+#### 5.1.2 End-to-End Architecture
+
 ```mermaid
 flowchart TD
-    Client["Client Browser"] --> Cloudflare["Cloudflare CDN (Edge Cache: 301 Redirects)"]
-    Cloudflare --> ALB["Application Load Balancer"]
-    ALB --> ShortenerApp["URL Shortener Service"]
-    ShortenerApp <--> RedisCluster[("Redis Cluster (LRU Hot URL Cache)")]
-    ShortenerApp <--> PostgreSQL[("PostgreSQL (Partitioned by Hash of ShortURL)")]
+    Client["Client Browser / Mobile"] --> CDN["Cloudflare Global CDN<br/>(Edge Cache: 301 Permanent Redirects)"]
+    CDN -->|Cache Miss| ALB["Application Load Balancer"]
+    ALB --> Gateway["Spring Cloud Gateway / Envoy"]
+    
+    subgraph AppCluster["Stateless URL Shortener Fleet"]
+        Gateway --> Svc1["Shortener Service Pod 1"]
+        Gateway --> Svc2["Shortener Service Pod 2"]
+    end
+
+    subgraph CacheTier["Dual-Layer Caching & Filtering"]
+        Svc1 & Svc2 <--> BloomFilter[("Redis Bloom Filter<br/>(Guards Against Non-Existent Keys)")]
+        Svc1 & Svc2 <--> RedisCluster[("Redis Cluster (L2 Cache)<br/>(LRU Eviction Policy)")]
+    end
+
+    subgraph StorageTier["Distributed Persistence"]
+        Svc1 & Svc2 <--> DBCluster[("PostgreSQL Cluster<br/>(Hash-Partitioned by short_code)")]
+    end
+
+    subgraph AnalyticsAsync["Async Click Tracking Pipeline"]
+        Svc1 & Svc2 -.->|Async Event| Kafka["Kafka Topic: 'url-click-events'"]
+        Kafka --> Flink["Apache Flink Stream Processor"]
+        Flink --> ClickHouse[("ClickHouse OLAP Analytics DB")]
+    end
 
     style Client fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style Cloudflare fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style CDN fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style ALB fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style ShortenerApp fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Gateway fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Svc1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Svc2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style BloomFilter fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style RedisCluster fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style PostgreSQL fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style DBCluster fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style Kafka fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Flink fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style ClickHouse fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
 ```
 
-- **Capacity Estimation**: 100 Million URLs created/month. Write QPS $\approx 40$, Read QPS $\approx 4000$ (100:1 read-to-write ratio).
-- **Encoding**: 64-bit Snowflake ID encoded with **Base62** (`[0-9, a-z, A-Z]`). A 7-character string supports $62^7 \approx 3.5 \text{ Trillion}$ URLs.
-- **Caching**: 80/20 Pareto rule. Cache top 20% of hot URLs in Redis to achieve sub-5ms redirection response times.
+#### 5.1.3 Base62 Encoding vs MD5 Hashing
+
+- **Why Not MD5/SHA-256 Hashing?** An MD5 hash produces a 128-bit hex string (32 characters). Taking the first 7 characters causes high collision probabilities (Birthday Paradox). Resolving collisions requires database lookups and appending salt, increasing write latency.
+- **The Base62 Bijection Approach**:
+  Using characters `[0-9, a-z, A-Z]` gives $10 + 26 + 26 = 62$ distinct symbols.
+  A 7-character Base62 string represents:
+  $$62^7 = 3,521,614,606,208 \approx 3.52 \text{ Trillion unique URLs}$$
+  By generating a unique 64-bit integer ID (via Twitter Snowflake or a centralized range allocator), we convert the ID to a Base62 string with zero possibility of collision!
+
+#### 5.1.4 Production Base62 & Snowflake Generator Implementation
+
+```java
+package com.company.tinyurl.util;
+
+public final class Base62Converter {
+
+    private static final String ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final int BASE = ALPHABET.length();
+
+    private Base62Converter() {}
+
+    public static String encode(long id) {
+        if (id <= 0) {
+            return String.valueOf(ALPHABET.charAt(0));
+        }
+        StringBuilder sb = new StringBuilder();
+        while (id > 0) {
+            int remainder = (int) (id % BASE);
+            sb.append(ALPHABET.charAt(remainder));
+            id /= BASE;
+        }
+        // Reverse because digits were collected from least to most significant
+        return sb.reverse().toString();
+    }
+
+    public static long decode(String shortCode) {
+        long id = 0;
+        for (int i = 0; i < shortCode.length(); i++) {
+            char c = shortCode.charAt(i);
+            int charIndex = ALPHABET.indexOf(c);
+            if (charIndex == -1) {
+                throw new IllegalArgumentException("Invalid Base62 character: " + c);
+            }
+            id = id * BASE + charIndex;
+        }
+        return id;
+    }
+}
+```
+
+#### 5.1.5 Database Partitioned Schema (PostgreSQL)
+
+```sql
+-- Partitioned table by Hash of short_code across 16 physical partitions
+CREATE TABLE url_mappings (
+    id BIGINT NOT NULL,
+    short_code VARCHAR(16) NOT NULL,
+    original_url TEXT NOT NULL,
+    user_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (short_code, id)
+) PARTITION BY HASH (short_code);
+
+-- Create 16 hash partitions
+CREATE TABLE url_mappings_p0 PARTITION OF url_mappings FOR VALUES WITH (MODULUS 16, REMAINDER 0);
+CREATE TABLE url_mappings_p1 PARTITION OF url_mappings FOR VALUES WITH (MODULUS 16, REMAINDER 1);
+-- ... (p2 to p15 created similarly)
+
+CREATE INDEX idx_url_short_code ON url_mappings (short_code);
+```
+
+#### 5.1.6 Dual-Layer Caching & Controller Implementation
+
+```java
+package com.company.tinyurl.service;
+
+import com.company.tinyurl.util.Base62Converter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+
+@RestController
+@RequestMapping
+public class UrlShortenerController {
+
+    private static final Logger log = LoggerFactory.getLogger(UrlShortenerController.class);
+    private static final String CACHE_PREFIX = "tinyurl:";
+    private static final String BLOOM_FILTER_KEY = "url_bloom_filter";
+
+    private final StringRedisTemplate redisTemplate;
+    private final JdbcTemplate jdbcTemplate;
+
+    public UrlShortenerController(StringRedisTemplate redisTemplate, JdbcTemplate jdbcTemplate) {
+        this.redisTemplate = redisTemplate;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @GetMapping("/{shortCode:[a-zA-Z0-9]{6,8}}")
+    public ResponseEntity<Void> redirect(@PathVariable String shortCode) {
+        // Step 1: L1/L2 Redis Cache Lookup
+        String cacheKey = CACHE_PREFIX + shortCode;
+        String cachedOriginalUrl = redisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedOriginalUrl != null) {
+            // Check for sentinel value preventing cache penetration
+            if ("NOT_FOUND".equals(cachedOriginalUrl)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+            return buildRedirectResponse(cachedOriginalUrl);
+        }
+
+        // Step 2: Database Fallback Lookup
+        var sql = "SELECT original_url FROM url_mappings WHERE short_code = ? AND (expires_at IS NULL OR expires_at > ?)";
+        var results = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("original_url"), shortCode, Instant.now());
+
+        if (results.isEmpty()) {
+            // Prevent Cache Penetration: Cache negative lookup with short TTL (2 minutes)
+            redisTemplate.opsForValue().set(cacheKey, "NOT_FOUND", Duration.ofMinutes(2));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        String originalUrl = results.get(0);
+
+        // Step 3: Populate Redis Cache with 24h TTL
+        redisTemplate.opsForValue().set(cacheKey, originalUrl, Duration.ofHours(24));
+
+        return buildRedirectResponse(originalUrl);
+    }
+
+    private ResponseEntity<Void> buildRedirectResponse(String destinationUrl) {
+        // HTTP 302 Found (Temporary Redirect): Ensures all future clicks hit our servers for click analytics!
+        // HTTP 301 Moved Permanently: Cached by browser; bypasses our servers (loses analytics).
+        return ResponseEntity.status(HttpStatus.FOUND)
+            .location(URI.create(destinationUrl))
+            .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, max-age=0, must-revalidate")
+            .build();
+    }
+}
+```
 
 ---
 
 ### 5.2 High-Throughput Distributed Rate Limiter Design
 
-Atomic Sliding Window Counter implemented via **Redis Lua Script** to eliminate race conditions:
+Rate limiting protects downstream APIs against abuse, brute-force attacks, resource exhaustion, and noisy-neighbor denial of service.
+
+#### 5.2.1 Comparison of Core Algorithms
+
+| Algorithm | Mechanism | Burst Handling | Memory Overhead | Complexity | Best Use Case |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Token Bucket** | Central bucket refilled at rate $r$. Each request consumes 1 token. Rejects if empty. | Allows bursts up to bucket capacity $B$. | Minimal (2 numbers: timestamp + token count). | Low | General API Gateway rate limiting (AWS API Gateway, Stripe). |
+| **Leaky Bucket** | Requests placed in FIFO queue; drained at constant steady rate. Drops if queue overflows. | Smooths bursts into uniform outbound stream. | Moderate (memory for queued requests). | Medium | Ingestion pipelines, payment processors with strict concurrency. |
+| **Fixed Window Counter** | Counts requests in fixed time interval (e.g. 10:00 to 10:01). Resets counter at interval edge. | Suffers 2x boundary burst (e.g. 100 requests at 10:00:59, 100 at 10:01:00). | Ultra-low (single integer per client). | Very Low | Coarse-grained rate limiting where bursts are tolerable. |
+| **Sliding Window Log** | Stores exact epoch timestamp for every request in a Redis Sorted Set (ZSET). Evicts old timestamps. | Extremely precise; prevents boundary bursts entirely. | High memory ($O(N)$ entries per client where $N$ is request volume). | Medium | Low-volume, high-security endpoints (Login, Password Reset). |
+| **Sliding Window Counter** | Blends count of previous window with current window: $\text{Count} = C_{\text{prev}} \times (1 - \text{weight}) + C_{\text{curr}}$. | Effectively smooths boundary bursts with zero timestamp tracking. | Minimal (2 counters per client). | Low | High-throughput distributed microservices rate limiting. |
+
+#### 5.2.2 Atomic Sliding Window Counter via Redis Lua Script
+
+Because multiple concurrent API Gateway instances process incoming requests in parallel, reading and writing counters in Redis without concurrency control causes race conditions. A Redis Lua script executes atomically on the Redis single-threaded engine:
 
 ```lua
--- KEYS[1]: Rate limit key (e.g. "ratelimit:user_1204")
+-- KEYS[1]: Rate limit key (e.g., "ratelimit:user_8123:minute")
 -- ARGV[1]: Current UNIX epoch timestamp in milliseconds
--- ARGV[2]: Window size in milliseconds (e.g. 60000 for 1 minute)
--- ARGV[3]: Max allowed requests in window (e.g. 100)
+-- ARGV[2]: Window size in milliseconds (e.g., 60000 for 1 minute)
+-- ARGV[3]: Max allowed requests per window (e.g., 100)
 
+local key = KEYS[1]
 local current_time = tonumber(ARGV[1])
-local window_start = current_time - tonumber(ARGV[2])
+local window_size = tonumber(ARGV[2])
 local max_requests = tonumber(ARGV[3])
+local clear_before = current_time - window_size
 
--- 1. Remove all request timestamps older than current sliding window
-redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', window_start)
+-- 1. Remove all request log entries older than the active window
+redis.call('ZREMRANGEBYSCORE', key, '-inf', clear_before)
 
--- 2. Count requests currently recorded in the active sliding window
-local current_requests = redis.call('ZCARD', KEYS[1])
+-- 2. Count current entries in window
+local current_count = redis.call('ZCARD', key)
 
-if current_requests < max_requests then
-    -- 3. Add current request timestamp to sorted set
-    redis.call('ZADD', KEYS[1], current_time, current_time)
-    redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[2]))
-    return 1 -- Request Allowed
+if current_count < max_requests then
+    -- 3. Add current request timestamp (using timestamp as both member and score)
+    redis.call('ZADD', key, current_time, current_time)
+    -- Set TTL on key equal to window size to auto-evict idle keys
+    redis.call('PEXPIRE', key, window_size)
+    -- Return allowed (1), remaining requests, and reset time
+    return {1, max_requests - (current_count + 1), math.ceil(window_size / 1000)}
 else
-    return 0 -- Rate Limit Exceeded
+    -- Request rate limit exceeded
+    local oldest_time = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+    local retry_after = 1
+    if #oldest_time > 0 then
+        retry_after = math.ceil((tonumber(oldest_time[2]) + window_size - current_time) / 1000)
+    end
+    return {0, 0, math.max(1, retry_after)}
 end
+```
+
+#### 5.2.3 Spring Boot Rate Limiting Interceptor Implementation
+
+```java
+package com.company.ratelimiter;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+
+@Component
+public class DistributedRateLimitingInterceptor implements HandlerInterceptor {
+
+    private final StringRedisTemplate redisTemplate;
+    private final DefaultRedisScript<List> rateLimitScript;
+
+    public DistributedRateLimitingInterceptor(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+        this.rateLimitScript = new DefaultRedisScript<>();
+        this.rateLimitScript.setLocation(new ClassPathResource("scripts/sliding_window_rate_limiter.lua"));
+        this.rateLimitScript.setResultType(List.class);
+    }
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        String clientIdentifier = resolveClientKey(request);
+        String redisKey = "ratelimit:" + clientIdentifier;
+
+        long nowMs = Instant.now().toEpochMilli();
+        long windowSizeMs = 60_000L; // 1 minute
+        long maxRequests = 100L;     // 100 requests per minute
+
+        List<Long> result = redisTemplate.execute(
+            rateLimitScript,
+            Collections.singletonList(redisKey),
+            String.valueOf(nowMs),
+            String.valueOf(windowSizeMs),
+            String.valueOf(maxRequests)
+        );
+
+        if (result == null || result.isEmpty()) {
+            // Fail-open strategy: If Redis fails, allow request to avoid outage
+            return true;
+        }
+
+        boolean allowed = result.get(0) == 1L;
+        long remaining = result.get(1);
+        long retryAfterSec = result.get(2);
+
+        // Standard RFC Rate Limit Headers
+        response.setHeader("X-RateLimit-Limit", String.valueOf(maxRequests));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(Math.max(0, remaining)));
+
+        if (!allowed) {
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value()); // HTTP 429
+            response.setHeader("Retry-After", String.valueOf(retryAfterSec));
+            response.setContentType("application/json");
+            response.getWriter().write(String.format("{\"error\": \"Rate limit exceeded. Retry in %d seconds.\"}", retryAfterSec));
+            return false;
+        }
+
+        return true;
+    }
+
+    private String resolveClientKey(HttpServletRequest request) {
+        // Prefer authenticated User ID or API Key; fallback to client IP
+        String apiKey = request.getHeader("X-API-KEY");
+        if (apiKey != null && !apiKey.isBlank()) {
+            return "apikey:" + apiKey;
+        }
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return "ip:" + forwardedFor.split(",")[0].trim();
+        }
+        return "ip:" + request.getRemoteAddr();
+    }
+}
 ```
 
 ---
 
 ### 5.3 Enterprise Multi-Channel Notification System Design
 
-```mermaid
-flowchart LR
-    InternalCaller["Internal Microservices"] --> API["Notification API Gateway"]
-    API --> PriorityRouter{"Priority Evaluator"}
-    
-    PriorityRouter -->|Critical: OTP / Payment Alert| HighQueue["Kafka: 'priority-notifications'"]
-    PriorityRouter -->|Bulk: Marketing / Newsletter| LowQueue["Kafka: 'bulk-notifications'"]
-    
-    HighQueue --> DispatcherHigh["High-Priority Worker Fleet"]
-    LowQueue --> DispatcherLow["Bulk Worker Fleet (Rate Throttled)"]
-    
-    DispatcherHigh & DispatcherLow --> SMS["Twilio / AWS SNS (SMS)"]
-    DispatcherHigh & DispatcherLow --> Email["SendGrid / SES (Email)"]
-    DispatcherHigh & DispatcherLow --> Push["Apple APNs / Google FCM (Push)"]
+An enterprise notification engine delivers SMS, Email, and Mobile Push Notifications with guaranteed delivery, vendor fallbacks, priority-based throttling, and deduplication.
 
-    style InternalCaller fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style API fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style PriorityRouter fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style HighQueue fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style LowQueue fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style DispatcherHigh fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style DispatcherLow fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#fde68a
-    style SMS fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Email fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Push fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+#### 5.3.1 System Requirements & Architecture
+
+**Requirements:**
+1. **Multi-Channel**: SMS (Twilio, AWS SNS), Email (SendGrid, AWS SES), Push (Apple APNs, Google FCM).
+2. **Priority Tiers**: High-priority alerts (OTP, payment confirmation) must deliver within $<3$ seconds; bulk marketing campaigns must not delay high-priority alerts.
+3. **Vendor Redundancy & Automatic Failover**: If Twilio returns 5xx errors or throttles, transparently fail over to AWS SNS.
+4. **Deduplication**: Prevent sending duplicate messages within a 5-minute sliding window (e.g. client double-clicks checkout).
+
+```mermaid
+flowchart TD
+    subgraph IngressTier["1. Ingress & Deduplication"]
+        Caller["Upstream Microservices"] --> API["Notification Gateway"]
+        API <--> DedupCache[("Redis Dedup Cache<br/>(Key: Hash of userId+msg, TTL: 5m)")]
+    end
+
+    subgraph KafkaPriorityMesh["2. Priority Event Streaming"]
+        API -->|High Priority| FastQueue["Kafka: 'notif-otp-urgent'<br/>(16 Partitions)"]
+        API -->|Normal Priority| BulkQueue["Kafka: 'notif-marketing-bulk'<br/>(4 Partitions)"]
+    end
+
+    subgraph WorkerFleet["3. Worker Fleet with Circuit Breaker"]
+        FastQueue --> UrgentWorkers["Urgent Worker Fleet (Auto-scaled)"]
+        BulkQueue --> BulkWorkers["Bulk Worker Fleet (Rate-Capped)"]
+    end
+
+    subgraph Providers["4. Third-Party Vendor Redundancy"]
+        UrgentWorkers & BulkWorkers --> Twilio["Primary SMS: Twilio"]
+        Twilio -.->|Failover on 5xx| AWSSNS["Fallback SMS: AWS SNS"]
+
+        UrgentWorkers & BulkWorkers --> SendGrid["Primary Email: SendGrid"]
+        SendGrid -.->|Failover on 5xx| AWSSES["Fallback Email: AWS SES"]
+
+        UrgentWorkers & BulkWorkers --> FCM["Push: Google FCM / Apple APNs"]
+    end
+
+    subgraph DLQ_And_Audit["5. Audit & Dead Letter Queue (DLQ)"]
+        UrgentWorkers & BulkWorkers -->|Failed after 3 retries| DLQ["Kafka: 'notif-dlq'"]
+        DLQ --> AlertEngine["SRE PagerDuty Alert Engine"]
+        UrgentWorkers & BulkWorkers --> AuditDB[("Cassandra / ScyllaDB Notification Log")]
+    end
+
+    style IngressTier fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style KafkaPriorityMesh fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style WorkerFleet fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Providers fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style DLQ_And_Audit fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+
+    style Caller fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style API fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DedupCache fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style FastQueue fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style BulkQueue fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style UrgentWorkers fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style BulkWorkers fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
+    style Twilio fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style AWSSNS fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style SendGrid fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style AWSSES fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style FCM fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style DLQ fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style AlertEngine fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+    style AuditDB fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#fff
+```
+
+#### 5.3.2 Resilient Multi-Provider Dispatcher with Circuit Breaker
+
+```java
+package com.company.notification.dispatcher;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+public record SmsPayload(String phoneNumber, String message, String idempotencyKey) {}
+
+@Service
+public class ResilientSmsDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(ResilientSmsDispatcher.class);
+
+    private final TwilioSmsClient twilioClient;
+    private final AwsSnsClient awsSnsClient;
+
+    public ResilientSmsDispatcher(TwilioSmsClient twilioClient, AwsSnsClient awsSnsClient) {
+        this.twilioClient = twilioClient;
+        this.awsSnsClient = awsSnsClient;
+    }
+
+    @CircuitBreaker(name = "smsProviderCircuitBreaker", fallbackMethod = "sendViaAwsSnsFallback")
+    public boolean sendSms(SmsPayload payload) {
+        log.info("Attempting primary dispatch via Twilio for recipient {}", payload.phoneNumber());
+        return twilioClient.dispatch(payload.phoneNumber(), payload.message());
+    }
+
+    /**
+     * Fallback triggered automatically if Twilio fails or Circuit Breaker opens.
+     */
+    public boolean sendViaAwsSnsFallback(SmsPayload payload, Throwable ex) {
+        log.warn("Twilio dispatch failed or circuit open. Failing over to AWS SNS for recipient: {}. Cause: {}",
+            payload.phoneNumber(), ex.getMessage());
+        return awsSnsClient.dispatch(payload.phoneNumber(), payload.message());
+    }
+}
 ```
 
 ---
 
 ### 5.4 Resilient Financial Payment Gateway Design
 
-```mermaid
-flowchart TD
-    subgraph CheckoutIngress ["Payment Submission & Idempotency"]
-        Initiated["INITIATED<br/>(Client checkout submitted with unique idempotency key)"]
-        Deduplicated["DEDUPLICATED<br/>(Idempotency validated via Redis distributed lock)"]
-    end
+Financial systems require zero tolerance for lost money, balance drift, or phantom transactions. Every transaction must adhere strictly to double-entry bookkeeping, absolute idempotency, and automated discrepancy reconciliation.
 
-    subgraph GatewayAuth ["PSP Processing & Settlement"]
-        Pending["PENDING_GATEWAY<br/>(Acquires DB lock & creates pending ledger journal entry)"]
-        Authorized["AUTHORIZED<br/>(Card issuer / PSP approves funds hold)"]
-        Captured["CAPTURED<br/>(Settlement completed, goods released for fulfillment)"]
-    end
+#### 5.4.1 Fundamental Double-Entry Bookkeeping Equation
 
-    subgraph TerminalOutcomes ["Exception & Reversal Flows"]
-        Declined["FAILED / DECLINED<br/>(Card declined or insufficient balance)"]
-        Voided["VOIDED<br/>(Hold released prior to capture upon order cancellation)"]
-        Refunded["REFUNDED<br/>(Post-capture chargeback or customer return credited)"]
-    end
+In an immutable double-entry ledger, money is never created or destroyed; it moves between accounts via balanced journal entries. Every entry consists of at least one Debit and at least one Credit such that:
 
-    Initiated -->|"Validate idempotency"| Deduplicated
-    Deduplicated -->|"Dispatch authorization payload"| Pending
-    Pending -->|"PSP approves"| Authorized
-    Pending -->|"Card declined / timeout"| Declined
-    Authorized -->|"Order shipped / captured"| Captured
-    Authorized -->|"Canceled before shipment"| Voided
-    Captured -->|"Dispute / Return"| Refunded
+$$\sum \text{Debits} \equiv \sum \text{Credits}$$
 
-    style CheckoutIngress fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style GatewayAuth fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style TerminalOutcomes fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+- **Asset & Expense Accounts**: Debits increase balance ($+$), Credits decrease balance ($-$).
+- **Liability & Equity Accounts**: Credits increase balance ($+$), Debits decrease balance ($-$).
 
-    style Initiated fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Deduplicated fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Pending fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style Authorized fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Captured fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style Declined fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
-    style Voided fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Refunded fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+#### 5.4.2 Production Immutable Ledger Schema (PostgreSQL)
+
+```sql
+-- Accounts Table: Master chart of accounts
+CREATE TABLE accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_number VARCHAR(64) UNIQUE NOT NULL,
+    account_type VARCHAR(32) NOT NULL, -- ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+    currency VARCHAR(3) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Journal Entries: Logical business transactions (e.g. Order #1001 Payment)
+CREATE TABLE journal_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    idempotency_key VARCHAR(128) UNIQUE NOT NULL,
+    reference_id VARCHAR(64) NOT NULL,
+    description TEXT NOT NULL,
+    posted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ledger Lines: Immutable atomic debits and credits
+CREATE TABLE ledger_lines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    journal_entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE RESTRICT,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    amount NUMERIC(18, 4) NOT NULL CHECK (amount > 0),
+    direction VARCHAR(6) NOT NULL CHECK (direction IN ('DEBIT', 'CREDIT')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_ledger_account_time ON ledger_lines (account_id, created_at);
 ```
 
-- **Double-Entry Bookkeeping Ledger**: Every monetary movement must have corresponding balanced Debit and Credit entries across accounts ($\sum \text{Debits} == \sum \text{Credits}$).
-- **Automated Reconciliation Engine**: Asynchronous nightly cron job comparing local ledger entries with payment gateway settlement reports (Stripe/Adyen CSV) to detect and resolve dropped webhook discrepancies.
+#### 5.4.3 Payment State Machine & Asynchronous Webhook Architecture
+
+```mermaid
+flowchart TD
+    subgraph ClientPerimeter ["1. Client Submission"]
+        Checkout["Client Submits Checkout<br/>(Idempotency-Key: 'ord-8102-pay')"]
+    end
+
+    subgraph LedgerReservation ["2. Double-Entry Authorization"]
+        LockAcquired["Acquire Redis Distributed Lock"]
+        LedgerHold["INSERT PENDING Journal Entry<br/>(Debit: Customer Receivable, Credit: Escrow Pending)"]
+    end
+
+    subgraph PSPGateway ["3. Payment Service Provider (Stripe / Adyen)"]
+        PSPRequest["Dispatch REST API to PSP"]
+        PSPOutcome{"PSP Synchronous Response"}
+    end
+
+    subgraph WebhookAndSettlement ["4. Asynchronous Settlement & Webhooks"]
+        WebhookReceived["PSP Sends Webhook: 'payment_intent.succeeded'"]
+        HMACVerified["Verify HMAC-SHA256 Signature"]
+        LedgerSettled["Finalize Ledger Entry<br/>(Debit: PSP Cash, Credit: Merchant Payable)"]
+    end
+
+    Checkout --> LockAcquired
+    LockAcquired --> LedgerHold
+    LedgerHold --> PSPRequest
+    PSPRequest --> PSPOutcome
+    PSPOutcome -->|Success / Pending| WebhookReceived
+    PSPOutcome -->|Immediate Decline| Reversal["Compensate: Release Ledger Hold"]
+    WebhookReceived --> HMACVerified
+    HMACVerified --> LedgerSettled
+
+    style ClientPerimeter fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style LedgerReservation fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style PSPGateway fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style WebhookAndSettlement fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+
+    style Checkout fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style LockAcquired fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style LedgerHold fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style PSPRequest fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style PSPOutcome fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style WebhookReceived fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style HMACVerified fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style LedgerSettled fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Reversal fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fff
+```
+
+#### 5.4.4 Automated Reconciliation Engine
+
+Even with webhook retries, network glitches or unexpected database restarts can cause dropped webhooks. A payment gateway must run an **Asynchronous Nightly Reconciliation Job**:
+1. Download official settlement CSV reports from payment processors (Stripe/Adyen/PayPal) at 02:00 UTC.
+2. Stream-parse settlement records and compare them against internal `journal_entries` within the corresponding settlement window:
+   $$\Delta = \text{Internal Ledger} - \text{External PSP Report}$$
+3. For any unmatched transaction:
+   - **Type 1: Captured in PSP, missing in local ledger**: Automatically inject a backdated adjustment journal entry and notify accounting.
+   - **Type 2: Captured in local ledger, missing in PSP**: Flag transaction as critical; trigger dispute investigation workflow.
 
 ---
 

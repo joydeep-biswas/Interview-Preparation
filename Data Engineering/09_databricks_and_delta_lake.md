@@ -7,9 +7,9 @@ A unified, comprehensive, production-grade guide to the Databricks Lakehouse Pla
 ## Architectural Overview: High-Level Platform & Lakehouse Architecture
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph ControlPlane ["Databricks Managed Control Plane"]
-        direction LR
+        direction TD
         UI["Workspace Web UI & IDEs"]
         JobMgr["Workflows & Cluster Manager"]
         CatalogServ["Unity Catalog Metadata Service"]
@@ -25,7 +25,7 @@ flowchart LR
     end
 
     subgraph CloudObjectStorage ["Cloud Object Storage: ADLS Gen2 / S3 / GCS"]
-        direction TB
+        direction LR
         DeltaTable[("Delta Lake Storage<br/>Parquet Data Files + _delta_log/")]
         Checkpoints["Checkpoints .parquet & .json"]
         DeltaTable --- Checkpoints
@@ -80,6 +80,7 @@ flowchart LR
    - [3.6 Delta Live Tables (DLT) Fundamentals](#36-delta-live-tables-dlt-fundamentals)
    - [3.7 DLT Expectations & Data Quality Enforcement](#37-dlt-expectations-data-quality-enforcement)
    - [3.8 DLT Change Data Capture (APPLY CHANGES INTO)](#38-dlt-change-data-capture-apply-changes-into)
+   - [3.9 Databricks Lakeflow (Connect, Pipelines & Jobs)](#39-databricks-lakeflow-connect-pipelines--jobs)
 4. [DevOps, IaC & CI/CD](#4-devops-iac-cicd)
    - [4.1 Databricks CLI](#41-databricks-cli)
    - [4.2 Databricks REST API](#42-databricks-rest-api)
@@ -128,8 +129,10 @@ flowchart LR
     - [10.5 Managed vs External Delta Tables](#105-managed-vs-external-delta-tables)
     - [10.6 UniForm (Universal Format)](#106-uniform-universal-format)
     - [10.7 Identity Columns](#107-identity-columns)
-    - [10.8 Generated Columns](#108-generated-columns)
-11. [References & Further Reading](#11-references-further-reading)
+11. [Summary Comparison & Engineering Reference Matrix](#11-summary-comparison--engineering-reference-matrix)
+    - [11.1 Delta Lake Physical Layout & Optimization Strategies Matrix](#111-delta-lake-physical-layout--optimization-strategies-matrix)
+    - [11.2 Production Lakehouse Engineering Invariants](#112-production-lakehouse-engineering-invariants)
+12. [References & Further Reading](#12-references--further-reading)
 
 ---
 
@@ -159,9 +162,9 @@ Databricks separates its architecture into two distinct administrative planes:
 - **Serverless Data Plane:** Managed elastically inside Databricks compute accounts with secure PrivateLink isolation to customer cloud storage.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph ControlPlane ["Databricks Control Plane (Databricks Cloud Tenant)"]
-        direction LR
+        direction TD
         UI["Web UI & Notebook Server"]
         WorkflowEng["Orchestration Engine (Workflows)"]
         ClusterCoord["Cluster Management Daemon"]
@@ -204,8 +207,16 @@ flowchart LR
     style Storage fill:#182234,stroke:#06b6d4,stroke-width:1.5px,color:#fff
 ```
 
-#### Security Implications
+#### Security Implications & Plane Comparison Matrix
 Customer data remains entirely within the customer's own cloud perimeter, adhering to strict enterprise data sovereignty and compliance requirements (HIPAA, PCI-DSS, SOC2).
+
+| Architectural Dimension | Control Plane | Classic Data Plane | Serverless Data Plane |
+| :--- | :--- | :--- | :--- |
+| **Hosting Tenant** | Databricks cloud account (multi-tenant) | Customer cloud account (AWS VPC, Azure VNet, GCP VPC) | Databricks cloud tenant (dedicated compute VPC) |
+| **Compute Resources** | Web UI, Workflows scheduler, cluster managers | EC2 instances, Azure VMs, Compute Engine instances | On-demand elastic container instances (< 10s launch) |
+| **Data Access** | **Zero customer data access** (stores metadata only) | Direct read/write to customer storage accounts | Secure private networking (PrivateLink) to customer storage |
+| **Network Perimeter** | Managed by Databricks with TLS 1.3 | Customer VNet/VPC with internal routing and firewalls | Fully isolated compute planes managed by Databricks |
+| **Maintenance & Patching** | Automatic and zero-downtime | Requires cluster recreation or Databricks runtime upgrades | Fully automated instant security and runtime patching |
 
 #### References
 - [Databricks Documentation: Architecture Overview](https://docs.databricks.com/en/getting-started/overview.html)
@@ -278,14 +289,14 @@ Databricks decouples compute from storage, allowing compute clusters to spin up 
 - **Job Compute (Automated):** Dedicated clusters launched automatically by the Databricks Workflow scheduler to execute a specific job or task. Spins up when the job starts and terminates immediately upon task completion. **Billed at a significantly discounted DBU rate (~50% cheaper)**.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph AllPurposeCompute ["All-Purpose Compute (Interactive Development)"]
-        direction TB
+        direction LR
         Dev["Engineer Developing in Notebook"] -->|Interactive Queries| AllPurpose["All-Purpose Cluster<br/>(Higher DBU Cost, Persistent)"]
     end
 
     subgraph JobComputeCluster ["Job Compute (Automated Production)"]
-        direction TB
+        direction LR
         Scheduler["Automated Workflow (2:00 AM)"] -->|Spin up on trigger| JobCompute["Job Cluster<br/>(50% Cheaper DBU, Auto-Terminates)"]
         JobCompute -->|Finish Task| Destroy["Cluster Destroyed Immediately"]
     end
@@ -645,6 +656,107 @@ dlt.apply_changes(
 
 #### References
 - [Databricks Documentation: CDC with Delta Live Tables](https://docs.databricks.com/en/delta-live-tables/cdc.html)
+
+---
+
+### 3.9 Databricks Lakeflow (Connect, Pipelines & Jobs)
+
+#### Definition & Core Concepts
+**Databricks Lakeflow** is the native, end-to-end data engineering platform that unifies and elevates data ingestion, declarative transformation, and workflow orchestration into a single serverless lakehouse experience:
+
+1. **Lakeflow Connect (Universal Ingestion):** Built-in, serverless native ingestion connectors for enterprise relational databases (SQL Server, Oracle, PostgreSQL, MySQL) and enterprise SaaS (Salesforce, Workday, ServiceNow, Google Analytics). Operates via low-latency log-based CDC without requiring third-party tools (like Fivetran) or complex Kafka staging.
+2. **Lakeflow Pipelines (Declarative Transformations):** The next evolution of Delta Live Tables (DLT). Enables data engineers to declare transformations using SQL and Python with automated pipeline DAG execution, out-of-the-box incremental processing, state management, and real-time schema evolution.
+3. **Lakeflow Jobs (Automated Orchestration):** Serverless orchestration engine providing automated failure recovery, health triage, task-level execution tracing, and intelligent data pipeline SLA alerting.
+
+```mermaid
+flowchart TD
+    subgraph Sources ["Upstream Sources"]
+        DB["OLTP Databases<br/>(Postgres, Oracle, SQL Server)"]
+        SaaS["Enterprise SaaS<br/>(Salesforce, Workday)"]
+    end
+
+    subgraph LakeflowPlatform ["Databricks Lakeflow Platform"]
+        Connect["1. Lakeflow Connect<br/>(Serverless Ingestion & CDC)"]
+        Pipelines["2. Lakeflow Pipelines (DLT)<br/>(Declarative Bronze/Silver/Gold)"]
+        Jobs["3. Lakeflow Jobs<br/>(Intelligent Orchestration & SLAs)"]
+        Connect --> Pipelines
+        Jobs -.->|Orchestrates & Monitors| Pipelines
+    end
+
+    subgraph LakehouseStorage ["Unity Catalog Lakehouse"]
+        Bronze[("Bronze Delta Tables")]
+        Silver[("Silver Curated Tables")]
+        Gold[("Gold Semantic Models")]
+        Bronze --> Silver --> Gold
+    end
+
+    Pipelines --> LakehouseStorage
+    Sources --> Connect
+
+    style Sources fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
+    style LakeflowPlatform fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style Connect fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style Pipelines fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Jobs fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style LakehouseStorage fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style Bronze fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Silver fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#fff
+    style Gold fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
+```
+
+#### Code Example: Declarative Lakeflow Pipeline with Data Quality & CDC
+```python
+import dlt
+from pyspark.sql.functions import col, current_timestamp
+
+# Step 1: Ingest continuous CDC stream via Lakeflow Connect into Bronze
+@dlt.table(
+    name="bronze_salesforce_leads",
+    comment="Raw continuous ingestion from Salesforce via Lakeflow Connect",
+    table_properties={"quality": "bronze"}
+)
+def bronze_salesforce_leads():
+    return (
+        spark.readStream.format("cloudFiles")
+        .option("cloudFiles.format", "json")
+        .option("cloudFiles.inferColumnTypes", "true")
+        .load("/mnt/lakeflow/salesforce/leads/")
+    )
+
+# Step 2: Cleanse and enforce data contracts into Silver
+@dlt.table(
+    name="silver_salesforce_leads",
+    comment="Curated leads enforcing valid email and non-empty status",
+    table_properties={"quality": "silver"}
+)
+@dlt.expect_or_drop("valid_email", "email IS NOT NULL AND email LIKE '%@%.%'")
+@dlt.expect("valid_lead_status", "status IN ('New', 'Contacted', 'Qualified', 'Unqualified')")
+def silver_salesforce_leads():
+    return (
+        dlt.read_stream("bronze_salesforce_leads")
+        .select(
+            col("Id").alias("lead_id"),
+            col("Email").alias("email"),
+            col("Status").alias("status"),
+            col("Company").alias("company"),
+            col("CreatedDate").cast("timestamp").alias("created_at"),
+            current_timestamp().alias("ingested_at")
+        )
+    )
+
+# Step 3: Maintain historical changes via SCD Type 2 tracking
+dlt.apply_changes(
+    target="silver_leads_scd2",
+    source="silver_salesforce_leads",
+    keys=["lead_id"],
+    sequence_by=col("created_at"),
+    stored_as_scd_type=2
+)
+```
+
+#### References
+- [Databricks Documentation: Lakeflow Overview](https://docs.databricks.com/en/lakeflow/index.html)
+- [Databricks Documentation: Lakeflow Connect](https://docs.databricks.com/en/lakeflow/connect.html)
 
 ---
 
@@ -1645,10 +1757,37 @@ PARTITIONED BY (event_date);
 
 ---
 
+# 11. Summary Comparison & Engineering Reference Matrix
+
+### 11.1 Delta Lake Physical Layout & Optimization Strategies Matrix
+
+Delta Lake provides multiple physical storage organization techniques to maximize read skipping and optimize write throughput. The table below details the trade-offs, operational costs, and target use cases for each strategy:
+
+| Optimization Technique | Underlying Physical Mechanics | Write / Compaction Overhead | Multi-Column Skipping Efficiency | Concurrency Conflict Sensitivity | Ideal Table Scale & Cardinality | Best Production Use Case |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Physical Directory Partitioning** | Hard directory hierarchy (`/year=2024/month=05/`) | Low during initial append; extreme rewriting if partition key evolves | Rigid single-column or hierarchical 1D pruning only | High: Concurrent writes to distinct partitions succeed, but small file sprawl is severe | Low-cardinality keys ($< 10{,}000$ distinct partitions); table size $> 1\text{ TB}$ | Coarse-grained temporal isolation (e.g., partitioned by `event_date`); prohibited for high-cardinality keys. |
+| **Z-Ordering (`OPTIMIZE ZORDER BY`)** | Space-filling Morton curves mapping multi-dimensional keys into 1D linear file order | **Very High**: Requires full rewrite and sorting of all Parquet files in affected partitions | High across $2 - 4$ correlated columns | **High**: Blocks concurrent updates during compaction; non-incremental | Static or append-mostly tables ($100\text{ GB} - 50\text{ TB}$) | Batch analytical fact tables queried on composite filters (e.g., `customer_id` + `transaction_timestamp`). |
+| **Liquid Clustering (`CLUSTER BY`)** | Incremental Hilbert space-filling curves; self-tuning file layout | **Low to Moderate**: Incremental compaction without full partition rewriting | **Exceptional**: Dynamic multi-column clustering adapts to data distribution | **Very Low**: Supports concurrent append, update, and cluster operations | Any table size ($1\text{ GB} - \text{Petabytes}$); high-cardinality keys | **Modern Databricks default**: Replaces both partitioning and Z-ordering for dynamic, evolving workloads. |
+| **Deletion Vectors (`delta.enableDeletionVectors`)** | Soft-deletion bitmaps stored alongside Parquet files; marks rows deleted without file rewrite | **Minimal**: Instant writes; avoids full Parquet file rewriting on row mutation | Neutral (Read path evaluates bitmap filter during vector scan) | **Ultra-Low**: Completely eliminates write conflicts on updates/deletes | High-frequency update/delete pipelines (CDC, GDPR right-to-be-forgotten) | Streaming CDC upserts, point-deletes, and regulatory GDPR scrubbing without write amplification. |
+| **Change Data Feed (CDF)** | Emits row-level change events (`_change_type`: insert, update_preimage, update_postimage, delete) | Low (Generates change files during merge/update) | N/A (Consumable as a streaming/batch change log) | Low | Tables serving downstream consumers | Silver-to-Gold incremental propagation, audit trail generation, and downstream event-driven microservices. |
+
 ---
 
-# 11. References & Further Reading
+### 11.2 Production Lakehouse Engineering Invariants
 
-- [Official Documentation & Design Principles Guide](https://docs.microsoft.com/en-us/azure/architecture/)
-- [High Performance Distributed Data Architecture Patterns](https://martinfowler.com/articles/patterns-of-distributed-systems/)
-- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/)
+- **The Liquid Clustering Default:** For all new production Delta tables on Databricks Runtime 13.3+, mandate **Liquid Clustering (`CLUSTER BY`)** instead of physical directory partitioning. Liquid clustering eliminates partition cardinality bottlenecks, prevents Small File Syndrome, and enables non-disruptive evolution of clustering keys without costly table restructurings.
+- **VACUUM Retention vs. Time Travel SLA:** Never execute `VACUUM` with a retention threshold lower than your organization's disaster recovery SLA (default $7$ days, `spark.databricks.delta.vacuum.parallelDelete.enabled = true`). Purging files too aggressively invalidates in-flight reader transactions and permanently breaks Delta Time Travel history.
+- **Deletion Vectors for Low-Latency Upserts:** Enable Deletion Vectors (`delta.enableDeletionVectors = true`) on all tables subjected to frequent `MERGE INTO`, `UPDATE`, or `DELETE` operations. Deletion vectors eliminate write amplification by recording localized bitmap masks instead of rewriting entire 500MB Parquet files, reducing write I/O by up to $90\%$.
+- **Automated Bin-Packing & Maintenance DAGs:** Schedule scheduled off-peak maintenance jobs executing `OPTIMIZE table_name` and `VACUUM table_name` to maintain uniform target file sizes between $100\text{ MB}$ and $1\text{ GB}$. Unmaintained Delta tables suffer from metadata log bloat and degraded query planning latency.
+- **Unity Catalog Centralized Governance:** Enforce 3-level namespace isolation (`catalog.schema.table`) in Unity Catalog. Decouple physical cloud storage credentials using Managed External Locations, and enforce row-level security (RLS) filters and dynamic column masking directly in the governance metastore rather than in client applications.
+
+---
+
+# 12. References & Further Reading
+
+- [Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores (Armbrust et al., VLDB 2020)](https://www.vldb.org/pvldb/vol13/p3411-armbrust.pdf) — Architectural principles behind the Delta transaction log and ACID guarantees.
+- [Databricks Documentation: Liquid Clustering Architecture & Guidance](https://docs.databricks.com/en/delta/clustering.html) — Next-generation multi-dimensional layout and incremental clustering.
+- [Databricks Documentation: Deletion Vectors Optimization](https://docs.databricks.com/en/delta/deletion-vectors.html) — Mechanics of soft-delete bitmaps and write amplification mitigation.
+- [Unity Catalog Architectural Guide (Databricks)](https://docs.databricks.com/en/data-governance/unity-catalog/index.html) — Unified governance, fine-grained access control, and data lineage across clouds.
+- [UniForm (Universal Format): Read Delta Lake with Iceberg and Hudi Clients](https://docs.databricks.com/en/delta/uniform.html) — Multi-format metadata translation and lakehouse interoperability.
+- [Delta Sharing: An Open Protocol for Secure Data Sharing](https://delta.io/sharing/) — Zero-copy, cross-cloud, cross-platform enterprise data exchange specification.

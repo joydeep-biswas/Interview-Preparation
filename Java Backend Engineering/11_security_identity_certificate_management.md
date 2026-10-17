@@ -1,6 +1,6 @@
 # 11. Security, Identity & Cryptographic Certificate Management
 
-A comprehensive, production-grade guide covering Spring Security 6 internal filter architectures, stateless OAuth 2.0 / OIDC authentication with PKCE, Web application defense (OWASP Top 10), Security response headers, Public Key Infrastructure (PKI), TLS 1.3 handshakes, Java Keystores (`KeyStore`) vs Truststores (`TrustStore`), Mutual TLS (mTLS), Spring Boot 3.1+ SSL Bundles (`SslBundle`), and production SSL/TLS diagnostics (`keytool`, `openssl`).
+A comprehensive, production-grade guide covering Spring Security 6 internal filter architectures, stateless OAuth 2.0 / OIDC authentication with PKCE, Web application defense (OWASP Top 10), Security response headers, Public Key Infrastructure (PKI), TLS 1.3 handshakes, Java Keystores (`KeyStore`) vs Truststores (`TrustStore`), Mutual TLS (mTLS), Spring Boot 3.1+ SSL Bundles (`SslBundle`), production SSL/TLS diagnostics (`keytool`, `openssl`), and high-impact incident troubleshooting playbooks.
 
 ---
 
@@ -11,8 +11,8 @@ flowchart TD
     subgraph Client_Security_Layer["1. Authentication, TLS & Security Edge"]
         Client["Browser / Mobile / Partner Client"] -->|"HTTPS / TLS 1.3 (Encrypted Tunnel)"| WAF["Web Application Firewall & CORS Filter"]
         WAF --> SecurityChain["Spring Security 6 Filter Chain<br/>(BearerTokenAuthenticationFilter & AuthorizationFilter)"]
-        SecurityChain <--> EntraID["Identity Provider (OAuth2 / OIDC / Azure AD)<br/>(JWKS Public Key Signature Validation)"]
-        
+        SecurityChain <--> EntraID["Identity Provider (OAuth2 / OIDC / Keycloak / Auth0)<br/>(JWKS Public Key Signature Validation)"]
+
         subgraph PKI_And_Certificates["Java Cryptographic Trust Engine"]
             KeyStore["Java KeyStore (PKCS12: keystore.p12)<br/>Private Key + Leaf Certificate (Who I Am)"]
             TrustStore["Java TrustStore (cacerts / truststore.p12)<br/>Trusted Root & Intermediate CAs (Whom I Trust)"]
@@ -22,424 +22,1381 @@ flowchart TD
     end
 
     subgraph App_Tier["2. Secure Spring Boot Application Core"]
-        SecurityChain --> RestAPI["Spring Boot 3 REST Application Controller<br/>@PreAuthorize(hasRole(&quot;ADMIN&quot;))"]
+        SecurityChain --> RestAPI["Spring Boot 3 REST Application Controller<br/>@PreAuthorize(\"hasRole('ADMIN')\")"]
         RestAPI --> SecureService["Domain Service Layer (Auditing & Encrypted Fields)"]
     end
 
-    style Client_Security_Layer fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-    style PKI_And_Certificates fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-    style App_Tier fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-
-    style Client fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style WAF fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style SecurityChain fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style EntraID fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style KeyStore fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style TrustStore fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style RestAPI fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style SecureService fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
+    style Client_Security_Layer fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style PKI_And_Certificates fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style App_Tier fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style Client fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style WAF fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style SecurityChain fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style EntraID fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style KeyStore fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style TrustStore fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style RestAPI fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style SecureService fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
 ---
 
 ## Table of Contents
-1. [Spring Security 6 & API Authentication](#1-spring-security-6-api-authentication)
-   - [1.1 Authentication (AuthN) vs Authorization (AuthZ)](#11-authentication-authn-vs-authorization-authz)
-   - [1.2 The Spring Security Filter Chain Internal Architecture](#12-the-spring-security-filter-chain-internal-architecture)
-   - [1.3 Password Hashing Algorithms: BCrypt vs Argon2](#13-password-hashing-algorithms-bcrypt-vs-argon2)
-   - [1.4 Stateful Session-Based vs Stateless JWT Token Authentication](#14-stateful-session-based-vs-stateless-jwt-token-authentication)
-   - [1.5 OAuth 2.0 & OpenID Connect (PKCE & Client Credentials Flow)](#15-oauth-20-openid-connect-pkce-client-credentials-flow)
-   - [1.6 Role-Based (RBAC), Attribute-Based (ABAC) & Method Security (`@PreAuthorize`)](#16-role-based-rbac-attribute-based-abac-method-security-preauthorize)
-2. [Web Application Security & OWASP Defense](#2-web-application-security-owasp-defense)
-   - [2.1 OWASP Top Vulnerabilities & Spring Boot Defenses (CSRF, XSS, SQLi, SSRF, IDOR)](#21-owasp-top-vulnerabilities-spring-boot-defenses-csrf-xss-sqli-ssrf-idor)
-   - [2.2 Security Response Headers, HTTPS/TLS & Secrets Management](#22-security-response-headers-httpstls-secrets-management)
-3. [Certificate Management, SSL/TLS, Keystores & Mutual TLS (mTLS) in Java](#3-certificate-management-ssltls-keystores-mutual-tls-mtls-in-java)
-   - [3.1 Public Key Infrastructure (PKI) & X.509 Certificate Chain of Trust](#31-public-key-infrastructure-pki-x509-certificate-chain-of-trust)
-   - [3.2 TLS 1.3 vs TLS 1.2 Handshake Deep-Dive & Perfect Forward Secrecy](#32-tls-13-vs-tls-12-handshake-deep-dive-perfect-forward-secrecy)
-   - [3.3 Mutual TLS (mTLS / Two-Way SSL) in Microservices & Banking APIs](#33-mutual-tls-mtls-two-way-ssl-in-microservices-banking-apis)
-   - [3.4 Java Keystore (`KeyStore`) vs Truststore (`TrustStore`)](#34-java-keystore-keystore-vs-truststore-truststore)
-   - [3.5 Spring Boot 3.1+ SSL Bundles (`SslBundle`) & Dynamic Certificate Reloading](#35-spring-boot-31-ssl-bundles-sslbundle-dynamic-certificate-reloading)
-   - [3.6 Certificate Management CLI (`keytool` & `openssl`) Cheatsheet](#36-certificate-management-cli-keytool-openssl-cheatsheet)
-   - [3.7 Production SSL/TLS Troubleshooting & Top Java Exceptions (PKIX Path Building Failed)](#37-production-ssltls-troubleshooting-top-java-exceptions-pkix-path-building-failed)
-4. [Summary Comparison & Engineering Reference Matrix](#4-summary-comparison-engineering-reference-matrix)
-5. [References & Further Reading](#5-references-further-reading)
+1. [Security Foundations: Concepts & Mental Models](#1-security-foundations-concepts--mental-models)
+   - [1.1 Authentication (AuthN) vs Authorization (AuthZ): The Airport Analogy](#11-authentication-authn-vs-authorization-authz-the-airport-analogy)
+   - [1.2 Cryptography Primitives: Symmetric vs Asymmetric vs Hashing vs HMAC](#12-cryptography-primitives-symmetric-vs-asymmetric-vs-hashing-vs-hmac)
+   - [1.2.1 Production JPA AttributeConverter: Column-Level AES-256-GCM Encryption](#121-production-jpa-attributeconverter-column-level-aes-256-gcm-encryption)
+   - [1.3 The CIA Triad, Principle of Least Privilege & Zero Trust Architecture](#13-the-cia-triad-principle-of-least-privilege--zero-trust-architecture)
+   - [1.4 Defense in Depth in Modern Microservices](#14-defense-in-depth-in-modern-microservices)
+2. [Spring Security 6 Internal Architecture](#2-spring-security-6-internal-architecture)
+   - [2.1 Servlet Filter Architecture: `DelegatingFilterProxy` & `FilterChainProxy`](#21-servlet-filter-architecture-delegatingfilterproxy--filterchainproxy)
+   - [2.2 The Complete Ordered Filter Chain Pipeline](#22-the-complete-ordered-filter-chain-pipeline)
+   - [2.3 Modern Component-Based Security Configuration (`SecurityFilterChain`)](#23-modern-component-based-security-configuration-securityfilterchain)
+   - [2.3.1 Production Custom Authentication Filter & Provider (API Key Security)](#231-production-custom-authentication-filter--provider-api-key-security)
+   - [2.3.2 Multi-Tenant JWT Issuer Resolution (`JwtIssuerAuthenticationManagerResolver`)](#232-multi-tenant-jwt-issuer-resolution-jwtissuerauthenticationmanagerresolver)
+   - [2.4 `SecurityContextHolder` & The ThreadLocal Concurrency Hazard in Async Pools](#24-securitycontextholder--the-threadlocal-concurrency-hazard-in-async-pools)
+   - [2.5 The Authentication Flow: `AuthenticationManager`, `ProviderManager` & `AuthenticationProvider`](#25-the-authentication-flow-authenticationmanager-providermanager--authenticationprovider)
+   - [2.6 Custom Authentication Entry Point & Access Denied Handlers (RFC 9457 Integration)](#26-custom-authentication-entry-point--access-denied-handlers-rfc-9457-integration)
+   - [2.7 Cryptographic Password Hashing: BCrypt vs PBKDF2 vs Argon2id](#27-cryptographic-password-hashing-bcrypt-vs-pbkdf2-vs-argon2id)
+3. [Token-Based Authentication & OAuth 2.0 / OIDC](#3-token-based-authentication--oauth-20--oidc)
+   - [3.1 Stateful Session Authentication vs Stateless JWT Tokens](#31-stateful-session-authentication-vs-stateless-jwt-tokens)
+   - [3.2 JWT Anatomy: Header, Payload Claims & Asymmetric RS256 Verification via JWKS](#32-jwt-anatomy-header-payload-claims--asymmetric-rs256-verification-via-jwks)
+   - [3.3 Access Token vs Refresh Token Lifecycle & Silent Token Rotation](#33-access-token-vs-refresh-token-lifecycle--silent-token-rotation)
+   - [3.4 OAuth 2.0 & OpenID Connect: The 4 Core Roles](#34-oauth-20--openid-connect-the-4-core-roles)
+   - [3.5 Authorization Code Flow with PKCE (Proof Key for Code Exchange)](#35-authorization-code-flow-with-pkce-proof-key-for-code-exchange)
+   - [3.6 Client Credentials Flow for Machine-to-Machine Microservices](#36-client-credentials-flow-for-machine-to-machine-microservices)
+   - [3.7 Method-Level Security: `@PreAuthorize`, SpEL & Custom Evaluators](#37-method-level-security-preauthorize-spel--custom-evaluators)
+   - [3.8 Production Keycloak & OIDC JWT Role Claims Converter](#38-production-keycloak--oidc-jwt-role-claims-converter)
+4. [Web Application Defenses & OWASP Top 10](#4-web-application-defenses--owasp-top-10)
+   - [4.1 Cross-Site Request Forgery (CSRF): Mechanics & Token Repositories](#41-cross-site-request-forgery-csrf-mechanics--token-repositories)
+   - [4.2 Cross-Site Scripting (XSS) & Content Security Policy (CSP)](#42-cross-site-scripting-xss--content-security-policy-csp)
+   - [4.3 Insecure Direct Object References (IDOR) & Tenancy Enforcement](#43-insecure-direct-object-references-idor--tenancy-enforcement)
+   - [4.4 Server-Side Request Forgery (SSRF) & Internal Network Shielding](#44-server-side-request-forgery-ssrf--internal-network-shielding)
+   - [4.5 Security Response Headers (`HSTS`, `X-Content-Type-Options`, `X-Frame-Options`)](#45-security-response-headers-hsts-x-content-type-options-x-frame-options)
+   - [4.6 Distributed Rate Limiting & Brute-Force Defense (Redis Token Bucket)](#46-distributed-rate-limiting--brute-force-defense-redis-token-bucket)
+5. [Public Key Infrastructure (PKI), TLS 1.3 & Certificate Management](#5-public-key-infrastructure-pki-tls-13--certificate-management)
+   - [5.1 PKI Fundamentals: Asymmetric Encryption & X.509 Certificate Chain of Trust](#51-pki-fundamentals-asymmetric-encryption--x509-certificate-chain-of-trust)
+   - [5.2 TLS 1.3 Handshake Deep-Dive & Perfect Forward Secrecy](#52-tls-13-handshake-deep-dive--perfect-forward-secrecy)
+   - [5.3 Java Keystore (`KeyStore`) vs Truststore (`TrustStore`)](#53-java-keystore-keystore-vs-truststore-truststore)
+   - [5.4 Mutual TLS (mTLS / Two-Way SSL) in Microservices & B2B Banking Gateways](#54-mutual-tls-mtls--two-way-ssl-in-microservices--b2b-banking-gateways)
+   - [5.5 Spring Boot 3.1+ SSL Bundles (`SslBundle`) & Dynamic Reloading](#55-spring-boot-31-ssl-bundles-sslbundle--dynamic-reloading)
+   - [5.6 Cryptographic Diagnostic CLI Playbook (`keytool` & `openssl`)](#56-cryptographic-diagnostic-cli-playbook-keytool--openssl)
+6. [Production Troubleshooting Playbook](#6-production-troubleshooting-playbook)
+7. [Summary Comparison & Engineering Reference Matrix](#7-summary-comparison--engineering-reference-matrix)
+8. [References & Further Reading](#8-references--further-reading)
 
 ---
 
-# 1. Spring Security 6 & API Authentication
+# 1. Security Foundations: Concepts & Mental Models
 
 ---
 
-### 1.1 Authentication (AuthN) vs Authorization (AuthZ)
+### 1.1 Authentication (AuthN) vs Authorization (AuthZ): The Airport Analogy
 
-- **Authentication (AuthN)**: "Who are you?" Verifying the claimed identity of an entity (e.g., verifying user credentials, validating a cryptographic JWT signature against a JWKS public key, or verifying a client mTLS x509 certificate).
-- **Authorization (AuthZ)**: "What are you permitted to do?" Evaluating whether an already-authenticated principal holds the requisite roles, scopes, or authorities to access a target URI or method (e.g. `ROLE_ADMIN` deleting a record).
-
----
-
-### 1.2 The Spring Security Filter Chain Internal Architecture
-
-In Spring Boot 3, all HTTP traffic is intercepted by standard servlet filters orchestrated by `DelegatingFilterProxy` and `FilterChainProxy`:
+To build secure software, engineers must never conflate authentication with authorization:
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
-sequenceDiagram
-    autonumber
-    actor Client as HTTP Client
-    participant DFP as DelegatingFilterProxy
-    participant FCP as FilterChainProxy
-    participant Cors as CorsFilter
-    participant Csrf as CsrfFilter
-    participant JWT as BearerTokenAuthenticationFilter
-    participant Ex as ExceptionTranslationFilter
-    participant AuthZ as AuthorizationFilter
-    participant Ctrl as @RestController
+flowchart TD
+    subgraph AirportAnalogy ["The Airport Terminal Security Model"]
+        direction TB
+        subgraph AuthN ["Authentication (AuthN): 'Who are you?'"]
+            IDCheck["1. TSA Security Checkpoint<br/>Inspects Government Passport & Face<br/>(> Confirms Identity: 'You are John Doe')"]
+        end
 
-    Client->>DFP: HTTP GET /api/v1/orders (Bearer JWT)
-    DFP->>FCP: Delegate to Spring Managed SecurityFilterChain
-    FCP->>Cors: Validate Origin headers
-    Cors->>Csrf: Pass (Disabled for stateless REST)
-    Csrf->>JWT: Extract & Validate Bearer Token
-    JWT->>JWT: Verify Signature & Populate SecurityContext
-    JWT->>Ex: Pass
-    Ex->>AuthZ: Evaluate hasRole('CUSTOMER')
-    AuthZ->>Ctrl: Dispatch to Controller method
-    Ctrl-->>Client: HTTP 200 OK (Orders JSON)
+        subgraph AuthZ ["Authorization (AuthZ): 'What are you permitted to do?'"]
+            GateCheck["2. Flight Gate Agent<br/>Inspects Boarding Pass Ticket<br/>(> Confirms Permission: 'Permitted to enter Flight 402, Seat 12B')"]
+            LoungeCheck["3. First-Class Lounge Agent<br/>Inspects VIP Status<br/>(> Denied if economy ticket: '403 Forbidden')"]
+        end
+
+        AuthN --> AuthZ
+    end
+
+    style AirportAnalogy fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style AuthN fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style AuthZ fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fde68a
+    style IDCheck fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style GateCheck fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style LoungeCheck fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fff
 ```
 
-#### Production Spring Security 6 Configuration
+* **Authentication (AuthN)**: Validating the claimed identity of a user or system (e.g., matching username/password, verifying an X.509 certificate, or validating an asymmetric RSA signature on a JWT token).
+* **Authorization (AuthZ)**: Evaluating whether an authenticated principal holds the necessary privileges, roles, or attributes to execute an action on a target resource (e.g., verifying whether John Doe can delete order #402).
+
+---
+
+### 1.2 Cryptography Primitives: Symmetric vs Asymmetric vs Hashing vs HMAC
+
+Backend engineers must distinguish the four core cryptographic primitives:
+
+```mermaid
+flowchart LR
+    subgraph Sym ["1. Symmetric Encryption (AES-256-GCM)"]
+        direction TB
+        P1["Plaintext"] -->|"Encrypt with Secret Key K"| C1["Ciphertext"]
+        C1 -->|"Decrypt with SAME Secret Key K"| P1_2["Plaintext"]
+    end
+
+    subgraph Asym ["2. Asymmetric Encryption (RSA / ECC)"]
+        direction TB
+        P2["Plaintext"] -->|"Encrypt with Public Key"| C2["Ciphertext"]
+        C2 -->|"Decrypt with PRIVATE Key"| P2_2["Plaintext"]
+    end
+
+    subgraph Hash ["3. Cryptographic Hash (SHA-256)"]
+        direction TB
+        P3["Any Length Input"] -->|"One-Way Trapdoor Function"| H3["Fixed 256-bit Digest (Irreversible!)"]
+    end
+
+    subgraph Hmac ["4. HMAC (HMAC-SHA256)"]
+        direction TB
+        P4["Input Message + Shared Key"] -->|"Hash-based MAC"| Tag["Authentication Tag (Guarantees Integrity)"]
+    end
+
+    style Sym fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Asym fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Hash fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Hmac fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+```
+
+| Primitive | Key Requirements | Reversible? | Primary Enterprise Use Case |
+| :--- | :--- | :---: | :--- |
+| **Symmetric Encryption** (`AES-GCM-256`) | Single shared secret key | **Yes** | Encrypting databases at rest, session cookies, internal secrets. Extremely fast. |
+| **Asymmetric Encryption** (`RSA-4096`, `ECDSA`, `Ed25519`) | Key Pair (Public Key + Private Key) | **Yes** | Digital signatures, JWT signing (RS256), TLS 1.3 key exchange, mTLS. |
+| **Cryptographic Hash** (`SHA-256`, `SHA-3`) | None (No key) | **NO** | Data integrity verification, file checksums, blockchain blocks. |
+| **HMAC** (`HmacSHA256`) | Shared secret key + Hash | **NO** | API request signing (AWS Signature v4), webhook payload authentication (Stripe/GitHub). |
+
+---
+
+### 1.2.1 Production JPA AttributeConverter: Column-Level AES-256-GCM Encryption
+
+Storing unencrypted sensitive fields (Social Security Numbers, Credit Cards, Tax IDs) in a database leaves organizations vulnerable to database dump leaks. A production-grade JPA `AttributeConverter` encrypts data in-memory before writing to SQL and decrypts automatically upon entity retrieval:
 
 ```java
-package com.company.security;
+package com.enterprise.security.crypto;
 
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.Base64;
+
+@Converter
+public class AesGcmAttributeConverter implements AttributeConverter<String, String> {
+
+    private static final String ALGORITHM = "AES/GCM/NoPadding";
+    private static final int TAG_LENGTH_BIT = 128;
+    private static final int IV_LENGTH_BYTE = 12; // 96-bit IV recommended for GCM
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    // 256-bit AES master key loaded securely from cloud vault / environment
+    private static final byte[] MASTER_KEY_BYTES = "SuperSecretMasterKey32BytesLong!".getBytes(StandardCharsets.UTF_8);
+    private static final SecretKey SECRET_KEY = new SecretKeySpec(MASTER_KEY_BYTES, "AES");
+
+    @Override
+    public String convertToDatabaseColumn(String plainText) {
+        if (plainText == null || plainText.isBlank()) return plainText;
+
+        try {
+            // 1. Generate unique 12-byte Initialization Vector (IV) for each encryption operation
+            byte[] iv = new byte[IV_LENGTH_BYTE];
+            SECURE_RANDOM.nextBytes(iv);
+
+            // 2. Initialize AES-GCM Cipher
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, SECRET_KEY, gcmSpec);
+
+            // 3. Encrypt plaintext
+            byte[] cipherText = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+
+            // 4. Prepend IV to ciphertext: [IV (12 bytes)] + [Ciphertext + Auth Tag]
+            ByteBuffer byteBuffer = ByteBuffer.allocate(iv.length + cipherText.length);
+            byteBuffer.put(iv);
+            byteBuffer.put(cipherText);
+
+            return Base64.getEncoder().encodeToString(byteBuffer.array());
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to encrypt database column", e);
+        }
+    }
+
+    @Override
+    public String convertToEntityAttribute(String dbData) {
+        if (dbData == null || dbData.isBlank()) return dbData;
+
+        try {
+            byte[] decoded = Base64.getDecoder().decode(dbData);
+            ByteBuffer byteBuffer = ByteBuffer.wrap(decoded);
+
+            // 1. Extract IV from first 12 bytes
+            byte[] iv = new byte[IV_LENGTH_BYTE];
+            byteBuffer.get(iv);
+
+            // 2. Extract remaining ciphertext
+            byte[] cipherText = new byte[byteBuffer.remaining()];
+            byteBuffer.get(cipherText);
+
+            // 3. Decrypt and verify GCM authentication tag
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+            cipher.init(Cipher.DECRYPT_MODE, SECRET_KEY, gcmSpec);
+
+            byte[] plainTextBytes = cipher.doFinal(cipherText);
+            return new String(plainTextBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to decrypt database column. Key mismatch or data corrupted!", e);
+        }
+    }
+}
+```
+
+```java
+// Entity Usage:
+@Entity
+@Table(name = "customer_profiles")
+public class CustomerProfile {
+    @Id
+    private UUID id;
+
+    @Convert(converter = AesGcmAttributeConverter.class)
+    @Column(name = "tax_identification_number", nullable = false)
+    private String taxIdentificationNumber; // Automatically encrypted at rest!
+}
+```
+
+---
+
+### 1.3 The CIA Triad, Principle of Least Privilege & Zero Trust Architecture
+
+1. **Confidentiality**: Ensuring data is accessible only to authorized entities (enforced via AES-256 encryption at rest and TLS 1.3 in transit).
+2. **Integrity**: Protecting data against unauthorized modification or tampering (enforced via cryptographic HMACs, digital signatures, and database constraints).
+3. **Availability**: Ensuring systems and data are reliably accessible to authorized users (enforced via DDoS mitigation, rate limiting, and circuit breakers).
+4. **Principle of Least Privilege (PoLP)**: Every module, user, and service account must operate using only the minimal set of permissions required to complete its job. A billing service should have read-only access to customer profiles, never administrative rights.
+5. **Zero Trust Architecture (NIST SP 800-207)**:
+   * **Core Tenet**: *"Never trust, always verify."*
+   * Traditional castle-and-moat security assumed that anything inside the internal corporate VPN was trustworthy. Modern cloud engineering rejects this: every network packet, inter-service RPC call, and database query must be authenticated and authorized, even across internal microservice meshes.
+
+---
+
+### 1.4 Defense in Depth in Modern Microservices
+
+Never rely on a single perimeter wall (such as an API Gateway). Security must be enforced across multiple concentric layers:
+1. **Network Layer**: Private VPC subnets, AWS Security Groups, Kubernetes NetworkPolicies, Mutual TLS (mTLS) between pods.
+2. **Transport Layer**: TLS 1.3 with strict HSTS policies.
+3. **Application Gateway Layer**: Rate limiting, WAF (Web Application Firewall) inspecting SQLi/XSS, CORS filtering.
+4. **Service Boundary Layer**: Spring Security filter chain validating JWT cryptographic signatures and claims.
+5. **Method / Domain Layer**: `@PreAuthorize` attribute-based tenancy checks (`#order.customerId == authentication.name`).
+6. **Data Persistence Layer**: Transparent Data Encryption (TDE), column-level field encryption for PII (Personally Identifiable Information), database audit logs.
+
+---
+
+# 2. Spring Security 6 Internal Architecture
+
+---
+
+### 2.1 Servlet Filter Architecture: `DelegatingFilterProxy` & `FilterChainProxy`
+
+Spring Security does not intercept requests at the Spring MVC controller level; it intercepts requests at the low-level **Servlet Filter pipeline** before requests ever reach `DispatcherServlet`:
+
+```mermaid
+flowchart TD
+    Req["Incoming HTTP Request"] --> DFP["DelegatingFilterProxy<br/>(Standard Servlet Filter registered in Tomcat)"]
+    DFP -->|"Delegates execution to Spring Bean"| FCP["FilterChainProxy<br/>(Spring-managed central security orchestrator)"]
+
+    subgraph SecurityFilterChain ["SecurityFilterChain (Ordered Pipeline of Filters)"]
+        direction TB
+        F1["1. CorsFilter (Validates Origin)"]
+        --> F2["2. CsrfFilter (Validates CSRF token)"]
+        --> F3["3. BearerTokenAuthenticationFilter (Validates JWT)"]
+        --> F4["4. ExceptionTranslationFilter (Catches AuthN/AuthZ exceptions)"]
+        --> F5["5. AuthorizationFilter (Checks role permissions & endpoints)"]
+    end
+
+    FCP --> SecurityFilterChain
+    SecurityFilterChain --> Controller["@RestController Controller Method"]
+
+    style Req fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style DFP fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style FCP fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style SecurityFilterChain fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
+    style Controller fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+```
+
+* **`DelegatingFilterProxy`**: A standard J2EE servlet filter configured in Tomcat that acts as a bridge, delegating all incoming HTTP filtering calls to a Spring-managed bean named `springSecurityFilterChain`.
+* **`FilterChainProxy`**: The master Spring bean that inspects the request URI and routes it to the matching `SecurityFilterChain`.
+
+---
+
+### 2.2 The Complete Ordered Filter Chain Pipeline
+
+Spring Security processes filters in a strict, deterministic sequence:
+1. `ChannelProcessingFilter`: Enforces HTTPS / TLS redirection.
+2. `CorsFilter`: Handles CORS preflight `OPTIONS` requests before authentication.
+3. `CsrfFilter`: Validates CSRF synchronizer tokens on state-mutating requests (`POST`, `PUT`, `DELETE`).
+4. `LogoutFilter`: Handles `/logout` and invalidates sessions/tokens.
+5. `BearerTokenAuthenticationFilter` / `UsernamePasswordAuthenticationFilter`: Extracts credentials from headers or forms and attempts authentication.
+6. `SecurityContextHolderFilter`: Populates `SecurityContext` from session or token.
+7. `ExceptionTranslationFilter`: Intercepts `AuthenticationException` (translating to HTTP 401 Unauthorized) and `AccessDeniedException` (translating to HTTP 403 Forbidden).
+8. `AuthorizationFilter`: Final filter verifying endpoint access rules.
+
+---
+
+---
+
+### 2.3 Modern Component-Based Security Configuration (`SecurityFilterChain`)
+
+In Spring Security 6 (Spring Boot 3), the legacy `WebSecurityConfigurerAdapter` has been completely removed in favor of a component-based model where security behavior is configured by declaring `@Bean SecurityFilterChain` instances.
+
+```java
+package com.enterprise.security.config;
+
+import com.enterprise.security.filter.ApiKeyAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Enables @PreAuthorize, @PostAuthorize
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true) // Activates @PreAuthorize, @PostAuthorize
 public class SecurityConfiguration {
 
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+
+    public SecurityConfiguration(ApiKeyAuthenticationFilter apiKeyAuthenticationFilter) {
+        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
+    }
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-            // 1. Disable CSRF for stateless REST APIs using Bearer tokens
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            // 1. Disable CSRF for stateless REST APIs utilizing Bearer JWTs or API keys
             .csrf(csrf -> csrf.disable())
-            // 2. Enforce strictly stateless session management (no HTTP sessions created)
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // 3. Define explicit endpoint authorization rules
+
+            // 2. Enforce strict Stateless session management (Tomcat never creates an HttpSession)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+            // 3. Configure URI authorization rules
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/public/**", "/actuator/health/**").permitAll()
+                .requestMatchers("/api/v1/auth/**", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN")
+                .requestMatchers("/api/v1/reports/**").hasAnyRole("ADMIN", "ANALYST")
                 .anyRequest().authenticated()
             )
-            // 4. Configure OAuth2 Resource Server for JWT token validation
+
+            // 4. Register custom API Key authentication filter prior to standard username/password filter
+            .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+            // 5. Configure OAuth2 JWT Resource Server with custom Keycloak/Auth0 claim mapper
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-            )
-            .build();
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(customJwtAuthenticationConverter()))
+            );
+
+        return http.build();
     }
 
+    /**
+     * Maps Keycloak's nested realm_access.roles claim JSON array to Spring Security's ROLE_ format.
+     */
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
-        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
-
-        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
-        jwtConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
-        return jwtConverter;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12); // Work factor = 12 (4096 rounds)
+    public Converter<Jwt, ? extends AbstractAuthenticationToken> customJwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+            if (realmAccess == null || !realmAccess.containsKey("roles")) {
+                return Collections.emptyList();
+            }
+            @SuppressWarnings("unchecked")
+            List<String> roles = (List<String>) realmAccess.get("roles");
+            return roles.stream()
+                .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                .collect(Collectors.toList());
+        });
+        return converter;
     }
 }
 ```
 
 ---
 
-### 1.3 Password Hashing Algorithms: BCrypt vs Argon2
+### 2.3.1 Production Custom Authentication Filter & Provider (API Key Security)
 
-| Dimension | BCrypt | Argon2 (Argon2id) |
-| :--- | :--- | :--- |
-| **Algorithm Type** | Adaptive cryptographic work factor ($2^{\text{cost}}$) | Memory-hard password hashing function |
-| **Hardware Resistance**| Vulnerable to dedicated ASIC and FPGA brute-force arrays | Highly resistant to GPU and custom ASIC cracking |
-| **Salt Handling** | Automatically embeds 128-bit salt within hash string | Configurable salt length, memory cost, and thread count |
-| **OWASP Status** | Approved legacy standard | **Top recommendation** for new enterprise systems |
+In high-throughput B2B partner APIs, authentication often relies on cryptographically random API keys passed via `X-API-KEY` headers rather than interactive OAuth logins. Here is how to implement a clean, idiomatic Spring Security 6 filter and provider:
 
----
+```java
+package com.enterprise.security.filter;
 
-### 1.4 Stateful Session-Based vs Stateless JWT Token Authentication
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
-```mermaid
-flowchart TD
-    subgraph StatefulSessions["Stateful Session Authentication (Monoliths)"]
-        direction TB
-        C1["Web Client"] -->|Cookie: JSESSIONID| Srv["Web Server Instance"]
-        Srv <-->|Session ID Lookup| MemStore["Server Memory / Redis Sticky Sessions"]
-        NoteSS["Requires sticky sessions or centralized session DB; scaling bottleneck"]
-    end
+import java.io.IOException;
 
-    subgraph StatelessJWT["Stateless JWT Authentication (Microservices)"]
-        direction TB
-        C2["Client App"] -->|Header: Authorization: Bearer eyJhbGci...| Micro1["Microservice A"]
-        C2 -->|Same Token| Micro2["Microservice B"]
-        Micro1 & Micro2 -.->|Verify digital signature via local public key| JWKS["Cached JWKS Public Keys"]
-        NoteJWT["Zero database queries to authenticate; instantly horizontally scalable"]
-    end
+@Component
+public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
-    style StatefulSessions fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-    style StatelessJWT fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
+    private static final String API_KEY_HEADER = "X-API-KEY";
+    private final AuthenticationManager authenticationManager;
 
-    style C1 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style Srv fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style MemStore fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style NoteSS fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style C2 fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style Micro1 fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style Micro2 fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style JWKS fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style NoteJWT fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
+    public ApiKeyAuthenticationFilter(AuthenticationManager authenticationManager) {
+        this.authenticationManager = authenticationManager;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String apiKey = request.getHeader(API_KEY_HEADER);
+
+        if (apiKey != null && !apiKey.isBlank()) {
+            try {
+                // Wrap raw API key in unauthenticated token
+                ApiKeyAuthenticationToken unauthenticatedToken = new ApiKeyAuthenticationToken(apiKey);
+                // Delegate validation to AuthenticationProvider
+                Authentication authenticatedToken = authenticationManager.authenticate(unauthenticatedToken);
+
+                // Populate SecurityContext for current thread
+                SecurityContext context = SecurityContextHolder.createEmptyContext();
+                context.setAuthentication(authenticatedToken);
+                SecurityContextHolder.setContext(context);
+
+            } catch (BadCredentialsException ex) {
+                SecurityContextHolder.clearContext();
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid API Key supplied");
+                return;
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+```java
+package com.enterprise.security.filter;
+
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class ApiKeyAuthenticationProvider implements AuthenticationProvider {
+
+    private final ApiKeyVaultService apiKeyVaultService;
+
+    public ApiKeyAuthenticationProvider(ApiKeyVaultService apiKeyVaultService) {
+        this.apiKeyVaultService = apiKeyVaultService;
+    }
+
+    @Override
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        ApiKeyAuthenticationToken token = (ApiKeyAuthenticationToken) authentication;
+        String rawApiKey = token.getCredentials();
+
+        // Validate hash of API key against vault/database
+        var partnerAccount = apiKeyVaultService.findAccountByApiKey(rawApiKey)
+            .orElseThrow(() -> new BadCredentialsException("Unrecognized or revoked API key"));
+
+        // Return fully populated, authenticated token with partner authorities
+        return new ApiKeyAuthenticationToken(
+            partnerAccount.clientId(),
+            List.of(new SimpleGrantedAuthority("ROLE_PARTNER"), new SimpleGrantedAuthority("SCOPE_READ"))
+        );
+    }
+
+    @Override
+    public boolean supports(Class<?> authentication) {
+        return ApiKeyAuthenticationToken.class.isAssignableFrom(authentication);
+    }
+}
 ```
 
 ---
 
-### 1.5 OAuth 2.0 & OpenID Connect (PKCE & Client Credentials Flow)
+### 2.3.2 Multi-Tenant JWT Issuer Resolution (`JwtIssuerAuthenticationManagerResolver`)
 
-```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
-sequenceDiagram
-    autonumber
-    actor User as End User (Browser)
-    participant Client as Frontend SPA (React)
-    participant Auth0 as OAuth2 / Entra ID IdP
-    participant API as Backend Resource Server
+In enterprise SaaS platforms, a single backend service must accept JWTs issued by multiple distinct Identity Providers (e.g., Tenant A uses Okta, Tenant B uses Microsoft Entra ID / Azure AD, and internal admins use Keycloak). Spring Security provides `JwtIssuerAuthenticationManagerResolver`:
 
-    Client->>Client: Generate code_verifier & code_challenge = SHA256(verifier)
-    Client->>Auth0: GET /authorize?response_type=code&code_challenge=...
-    Auth0->>User: Prompt Login & Consent Form
-    User-->>Auth0: Submit Credentials
-    Auth0-->>Client: Redirect 302 with ?code=AUTH_CODE
-    Client->>Auth0: POST /token with code=AUTH_CODE & code_verifier=...
-    Auth0->>Auth0: Verify code_challenge == SHA256(code_verifier)
-    Auth0-->>Client: Return { access_token, id_token, refresh_token }
-    Client->>API: HTTP GET /api/orders (Authorization: Bearer <access_token>)
-    API->>API: Validate JWT signature & claims
-    API-->>Client: Return JSON Data
+```java
+package com.enterprise.security.config;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationManagerResolver;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
+import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerAuthenticationManagerResolver;
+import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class MultiTenantSecurityConfiguration {
+
+    private static final String OKTA_ISSUER = "https://dev-company.okta.com/oauth2/default";
+    private static final String KEYCLOAK_ISSUER = "https://id.company.com/realms/enterprise";
+
+    @Bean
+    public SecurityFilterChain multiTenantFilterChain(HttpSecurity http) throws Exception {
+        http
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/public/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .authenticationManagerResolver(issuerAuthenticationManagerResolver())
+            );
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationManagerResolver<HttpServletRequest> issuerAuthenticationManagerResolver() {
+        Map<String, AuthenticationManager> managers = new HashMap<>();
+
+        // Register Okta Provider
+        JwtAuthenticationProvider oktaProvider = new JwtAuthenticationProvider(JwtDecoders.fromIssuerLocation(OKTA_ISSUER));
+        managers.put(OKTA_ISSUER, oktaProvider::authenticate);
+
+        // Register Keycloak Provider
+        JwtAuthenticationProvider keycloakProvider = new JwtAuthenticationProvider(JwtDecoders.fromIssuerLocation(KEYCLOAK_ISSUER));
+        managers.put(KEYCLOAK_ISSUER, keycloakProvider::authenticate);
+
+        // Dynamically inspects the 'iss' claim in the untrusted incoming JWT header/payload to select the manager
+        return new JwtIssuerAuthenticationManagerResolver(managers::get);
+    }
+}
 ```
 
 ---
 
-### 1.6 Role-Based (RBAC), Attribute-Based (ABAC) & Method Security (`@PreAuthorize`)
+### 2.4 `SecurityContextHolder` & The ThreadLocal Concurrency Hazard in Async Pools
 
-- **RBAC**: Access granted based strictly on static user roles (`hasRole('ADMIN')`).
-- **ABAC**: Access granted dynamically based on user attributes, resource state, and environmental context (e.g. "A doctor can read patient records *only if* the patient is currently admitted to the doctor's department").
-- **Method Security**: Decorate service layer methods with Spring Expression Language (SpEL):
+* **`SecurityContextHolder`**: Stores security context details using a `ThreadLocal` strategy. Any thread serving an authenticated request can access the current user via `SecurityContextHolder.getContext().getAuthentication()`.
+* **The Thread Pool Concurrency Trap**:
+  In modern asynchronous code (`@Async`, `CompletableFuture.supplyAsync()`, or custom `ExecutorService`), child worker threads **do not inherit the parent thread's `ThreadLocal` context**! The child thread executes with an empty `SecurityContext` $\to$ `NullPointerException` or unauthenticated failure!
+* **Production Remedy**: Wrap thread pool executors using Spring's `DelegatingSecurityContextExecutorService`:
   ```java
-  @PreAuthorize("hasRole('ADMIN') or #order.customerId == authentication.principal.id")
-  public void cancelOrder(Order order) { ... }
+  ExecutorService delegate = Executors.newFixedThreadPool(10);
+  ExecutorService securityExecutor = new DelegatingSecurityContextExecutorService(delegate);
   ```
 
 ---
 
-# 2. Web Application Security & OWASP Defense
-
----
-
-### 2.1 OWASP Top Vulnerabilities & Spring Boot Defenses (CSRF, XSS, SQLi, SSRF, IDOR)
-
-1. **Cross-Site Request Forgery (CSRF)**: Attacker tricks an authenticated user's browser into submitting unauthorized requests. *Defense*: For stateless REST APIs using `Authorization: Bearer` headers, CSRF is disabled because browsers never attach custom authorization headers automatically. For cookie-based apps, enforce `SameSite=Strict` cookies and CSRF tokens.
-2. **Cross-Site Scripting (XSS)**: Injection of malicious scripts executed inside a victim's browser. *Defense*: Context-aware output encoding (HTML, JavaScript, CSS), Content Security Policy (`CSP`) headers, and sanitize user HTML input with OWASP Java HTML Sanitizer.
-3. **SQL Injection (SQLi)**: Untrusted input concatenated directly into SQL query strings. *Defense*: Always use parameterized queries, PreparedStatement, or Spring Data JPA repositories with named parameters (`@Param`).
-4. **Server-Side Request Forgery (SSRF)**: Attacker tricks the backend into making unauthorized HTTP requests to internal networks or cloud metadata services (`http://169.254.169.254`). *Defense*: Whitelist permitted external target domains; block internal IP ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.1`).
-5. **Insecure Direct Object Reference (IDOR)**: Accessing resources directly via user-supplied IDs without verifying ownership (`/api/documents/1029`). *Defense*: Always verify that the authenticated user owns the requested entity ID before returning data.
-
----
-
-### 2.2 Security Response Headers, HTTPS/TLS & Secrets Management
-
-Production Spring Boot applications should enforce mandatory HTTP response security headers:
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (Enforces HTTPS).
-- `X-Content-Type-Options: nosniff` (Prevents MIME sniffing attacks).
-- `X-Frame-Options: DENY` (Prevents Clickjacking).
-- `Content-Security-Policy: default-src 'self'` (Restricts resource loading).
-
----
-
-# 3. Certificate Management, SSL/TLS, Keystores & Mutual TLS (mTLS) in Java
-
----
-
-### 3.1 Public Key Infrastructure (PKI) & X.509 Certificate Chain of Trust
-
-Public Key Infrastructure (PKI) underpins secure Internet and inter-service communications by combining **Asymmetric Cryptography** (for authentication and key exchange) with **Symmetric Cryptography** (for high-speed bulk data encryption):
+### 2.5 The Authentication Flow: `AuthenticationManager`, `ProviderManager` & `AuthenticationProvider`
 
 ```mermaid
 flowchart TD
-    subgraph RootCA["1. Root Certificate Authority (Self-Signed)"]
-        RootCert["Root CA Certificate<br/>(Issuer == Subject: DigiCert / Let's Encrypt Global Root)<br/>Pre-installed in Java 'cacerts' TrustStore"]
-        RootKey["Root CA Private Key (Offline Vault)"]
-    end
+    Filter["Authentication Filter (e.g. UsernamePasswordFilter)"]
+    -->|"1. Creates unauthenticated Authentication token"| AM["AuthenticationManager (Interface)"]
+    AM --> PM["ProviderManager (Standard Implementation)"]
 
-    subgraph IntermediateCA["2. Intermediate Certificate Authority"]
-        InterCert["Intermediate CA Certificate<br/>(Signed by Root CA Private Key)"]
-        InterKey["Intermediate CA Private Key"]
-    end
+    PM -->|"Iterates through registered providers"| P1["DaoAuthenticationProvider<br/>(Username/Password against DB)"]
+    PM -->|"Fallback provider"| P2["JwtAuthenticationProvider<br/>(Validates JWT signature & claims)"]
+    PM -->|"Fallback provider"| P3["LdapAuthenticationProvider<br/>(Active Directory / LDAP)"]
 
-    subgraph LeafServerCert["3. Leaf / Server Certificate (Your Microservice)"]
-        ServerCert["Server Certificate (*.company.com)<br/>Subject Alternative Names (SAN): api.company.com<br/>(Signed by Intermediate CA Private Key)"]
-        ServerKey["Server Private Key (Stored securely in keystore.p12)"]
-    end
+    P1 --> UDS["UserDetailsService.loadUserByUsername()"]
+    P1 --> PE["PasswordEncoder.matches()"]
 
-    RootKey -->|Signs| InterCert
-    InterKey -->|Signs| ServerCert
-    
-    ClientVerifier["Client Application (Java RestClient / Browser)"] -->|Validates signature path up to trusted Root CA| RootCert
+    P1 -->|"Success: Returns authenticated token with Authorities"| PM
+    PM --> Filter
+    Filter --> SCH["SecurityContextHolder.getContext().setAuthentication(auth)"]
 
-    style RootCA fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-    style IntermediateCA fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-    style LeafServerCert fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-
-    style RootCert fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style RootKey fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style InterCert fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style InterKey fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style ServerCert fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style ServerKey fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style ClientVerifier fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style Filter fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style AM fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style PM fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+    style P1 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style P2 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style P3 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style SCH fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
 ```
-
-#### X.509 Certificate Components
-1. **Subject**: The identity owner of the certificate (e.g. `CN=api.company.com, O=Enterprise Corp`).
-2. **Subject Alternative Name (SAN)**: The list of valid hostnames and IP addresses (`DNS:api.company.com, DNS:orders.internal`). Modern TLS clients reject certificates if the requested hostname is not in the SAN extension.
-3. **Issuer**: The Certificate Authority (CA) that cryptographically signed this certificate.
-4. **Validity Window**: `NotBefore` and `NotAfter` timestamps. Expired certificates cause immediate connection termination.
-5. **Public Key & Signature Algorithm**: The public key algorithm (RSA 2048/4096 or ECDSA P-256/P-384) and the cryptographic signature generated by the issuing CA.
 
 ---
 
-### 3.2 TLS 1.3 vs TLS 1.2 Handshake Deep-Dive & Perfect Forward Secrecy
+### 2.6 Custom Authentication Entry Point & Access Denied Handlers (RFC 9457 Integration)
 
-TLS 1.3 significantly enhances both security and performance over TLS 1.2, reducing handshake latency from 2 Round Trips (2-RTT) down to **1 Round Trip (1-RTT)**:
+When an unauthenticated or unauthorized request fails, Spring Security by default renders an empty page or basic HTML. In REST microservices, you must emit standardized RFC 9457 JSON problem details:
+
+```java
+@Component
+public class ProblemDetailsAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+    private final ObjectMapper objectMapper;
+
+    public ProblemDetailsAuthenticationEntryPoint(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public void commence(HttpServletRequest request, HttpServletResponse response,
+                         AuthenticationException authException) throws IOException {
+        
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, "Full authentication is required to access this resource");
+        problem.setTitle("Unauthorized Access");
+        problem.setType(URI.create("https://api.enterprise.com/errors/unauthorized"));
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("timestamp", Instant.now());
+
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+}
+```
+
+---
+
+### 2.7 Cryptographic Password Hashing: BCrypt vs PBKDF2 vs Argon2id
+
+> [!CAUTION]
+> **Production Rule**: Never store passwords using MD5, SHA-1, SHA-256, or SHA-512! Modern GPUs can compute over 10 billion SHA-256 hashes per second, cracking common passwords in minutes using precomputed rainbow tables.
+
+Modern password storage requires **Adaptive Key Derivation Functions (KDFs)** that incorporate:
+1. **Cryptographic Salt**: A unique, random byte sequence generated per user, preventing rainbow table attacks.
+2. **Work Factor / Iteration Cost**: Tunable computational cost that can be increased as hardware gets faster.
+
+| Algorithm | Key Characteristic | Memory Hardness | Production Recommendation |
+| :--- | :--- | :---: | :--- |
+| **BCrypt** | Blowfish-based; configurable cost factor ($2^{10}$ to $2^{14}$) | Low | **Standard Production Default in Spring Security** |
+| **PBKDF2** | NIST standard; HMAC iteration loop | Low | Enterprise compliance requirements (FIPS) |
+| **Argon2id** | Winner of Password Hashing Competition; hybrid memory/time hard | **Very High** | **Gold Standard** (Resistant to GPU / ASIC cracking) |
+
+```java
+@Bean
+public PasswordEncoder passwordEncoder() {
+    // Argon2id configuration: salt length 16, hash length 32, parallelism 1, memory 65536 KB, iterations 3
+    return new Argon2PasswordEncoder(16, 32, 1, 65536, 3);
+}
+```
+
+---
+
+# 3. Token-Based Authentication & OAuth 2.0 / OIDC
+
+---
+
+### 3.1 Stateful Session Authentication vs Stateless JWT Tokens
+
+```mermaid
+flowchart TD
+    subgraph Stateful ["Stateful Session Authentication (Legacy Monolith)"]
+        ClientA["Browser"] -->|"Cookie: JSESSIONID=xyz"| ServerA["Tomcat Server (Heap Memory)"]
+        ServerA --> SessionStore["In-Memory Session Table<br/>(Fails on horizontal scaling without sticky sessions or Redis)"]
+    end
+
+    subgraph Stateless ["Stateless JWT Token Authentication (Cloud Microservices)"]
+        ClientB["Client App"] -->|"Authorization: Bearer <JWT>"| Microservice["Any Microservice Instance"]
+        Microservice --> JWKS["Verifies Asymmetric Signature via Public Key<br/>(ZERO database or session lookups needed!)"]
+    end
+
+    style Stateful fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style Stateless fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+```
+
+---
+
+### 3.2 JWT Anatomy: Header, Payload Claims & Asymmetric RS256 Verification via JWKS
+
+A JSON Web Token (JWT) is composed of three Base64URL-encoded strings separated by dots (`.`):
+
+```json
+    // "header": 
+    {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+    // "payload": 
+    {
+        "sub": "user_12345",
+        "iat": 1700000000,
+        "exp": 1700003600,
+        "roles": ["admin", "data_ingest"]
+    }
+    // "signature": "a-string-secret-at-least-256-bits-long"
+
+// Gets Encoded as: 
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.        -> 1. HEADER (Algorithm & Type)
+// eyJzdWIiOiJ1c2VyXzEyMzQ1IiwiaWF0IjoxNzAw...  -> 2. PAYLOAD (Claims & Subject)
+// DWkrkUkOXitp6TASupJi-vV7l7C84yUiPWAZ4_cDO0k  -> 3. SIGNATURE (Cryptographic Proof)
+```
+
+1. **Header**: Declares the cryptographic algorithm (e.g., `{"alg": "RS256", "typ": "JWT"}`).
+2. **Payload**: Contains standard claims (`sub` = subject user ID, `iss` = issuer URI, `exp` = expiration timestamp) and custom business claims (`roles`).
+3. **Signature (RS256 - Asymmetric)**:
+   $$\text{Signature} = \text{RSA-SHA256}(\text{Base64Url}(\text{Header}) + "." + \text{Base64Url}(\text{Payload}),\ \text{Private Key})$$
+   * **Why RS256 over HS256**: In HS256 (symmetric), both the authorization server and all 50 microservices must share the identical secret key. If one service is compromised, an attacker can forge valid tokens for the entire ecosystem! With **RS256 (asymmetric)**, only the Identity Provider holds the **Private Key** to sign tokens; microservices require only the **Public Key** to verify signatures.
+
+---
+
+### 3.3 Access Token vs Refresh Token Lifecycle & Silent Token Rotation
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
-    actor Client as Java Client / Browser
+    actor User as User / Client App
+    participant AuthServer as Authorization Server (Keycloak / Auth0)
+    participant ResourceServer as Microservice Resource Server
+
+    User->>AuthServer: Authenticate credentials
+    AuthServer-->>User: Returns Access Token (TTL: 15 min) + Refresh Token (TTL: 7 days)
+    Note over User: Refresh Token stored in HttpOnly, Secure, SameSite=Strict cookie!
+
+    User->>ResourceServer: GET /api/orders (Bearer <AccessToken>)
+    ResourceServer-->>User: 200 OK (Orders Data)
+
+    Note over User: 15 minutes elapse... Access Token expires!
+    User->>ResourceServer: GET /api/orders (Bearer <ExpiredAccessToken>)
+    ResourceServer-->>User: 401 Unauthorized (Token Expired)
+
+    User->>AuthServer: POST /oauth/token (grant_type=refresh_token + Refresh Token Cookie)
+    Note over AuthServer: Token Rotation: Invalidates old refresh token & emits brand new pair!
+    AuthServer-->>User: Returns NEW Access Token (15m) + NEW Refresh Token (7d)
+```
+
+---
+
+### 3.4 OAuth 2.0 & OpenID Connect: The 4 Core Roles
+
+* **Resource Owner**: The end-user who owns the data.
+* **Client**: The application attempting to act on the user's behalf (e.g., React SPA, iOS mobile app, backend service).
+* **Authorization Server**: The identity system that authenticates the user and issues tokens (Keycloak, Okta, Azure AD).
+* **Resource Server**: The Spring Boot backend hosting protected business APIs.
+* **OpenID Connect (OIDC)**: An identity layer built directly on top of OAuth 2.0 that introduces the **ID Token** to communicate user identity profile information.
+
+---
+
+---
+
+### 3.5 Authorization Code Flow with PKCE (Proof Key for Code Exchange)
+
+The **Authorization Code Flow with PKCE (RFC 7636)** is the global industry standard for authenticating users across single-page applications (React, Angular) and mobile apps. In public clients, client secrets cannot be securely stored because compiled JavaScript or mobile binary code can be reverse-engineered. PKCE dynamically creates a cryptographic secret per authentication attempt.
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    actor Browser as Browser Client (SPA)
+    participant AuthServer as Authorization Server
+    participant Backend as Backend Resource Server
+
+    Note over Browser: 1. Generates secret 'Code Verifier' and hashes it to 'Code Challenge'
+    Browser->>AuthServer: Redirect to /authorize?code_challenge=xyz&code_challenge_method=S256
+    AuthServer->>Browser: Prompts user login & consent
+    Browser->>AuthServer: Submits credentials
+    AuthServer-->>Browser: Redirects to redirect_uri with temporary ?code=AUTH_CODE_123
+
+    Browser->>AuthServer: POST /token (code=AUTH_CODE_123 & code_verifier=SECRET)
+    Note over AuthServer: Computes SHA-256(code_verifier) and matches against code_challenge!
+    AuthServer-->>Browser: Returns Access Token (JWT) & Refresh Token
+
+    Browser->>Backend: GET /api/v1/profile (Authorization: Bearer <JWT>)
+    Backend-->>Browser: Returns Protected Resource
+```
+
+#### Production Java PKCE Generator Implementation
+
+```java
+package com.enterprise.security.pkce;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Base64;
+
+public final class PkceUtility {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    private PkceUtility() {}
+
+    /**
+     * Generates a cryptographically random, high-entropy Code Verifier string (43 to 128 characters).
+     */
+    public static String generateCodeVerifier() {
+        byte[] randomBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        // Base64URL-encode without padding as required by RFC 7636
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    /**
+     * Computes the SHA-256 Code Challenge from the Code Verifier.
+     * Code Challenge = Base64URL-Encode(SHA-256(Code Verifier))
+     */
+    public static String generateCodeChallenge(String codeVerifier) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(codeVerifier.getBytes(StandardCharsets.US_ASCII));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm unavailable", e);
+        }
+    }
+}
+```
+
+---
+
+### 3.6 Client Credentials Flow for Machine-to-Machine Microservices
+
+When microservices communicate behind the scenes without user interaction (e.g., `OrderService` calling `InventoryService`):
+
+```bash
+# Microservice requests machine-to-machine token using Client ID & Client Secret
+curl -X POST https://auth.company.com/oauth/token \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "grant_type=client_credentials" \
+     -d "client_id=order-service-client" \
+     -d "client_secret=super_secret_credentials_value" \
+     -d "scope=inventory:read inventory:write"
+```
+
+---
+
+### 3.7 Method-Level Security: `@PreAuthorize`, SpEL & Custom Evaluators
+
+```java
+@Service
+public class OrderSecurityEvaluator {
+    public boolean isOrderOwner(Authentication auth, Long orderId, OrderRepository repo) {
+        String username = auth.getName();
+        return repo.findById(orderId)
+                .map(order -> order.getCustomerUsername().equals(username))
+                .orElse(false);
+    }
+}
+
+@Service
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+
+    public OrderService(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
+
+    // Advanced ABAC: Delegates authorization to custom Spring bean evaluator!
+    @PreAuthorize("hasRole('ADMIN') or @orderSecurityEvaluator.isOrderOwner(authentication, #orderId, @orderRepository)")
+    public OrderResponse getOrderDetails(Long orderId) {
+        return orderRepository.findById(orderId)
+                .map(OrderResponse::fromEntity)
+    }
+}
+```
+
+---
+
+### 3.8 Production Keycloak & OIDC JWT Role Claims Converter
+
+In enterprise microservices integrated with Keycloak, Okta, or Azure AD, identity providers do not store user roles in a top-level `scope` or `roles` claim. Instead, roles are buried inside nested JSON structures such as `realm_access.roles` or `resource_access.{client_id}.roles`:
+
+```json
+{
+  "iss": "https://auth.enterprise.com/realms/production",
+  "sub": "usr_998127391",
+  "realm_access": {
+    "roles": ["customer", "payment_operator"]
+  },
+  "resource_access": {
+    "billing_service": {
+      "roles": ["invoice_viewer", "invoice_admin"]
+    }
+  }
+}
+```
+
+Standard Spring Security `JwtAuthenticationConverter` extracts only `SCOPE_` authorities from the `scope` claim, leaving the application unable to authorize `@PreAuthorize("hasRole('INVOICE_ADMIN')")`.
+
+#### Production Custom JwtAuthenticationConverter Bean
+
+```java
+package com.enterprise.security.oauth2;
+
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+@Component
+public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+
+    private final JwtGrantedAuthoritiesConverter defaultAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+
+    @Override
+    public AbstractAuthenticationToken convert(Jwt jwt) {
+        Collection<GrantedAuthority> authorities = Stream.concat(
+                defaultAuthoritiesConverter.convert(jwt).stream(),
+                extractNestedRoles(jwt).stream()
+        ).collect(Collectors.toSet());
+
+        String principalClaimName = jwt.getClaimAsString("preferred_username");
+        if (principalClaimName == null) {
+            principalClaimName = jwt.getSubject();
+        }
+
+        return new JwtAuthenticationToken(jwt, authorities, principalClaimName);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Collection<GrantedAuthority> extractNestedRoles(Jwt jwt) {
+        Set<GrantedAuthority> grantedAuthorities = new HashSet<>();
+
+        // 1. Extract Realm Roles: realm_access.roles
+        Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+        if (realmAccess != null && realmAccess.containsKey("roles")) {
+            List<String> realmRoles = (List<String>) realmAccess.get("roles");
+            realmRoles.stream()
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                    .forEach(grantedAuthorities::add);
+        }
+
+        // 2. Extract Client-Specific Roles: resource_access.billing_service.roles
+        Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
+        if (resourceAccess != null) {
+            for (Map.Entry<String, Object> clientEntry : resourceAccess.entrySet()) {
+                String clientName = clientEntry.getKey();
+                Map<String, Object> clientData = (Map<String, Object>) clientEntry.getValue();
+                if (clientData.containsKey("roles")) {
+                    List<String> clientRoles = (List<String>) clientData.get("roles");
+                    clientRoles.stream()
+                            .map(role -> new SimpleGrantedAuthority("ROLE_" + clientName.toUpperCase() + "_" + role.toUpperCase()))
+                            .forEach(grantedAuthorities::add);
+                }
+            }
+        }
+
+        return grantedAuthorities;
+    }
+}
+```
+
+#### Registering Converter in SecurityFilterChain
+
+```java
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                               KeycloakJwtAuthenticationConverter keycloakConverter) throws Exception {
+    return http
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/api/admin/**").hasRole("ADMIN")
+            .requestMatchers("/api/invoices/**").hasRole("BILLING_SERVICE_INVOICE_ADMIN")
+            .anyRequest().authenticated()
+        )
+        .oauth2ResourceServer(oauth2 -> oauth2
+            .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakConverter))
+        )
+        .build();
+}
+```
+
+---
+
+# 4. Web Application Defenses & OWASP Top 10
+
+---
+
+### 4.1 Cross-Site Request Forgery (CSRF): Mechanics & Token Repositories
+
+In a **CSRF** attack, a malicious website tricks a user's browser into executing an unwanted action on a trusted website where the user is currently authenticated via cookies:
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    actor Victim as Authenticated User
+    participant Bank as Bank Portal (Cookie Auth)
+    participant Attacker as Malicious Website
+
+    Victim->>Bank: Logs in; Bank sets Session Cookie: JSESSIONID=abc
+    Victim->>Attacker: Visits malicious forum site in another tab
+    Attacker->>Bank: Malicious page fires auto-submitting form: POST /transfer?to=attacker&amt=5000
+    Note over Bank: Browser automatically attaches JSESSIONID cookie!
+    Bank->>Bank: Executes transfer! Victim funds stolen!
+```
+
+#### The Defense: Synchronizer Token Pattern
+Spring Security injects a unique, cryptographically random CSRF token into each session. Mutating requests (`POST`, `PUT`, `DELETE`) must supply this token in a header (`X-XSRF-TOKEN`), which third-party sites cannot read due to the **Same-Origin Policy (SOP)**:
+
+```java
+// For cookie-based SPAs:
+http.csrf(csrf -> csrf
+    .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+);
+```
+
+---
+
+### 4.2 Cross-Site Scripting (XSS) & Content Security Policy (CSP)
+
+* **XSS Attack**: Injecting malicious JavaScript into web pages viewed by other users to steal session cookies or credentials.
+* **Spring Boot Defense**: Use Thymeleaf (which escapes HTML by default via `th:text`), sanitize input with OWASP Java HTML Sanitizer, and configure strict **Content Security Policy (CSP)** headers:
+  ```java
+  http.headers(headers -> headers
+      .contentSecurityPolicy(csp -> csp
+          .policyDirectives("default-src 'self'; script-src 'self'; object-src 'none';")
+      )
+  );
+  ```
+
+---
+
+### 4.3 Insecure Direct Object References (IDOR) & Tenancy Enforcement
+
+An IDOR vulnerability occurs when an application exposes a direct reference to an internal database object (e.g. `GET /api/orders/5001`) without verifying whether the requesting user owns that object:
+
+```java
+@GetMapping("/orders/{orderId}")
+public OrderResponse getOrder(@PathVariable Long orderId, @AuthenticationPrincipal Jwt jwt) {
+    String currentUserId = jwt.getSubject();
+    // ✅ TENANCY ENFORCEMENT: Enforce customer ID in the database query!
+    return orderRepository.findByIdAndCustomerId(orderId, currentUserId)
+            .map(orderMapper::toDto)
+            .orElseThrow(() -> new ResourceNotFoundException("Order not found or unauthorized"));
+}
+```
+
+---
+
+### 4.4 Server-Side Request Forgery (SSRF) & Internal Network Shielding
+
+SSRF occurs when an attacker coaxes a backend server into making HTTP requests to internal, non-routable IP addresses (e.g., AWS metadata endpoint `http://169.254.169.254/latest/meta-data/` to steal IAM roles).
+* **Defense**: Strictly whitelist allowed external target domains and block loopback/private subnets (`127.0.0.1`, `10.0.0.0/8`, `169.254.0.0/16`).
+
+---
+
+### 4.5 Security Response Headers (`HSTS`, `X-Content-Type-Options`, `X-Frame-Options`)
+
+Spring Security configures safe default HTTP security headers:
+```properties
+Strict-Transport-Security: max-age=31536000 ; includeSubDomains (Enforces HTTPS for 1 year)
+X-Content-Type-Options: nosniff (Prevents MIME-type sniffing)
+X-Frame-Options: DENY (Prevents clickjacking inside iframe)
+Referrer-Policy: strict-origin-when-cross-origin
+```
+
+---
+
+### 4.6 Distributed Rate Limiting & Brute-Force Defense (Redis Token Bucket)
+
+Authentication endpoints (e.g. `/api/v1/auth/login`, `/oauth/token`) are primary targets for credential stuffing and dictionary brute-force attacks. In distributed architectures, in-memory rate limiting fails because traffic load-balances across dozens of container instances.
+
+#### Distributed Token Bucket Architecture via Redis
+
+```mermaid
+flowchart TD
+    Client["Client Request (POST /api/v1/auth/login)"] --> Filter["RateLimitingFilter (OncePerRequestFilter)"]
+    Filter --> Redis[("Redis Cluster / Redisson<br/>Key: rate:login:{client_ip}<br/>Token Bucket: Capacity 5, Refill 5 tokens / min")]
+    Redis -->|Tokens Available?| Decision{Decision}
+    Decision -->|Yes: Consume 1 Token| Allow["Pass through to AuthenticationFilter<br/>HTTP Headers: X-RateLimit-Remaining: N"]
+    Decision -->|No: Bucket Empty| Deny["Short-Circuit 429 Too Many Requests<br/>RFC 7807 ProblemDetail + Retry-After: 12s"]
+
+    style Filter fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style Redis fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style Allow fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style Deny fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fff
+```
+
+#### Production Rate Limiting Filter Implementation
+
+```java
+package com.enterprise.security.filter;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.Refill;
+import io.github.bucket4j.distributed.proxy.ProxyManager;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.net.URI;
+import java.time.Duration;
+
+@Component
+public class DistributedRateLimitingFilter extends OncePerRequestFilter {
+
+    private final ProxyManager<String> proxyManager;
+    private final ObjectMapper objectMapper;
+
+    public DistributedRateLimitingFilter(ProxyManager<String> proxyManager, ObjectMapper objectMapper) {
+        this.proxyManager = proxyManager;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        // Enforce rate limiting strictly on sensitive authentication routes
+        if ("/api/v1/auth/login".equals(request.getRequestURI()) && "POST".equalsIgnoreCase(request.getMethod())) {
+            String clientIp = extractClientIp(request);
+            String bucketKey = "rate_limit:login:" + clientIp;
+
+            // Strict limit: 5 attempts per minute per IP address
+            Bandwidth limit = Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)));
+            Bucket bucket = proxyManager.builder().build(bucketKey, () -> limit);
+
+            ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+
+            if (probe.isConsumed()) {
+                response.addHeader("X-Rate-Limit-Remaining", String.valueOf(probe.getRemainingTokens()));
+                filterChain.doFilter(request, response);
+            } else {
+                long waitForRefillNanos = probe.getNanosToWaitForRefill();
+                long waitForRefillSeconds = Math.max(1, waitForRefillNanos / 1_000_000_000L);
+
+                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+                response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+                response.addHeader("Retry-After", String.valueOf(waitForRefillSeconds));
+
+                ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        "Too many login attempts. Please wait " + waitForRefillSeconds + " seconds before retrying."
+                );
+                problem.setType(URI.create("https://enterprise.com/errors/too-many-requests"));
+                problem.setTitle("Rate Limit Exceeded");
+
+                response.getWriter().write(objectMapper.writeValueAsString(problem));
+                return; // Short-circuit pipeline!
+            }
+        } else {
+            filterChain.doFilter(request, response);
+        }
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+}
+```
+
+---
+
+# 5. Public Key Infrastructure (PKI), TLS 1.3 & Certificate Management
+
+---
+
+### 5.1 PKI Fundamentals: Asymmetric Encryption & X.509 Certificate Chain of Trust
+
+Public Key Infrastructure binds cryptographic public keys to verified identities using digital certificates signed by **Certificate Authorities (CAs)**:
+
+```mermaid
+flowchart TD
+    RootCA["Root Certificate Authority (CA)<br/>(e.g., DigiCert, Let's Encrypt Root)<br/>Self-Signed Root Certificate installed in Java TrustStore (cacerts)"]
+    -->|"Signs with Root Private Key"| InterCA["Intermediate Certificate Authority<br/>(e.g., Let's Encrypt R3)"]
+    InterCA -->|"Signs with Intermediate Private Key"| LeafCert["Server Leaf Certificate (*.company.com)<br/>Installed in Spring Boot KeyStore (keystore.p12)"]
+
+    style RootCA fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style InterCA fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style LeafCert fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fde68a
+```
+
+* When a client connects to a server, the server delivers its **Leaf Certificate** and the **Intermediate Certificate**.
+* The client verifies that the Intermediate Certificate was signed by a trusted **Root CA** already present in its local truststore. If any link in the chain is broken or expired, verification fails!
+
+---
+
+### 5.2 TLS 1.3 Handshake Deep-Dive & Perfect Forward Secrecy
+
+TLS 1.3 optimizes the connection handshake from 2 round-trips (TLS 1.2) down to a **single 1-RTT round-trip**:
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
+sequenceDiagram
+    autonumber
+    actor Client as HTTP Client
     participant Server as Spring Boot HTTPS Server
 
-    Note over Client,Server: 1. TLS 1.3 Handshake (1-RTT Phase)
-    Client->>Server: ClientHello: Supported Ciphers + Client Key Share (ECDHE Public Key)
-    Server->>Client: ServerHello: Chosen Cipher + Server Key Share (ECDHE Public Key)
-    Note over Client,Server: Both derive Shared Secret via Ephemeral Diffie-Hellman!
-    Server->>Client: {EncryptedExtensions + Certificate + CertificateVerify + Finished}
-    Note over Client: Validates Certificate Chain & Signature using TrustStore
-    Client->>Server: {Finished}
-    
-    Note over Client,Server: 2. Application Data Encryption (Symmetric Phase)
-    Client->>Server: Encrypted HTTP POST /api/orders (AES-256-GCM / ChaCha20-Poly1305)
-    Server-->>Client: Encrypted HTTP 200 OK (Orders JSON)
+    Client->>Server: ClientHello (Supported Ciphers + Key Share: Ephemeral Diffie-Hellman public key)
+    Server->>Client: ServerHello (Selected Cipher + Server Key Share + Server X.509 Certificate + Finished)
+    Note over Client,Server: Cryptographic session keys computed independently on both sides!
+    Client->>Server: Finished + Encrypted Application Data (HTTP GET /api/v1/orders)
+    Server-->>Client: Encrypted HTTP 200 OK Response
 ```
 
-#### Why TLS 1.3 Outperforms TLS 1.2
-1. **1-RTT Handshake**: Halves network connection setup latency (especially noticeable on cross-region cloud calls).
-2. **Elimination of Legacy Vulnerable Primitives**: Completely drops insecure legacy cipher suites (static RSA key exchange, CBC-mode ciphers, SHA-1, RC4, 3DES).
-3. **Mandatory Perfect Forward Secrecy (PFS)**: Every session generates ephemeral Diffie-Hellman keys (`ECDHE`). Even if an attacker steals the server's private key a year later, they cannot decrypt previously recorded network traffic.
+* **Perfect Forward Secrecy (PFS)**: TLS 1.3 mandates ephemeral Diffie-Hellman key exchanges (`ECDHE`). Even if an attacker records encrypted network traffic today and steals the server's private key 5 years from now, they **cannot decrypt past recorded sessions**!
 
 ---
 
-### 3.3 Mutual TLS (mTLS / Two-Way SSL) in Microservices & Banking APIs
+### 5.3 Java Keystore (`KeyStore`) vs Truststore (`TrustStore`)
 
-In standard One-Way TLS, only the server proves its identity to the client. In **Mutual TLS (mTLS)**, both the client and the server cryptographically authenticate each other:
+| Dimension | Java KeyStore (`keystore.p12`) | Java TrustStore (`truststore.p12` / `cacerts`) |
+| :--- | :--- | :--- |
+| **Architectural Purpose** | **"Who I Am" (Authentication Identity)** | **"Whom I Trust" (Verification Registry)** |
+| **Contents** | Holds **Private Keys** and their matching public Leaf Certificates. | Holds **Public Certificates of trusted CAs** (Root & Intermediate). |
+| **Standard Format** | **PKCS12** (`.p12` - Modern standard replacing legacy JKS) | **PKCS12** or default `$JAVA_HOME/lib/security/cacerts` |
+| **Confidentiality** | **Highly Confidential**: Must be protected with strong passwords. | Low/Moderate: Contains public certificates only. |
+
+---
+
+### 5.4 Mutual TLS (mTLS / Two-Way SSL) in Microservices & B2B Banking Gateways
+
+In standard TLS (one-way), only the client authenticates the server. In **Mutual TLS (mTLS)**, both parties authenticate each other:
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'actorBkg': '#1e293b', 'actorBorder': '#3b82f6', 'actorTextColor': '#ffffff', 'signalColor': '#93c5fd', 'signalTextColor': '#ffffff', 'noteBkgColor': '#1e293b', 'noteBorderColor': '#f59e0b', 'noteTextColor': '#fde68a', 'activationBkgColor': '#3b82f6', 'sequenceNumberColor': '#ffffff' }}}%%
 sequenceDiagram
     autonumber
-    participant Client as Order Microservice (Client)
-    participant Server as Payment Microservice (Server)
+    participant Client as API Partner Microservice
+    participant Server as Enterprise Bank Gateway
 
-    Client->>Server: ClientHello (Supported Ciphers + Key Share)
-    Server->>Client: ServerHello + Server Certificate + CertificateRequest
-    Note over Client: 1. Client verifies Server Certificate against its TrustStore
-    Client->>Server: Client Certificate + CertificateVerify (Signed by Client Private Key) + Finished
-    Note over Server: 2. Server verifies Client Certificate against its TrustStore & Extracts Subject DN
-    Server->>Client: Finished
-    Note over Client,Server: Mutual Zero-Trust Connection Established
-    Client->>Server: Secure mTLS Request with Client Identity
+    Client->>Server: 1. TLS 1.3 Handshake Init
+    Server->>Client: 2. Server sends its Certificate + "CertificateRequest"
+    Client->>Client: 3. Validates Server Cert against TrustStore
+    Client->>Server: 4. Client sends its OWN Certificate (from KeyStore)
+    Server->>Server: 5. Validates Client Cert against Server TrustStore
+    Note over Client,Server: Mutual Cryptographic Trust Established!
 ```
 
-- **Zero-Trust Networking**: Guarantees that only authorized microservices with valid private keys issued by the enterprise internal CA can invoke payment endpoints.
-- **Identity Extraction**: Spring Security can inspect the client certificate subject (`X509AuthenticationFilter`) to authorize roles directly (`CN=order-service`).
+#### Production Spring Boot 3 `RestClient` mTLS Client Configuration
+
+When making outbound calls to a secured banking partner requiring client certificate authentication, configure `RestClient` with a custom `SSLContext`:
+
+```java
+package com.enterprise.security.client;
+
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+
+import javax.net.ssl.SSLContext;
+import java.io.InputStream;
+import java.security.KeyStore;
+
+@Configuration
+public class MtlsRestClientConfiguration {
+
+    @Value("${partner.bank.keystore.location}")
+    private Resource keystoreResource;
+
+    @Value("${partner.bank.keystore.password}")
+    private String keystorePassword;
+
+    @Value("${partner.bank.truststore.location}")
+    private Resource truststoreResource;
+
+    @Value("${partner.bank.truststore.password}")
+    private String truststorePassword;
+
+    @Bean
+    public RestClient partnerBankRestClient() throws Exception {
+        // 1. Load Client KeyStore (contains our private key + leaf certificate)
+        KeyStore clientKeyStore = KeyStore.getInstance("PKCS12");
+        try (InputStream is = keystoreResource.getInputStream()) {
+            clientKeyStore.load(is, keystorePassword.toCharArray());
+        }
+
+        // 2. Load TrustStore (contains bank partner's root CA certificate)
+        KeyStore trustStore = KeyStore.getInstance("PKCS12");
+        try (InputStream is = truststoreResource.getInputStream()) {
+            trustStore.load(is, truststorePassword.toCharArray());
+        }
+
+        // 3. Build SSLContext configured for mTLS
+        SSLContext sslContext = SSLContextBuilder.create()
+            .loadKeyMaterial(clientKeyStore, keystorePassword.toCharArray())
+            .loadTrustMaterial(trustStore, null)
+            .build();
+
+        // 4. Create Apache HttpClient 5 socket factory and pooling connection manager
+        var connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+            .setSSLSocketFactory(SSLConnectionSocketFactoryBuilder.create().setSslContext(sslContext).build())
+            .setMaxConnTotal(100)
+            .setMaxConnPerRoute(20)
+            .build();
+
+        CloseableHttpClient httpClient = HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            .build();
+
+        // 5. Build Spring RestClient
+        return RestClient.builder()
+            .requestFactory(new HttpComponentsClientHttpRequestFactory(httpClient))
+            .baseUrl("https://api.partner-bank.com/v1")
+            .build();
+    }
+}
+```
 
 ---
 
-### 3.4 Java Keystore (`KeyStore`) vs Truststore (`TrustStore`)
+### 5.5 Spring Boot 3.1+ SSL Bundles (`SslBundle`) & Dynamic Reloading
 
-Understanding the distinction between Keystore and Truststore is essential for every Java backend developer:
-
-```mermaid
-flowchart LR
-    subgraph KeyStoreContainer["Java KeyStore (keystore.p12)"]
-        direction LR
-        PrivKey["Private Key (Secret!)"]
-        CertChain["Public Certificate Chain"]
-        PurposeKS["Answers: 'WHO AM I?'<br/>Used by Server to present its identity to clients,<br/>or by Client in mTLS to prove identity to server."]
-        PrivKey --- CertChain --- PurposeKS
-    end
-
-    subgraph TrustStoreContainer["Java TrustStore (cacerts / truststore.p12)"]
-        direction LR
-        RootCAs["Trusted Root CA Certificates"]
-        InterCAs["Trusted Intermediate CA Certificates"]
-        PurposeTS["Answers: 'WHOM DO I TRUST?'<br/>Used by Client/Server to verify certificates<br/>presented by the remote party."]
-        RootCAs --- InterCAs --- PurposeTS
-    end
-
-    style KeyStoreContainer fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-    style TrustStoreContainer fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#cbd5e1
-
-    style PrivKey fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style CertChain fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style PurposeKS fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style RootCAs fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style InterCAs fill:#1f2937,stroke:#64748b,stroke-width:2px,color:#fff
-    style PurposeTS fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-```
-
-#### Key Store File Formats
-- **`PKCS12` (`.p12` / `.pfx`)**: Modern industry-standard format (RFC 7292). **Default in Java 9+**. Highly portable across Java, OpenSSL, Windows, and Linux.
-- **`JKS` (Java KeyStore)**: Proprietary legacy format. Deprecated for new systems in favor of PKCS12.
-- **Default JVM TrustStore**: Located at `$JAVA_HOME/lib/security/cacerts` (password default: `changeit`).
-
----
-
-### 3.5 Spring Boot 3.1+ SSL Bundles (`SslBundle`) & Dynamic Certificate Reloading
-
-Spring Boot 3.1 introduced **SSL Bundles**, allowing centralized, named SSL configurations and dynamic certificate reloading without restarting the JVM:
-
-#### 1. Server HTTPS & mTLS Configuration (`application.yml`)
+Spring Boot 3.1 introduced **SSL Bundles**, cleanly centralizing TLS certificates without hardcoded property spaghetti:
 
 ```yaml
-server:
-  port: 8443
-  ssl:
-    bundle: server-bundle
-    client-auth: need # Enforces Mutual TLS (mTLS)
-
 spring:
   ssl:
     bundle:
@@ -448,113 +1405,225 @@ spring:
           key:
             alias: "api-server"
           keystore:
+            location: "classpath:keystore.p12"
+            password: "keystore-secret"
             type: "PKCS12"
-            location: "classpath:ssl/server-keystore.p12"
-            password: "keystorepassword"
           truststore:
+            location: "classpath:truststore.p12"
+            password: "truststore-secret"
             type: "PKCS12"
-            location: "classpath:ssl/server-truststore.p12"
-            password: "truststorepassword"
-          reload-on-update: true # Dynamically reloads when cert file updates on disk!
-```
 
-#### 2. Calling an External mTLS API using Spring `RestClient` with SSL Bundle
-
-```java
-package com.company.client;
-
-import org.springframework.boot.ssl.SslBundles;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
-
-import javax.net.ssl.SSLContext;
-import java.net.http.HttpClient;
-
-@Configuration
-public class PaymentClientConfig {
-
-    @Bean
-    public RestClient paymentRestClient(SslBundles sslBundles) {
-        // Fetch pre-configured SSL Bundle containing Client Private Key & Partner TrustStore
-        SSLContext sslContext = sslBundles.getBundle("payment-partner-bundle").createSslContext();
-
-        // Configure Java HTTP Client with mTLS SSLContext
-        HttpClient httpClient = HttpClient.newBuilder()
-            .sslContext(sslContext)
-            .build();
-
-        return RestClient.builder()
-            .baseUrl("https://api.partnerbank.com/v1")
-            .requestFactory(new JdkClientHttpRequestFactory(httpClient))
-            .build();
-    }
-}
+server:
+  port: 8443
+  ssl:
+    bundle: "server-bundle"
+    client-auth: need # Enforces strict Mutual TLS (mTLS)!
 ```
 
 ---
 
-### 3.6 Certificate Management CLI (`keytool` & `openssl`) Cheatsheet
+### 5.6 Cryptographic Diagnostic CLI Playbook (`keytool` & `openssl`)
 
-| Task & Command | Flags & Parameters Explained | What Does What | Practical Production Scenario |
-| :--- | :--- | :--- | :--- |
-| `keytool -genkeypair -alias myapp -keyalg RSA -keysize 2048 -validity 365 -keystore keystore.p12 -storetype PKCS12` | `-alias`: Identifier<br>`-keyalg`: Algorithm<br>`-keysize`: Bit length<br>`-storetype PKCS12`: Modern format | Generates a new private key and self-signed certificate in PKCS12 file | Creating local development SSL certificates |
-| `keytool -certreq -alias myapp -keystore keystore.p12 -file myapp.csr` | `-certreq`: Certificate Signing Request<br>`-file`: Output `.csr` | Generates a CSR to send to an enterprise or commercial CA (DigiCert) | Requesting a real signed enterprise certificate |
-| `keytool -importcert -alias myrootca -file ca.crt -keystore truststore.p12 -storepass changeit -noprompt` | `-importcert`: Import cert<br>`-noprompt`: Auto-accept trust | Imports an enterprise Root or Intermediate CA certificate into truststore | Enabling Java to trust an internal corporate CA |
-| `keytool -list -v -keystore keystore.p12 -storepass changeit` | `-v`: Verbose output | Dumps full certificate details, expiration dates, and SAN extensions | Inspecting certificate validity and debugging cert mismatches |
-| `openssl pkcs12 -export -in cert.crt -inkey priv.key -out keystore.p12 -name "server-cert"` | `-export`: Combine to PKCS12<br>`-inkey`: Private key file | Converts PEM format certificate and private key into a Java-compatible PKCS12 store | Converting Kubernetes or Let's Encrypt certificates for Spring Boot |
-| `openssl s_client -connect api.company.com:443 -showcerts -servername api.company.com` | `-servername`: Send SNI header<br>`-showcerts`: Print all certs | Connects to remote HTTPS endpoint and dumps entire certificate chain | Diagnosing remote server certificate expiration or broken chain |
+#### Complete End-to-End Self-Signed SAN Certificate Generation Playbook
 
----
+Modern browsers and Java 17+ reject certificates without **Subject Alternative Name (SAN)** fields:
 
-### 3.7 Production SSL/TLS Troubleshooting & Top Java Exceptions (PKIX Path Building Failed)
-
-#### 1. `javax.net.ssl.SSLHandshakeException: PKIX path building failed: unable to find valid certification path to requested target`
-- **Root Cause**: The Java application is connecting to an external HTTPS server whose certificate is signed by an untrusted Root CA (e.g. internal enterprise private CA or self-signed certificate) that is **not present** in the JVM's `cacerts` TrustStore.
-- **Resolution**:
-  1. Download the remote server's Root CA certificate:
-     ```bash
-     openssl s_client -connect internal-service.corp:443 -showcerts </dev/null 2>/dev/null | openssl x509 -outform PEM > corporate-root-ca.crt
-     ```
-  2. Import it into your application's truststore or Java's `cacerts`:
-     ```bash
-     keytool -importcert -alias corp-root-ca -file corporate-root-ca.crt -keystore truststore.p12 -storepass changeit -noprompt
-     ```
-  3. Start the Spring Boot application with `-Djavax.net.ssl.trustStore=/path/to/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit`.
-
-#### 2. `javax.net.ssl.SSLPeerUnverifiedException: Certificate for <host> doesn't match common name of the certificate subject: [...]`
-- **Root Cause**: The hostname being called in the URL (e.g. `https://orders-service:8443`) does not match the Common Name (CN) or any Subject Alternative Name (SAN) in the server's certificate.
-- **Resolution**: Re-issue the certificate with the proper SAN DNS entries (`SAN:DNS:orders-service,DNS:localhost`).
-
-#### 3. How to Enable Live TLS Handshake Debugging in Java
-Add this JVM flag during startup to stream the raw cryptographic handshake steps directly to standard error:
 ```bash
-java -Djavax.net.debug=ssl:handshake:verbose -jar app.jar
+# 1. Generate Private Key and CSR with SAN (DNS and IP)
+openssl req -new -newkey rsa:4096 -nodes \
+    -keyout server.key -out server.csr \
+    -subj "/C=US/ST=California/L=SanFrancisco/O=Enterprise/CN=api.enterprise.com" \
+    -addext "subjectAltName=DNS:api.enterprise.com,DNS:localhost,IP:127.0.0.1"
+
+# 2. Self-sign certificate with 1-year validity
+openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt \
+    -copy_extensions copy
+
+# 3. Package private key and certificate into PKCS12 KeyStore
+openssl pkcs12 -export \
+    -in server.crt -inkey server.key \
+    -out keystore.p12 -name "api-server" \
+    -passout pass:changeit
+
+# 4. Inspect certificates inside a PKCS12 Java KeyStore
+keytool -list -v -keystore keystore.p12 -storetype PKCS12 -storepass changeit
+
+# 5. Import server certificate into client TrustStore
+keytool -importcert -alias api-server-ca \
+    -file server.crt \
+    -keystore truststore.p12 -storetype PKCS12 \
+    -storepass changeit -noprompt
+
+# 6. Test remote SSL connection with SNI and verify certificate chain
+openssl s_client -connect api.enterprise.com:443 -servername api.enterprise.com -showcerts
 ```
 
 ---
 
+# 6. Production Troubleshooting Playbook
+
+### Incident 1: `SSLHandshakeException: PKIX path building failed`
+* **Symptom**: Outbound HTTPS calls fail with:
+  `sun.security.validator.ValidatorException: PKIX path building failed: unable to find valid certification path to requested target`.
+* **Root Cause**: The remote server presents a certificate signed by a private or corporate internal CA not present in Java's trusted CA registry (`cacerts`).
+* **SRE Diagnostic & Resolution**:
+  1. Retrieve and view remote server certificate chain:
+     ```bash
+     openssl s_client -connect remote.service:443 -showcerts </dev/null 2>/dev/null | openssl x509 -outform PEM > server.crt
+     ```
+  2. Inspect certificate issuer and expiry:
+     ```bash
+     openssl x509 -in server.crt -text -noout | grep -E "(Issuer|Not After)"
+     ```
+  3. Import the root/intermediate CA certificate into the application's `TrustStore`:
+     ```bash
+     keytool -importcert -alias remote-ca -file server.crt -keystore truststore.p12 -storepass secret -noprompt
+     ```
+  4. Pass truststore flag to JVM:
+     `-Djavax.net.ssl.trustStore=/path/to/truststore.p12 -Djavax.net.ssl.trustStorePassword=secret`
+
+### Incident 2: `SSLHandshakeException: Received fatal alert: certificate_unknown` in mTLS
+* **Symptom**: In an mTLS setup, client requests fail during handshake before reaching any controller.
+* **Root Cause**: The server requested a client certificate (`CertificateRequest`), but the client either sent no certificate or sent a certificate signed by a CA missing from the server's truststore.
+* **SRE Diagnostic & Resolution**:
+  Enable SSL handshake debug logging in the JVM:
+  ```bash
+  java -Djavax.net.debug=ssl:handshake -jar application.jar
+  ```
+  Look for `*** CertificateRequest` from server and verify the client certificate's Subject and Issuer against the server's accepted CA list.
+
+### Incident 3: Memory Leak / User Impersonation via `SecurityContextHolder` in Thread Pools
+* **Symptom**: User A occasionally sees User B's private account dashboard after high concurrency bursts.
+* **Root Cause**: Tomcat worker threads or asynchronous `@Async` executor threads reuse `ThreadLocal` variables across requests without clearing `SecurityContext`.
+* **Remedy**:
+  1. Always verify that Spring Security's `SecurityContextHolderFilter` executes.
+  2. In manual thread execution, wrap calls in a try-finally block:
+     ```java
+     try {
+         SecurityContextHolder.setContext(context);
+         task.run();
+     } finally {
+         SecurityContextHolder.clearContext(); // MANDATORY!
+     }
+     ```
+
+### Incident 4: JWKS Key Rotation Desynchronization (`InvalidSignatureException`)
+* **Symptom**: Microservices reject all valid user tokens with `InvalidSignatureException: Signature verification failed`.
+* **Root Cause**: The Identity Provider rotated its RS256 signing key pair. The incoming JWT has a new `kid` (Key ID), but the resource server cached the old JWKS payload and cannot find the matching public key.
+* **Remedy**:
+  Configure Nimbus JWT decoder with appropriate cache refresh timeouts and dynamic reload:
+  ```java
+  @Bean
+  public JwtDecoder jwtDecoder() {
+      return NimbusJwtDecoder.withJwkSetUri("https://auth.company.com/.well-known/jwks.json")
+              .cache(new ConcurrentMapCache("jwksCache"))
+              .build();
+  }
+  ```
+
+### Incident 5: CSRF Token Mismatch (`403 Forbidden`) on Single-Page Applications
+* **Symptom**: POST requests from a React frontend return HTTP 403 Forbidden with `Invalid CSRF Token`.
+* **Root Cause**: Modern SPAs read the CSRF cookie (`XSRF-TOKEN`) via JavaScript and send it in the `X-XSRF-TOKEN` header. If `CookieCsrfTokenRepository` has `httpOnly=true`, JavaScript cannot read the cookie; or the `CsrfTokenRequestAttributeHandler` is not configured for Deferred CSRF resolution in Spring Security 6.
+* **Remedy**:
+  ```java
+  CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+  XorCsrfTokenRequestAttributeHandler delegate = new XorCsrfTokenRequestAttributeHandler();
+  http.csrf(csrf -> csrf
+      .csrfTokenRepository(tokenRepository)
+      .csrfTokenRequestHandler(delegate::handle)
+  );
+  ```
+
 ---
 
-# 4. Summary Comparison & Engineering Reference Matrix
+### Incident 6: TLS Certificate Expiration Blackout & Automated cert-manager Renewal Failures
+* **Symptom**: Production ingress gateways abruptly reject all incoming HTTPS traffic with `NET::ERR_CERT_DATE_INVALID` or `javax.net.ssl.SSLHandshakeException: Certificate expired`.
+* **Root Cause**: In Kubernetes environments, `cert-manager` attempts to renew certificates 30 days before expiration. The automated renewal stalled due to:
+  1. Failed ACME HTTP-01 challenge (ingress routing rule blocked `/.well-known/acme-challenge/*`).
+  2. Let's Encrypt API rate limits reached (exceeded 5 duplicate certificates per week).
+  3. Stale cloud provider DNS API tokens preventing DNS-01 TXT record propagation.
+* **SRE Diagnostic & Recovery Playbook**:
+  ```bash
+  # 1. Inspect cert-manager certificate resource state in Kubernetes
+  kubectl describe certificate enterprise-tls -n production
 
-| Security / Identity Mechanism | Session Cookies | JWT (Stateless Bearer) | OAuth 2.0 / OIDC | Mutual TLS (mTLS) | API Key / HMAC Signature |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Primary Architectural Scope** | Traditional Monolithic Web Apps (SSR) | Distributed Microservices / SPAs | Delegated Federated Authorization | Zero-Trust Service-to-Service Mesh | B2B Partner API Integration |
-| **State Storage** | Server-side (Redis / DB Session Store) | Client-side (Encrypted HTTP-Only Cookie or Storage) | Identity Provider (Keycloak, Okta, Entra ID) | Cryptographic Hardware / X.509 Keystore | DB / Vault Secret Store |
-| **Revocation Velocity** | Immediate ($O(1)$ delete session ID) | Difficult before TTL expiry (requires Redis blacklist) | Immediate at Token Endpoint / Refresh cycle | Immediate via CRL / OCSP Stapling | Immediate revocation of key hash |
-| **Payload Size** | Minimal (32-byte opaque session ID) | Moderate to High (base64 claims, roles, signatures) | High (Token payload + metadata) | Zero HTTP payload (negotiated at TLS layer) | Minimal (HTTP Header string) |
-| **Vulnerability Surface** | CSRF, Session Fixation | XSS (if in localStorage), Signature Forgery | Redirect URI poisoning, PKCE downgrade | Private key leakage, expired CA certs | Key leakage, Replay attacks |
-| **Verification Overhead** | DB / Cache roundtrip lookup | Local cryptographic CPU verification (RS256 / EdDSA) | JWKS endpoint caching + signature verify | Asymmetric handshake during TLS session setup | Constant-time SHA256 string comparison |
-| **Java / Spring Implementation** | `HttpSession`, Spring Session Redis | `NimbusJwtDecoder`, Spring Security Resource Server | `spring-boot-starter-oauth2-client` | Spring Boot 3.1+ `ssl.bundle.jks`, Netty SslContext | Custom Spring `OncePerRequestFilter` |
+  # 2. Trace underlying ACME Order and Challenge lifecycle
+  kubectl get orders -n production
+  kubectl describe challenge <challenge-name> -n production
+
+  # 3. Emergency Manual Keystore Injection (Bypass cert-manager temporarily)
+  kubectl create secret tls emergency-tls-backup \
+      --cert=/tmp/renewed-cert.crt \
+      --key=/tmp/renewed-key.key \
+      --dry-run=client -o yaml | kubectl apply -n production -f -
+
+  # 4. Patch Ingress to use emergency secret immediately
+  kubectl patch ingress enterprise-ingress -n production \
+      --type='json' -p='[{"op": "replace", "path": "/spec/tls/0/secretName", "value":"emergency-tls-backup"}]'
+  ```
 
 ---
 
-# 5. References & Further Reading
+### Incident 7: Side-Channel Timing Attacks in Cryptographic Token Verification
+* **Symptom**: Enterprise penetration testing reports a vulnerability in webhook HMAC signatures or custom API key verification: *CWE-208: Observable Timing Discrepancy*.
+* **Root Cause**: Developers evaluate secrets using standard equality operators:
+  ```java
+  // VULNERABLE: Aborts comparison on first mismatched byte!
+  if (computedHmac.equals(providedHmac)) { ... }
+  ```
+  `String.equals()` terminates immediately upon encountering the first differing character ($O(1)$ early exit). An attacker repeatedly transmits crafted HMAC bytes, measuring request response times with microsecond precision. When byte $k$ is guessed correctly, comparison time increases by $\approx 10\text{--}50\text{ nanoseconds}$, allowing full secret reconstruction byte-by-byte!
+* **Remedy & Constant-Time Verification**:
+  Always execute cryptographic comparisons using constant-time comparison algorithms that run across every byte regardless of mismatch location:
+  ```java
+  package com.enterprise.security.crypto;
 
-- [Spring Security Reference Documentation](https://docs.spring.io/spring-security/reference/)
-- [Java Cryptography Architecture (JCA) Reference Guide](https://docs.oracle.com/en/java/javase/21/security/java-cryptography-architecture-jca-reference-guide.html)
-- [Spring Boot 3 SSL Bundles Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.ssl)
-- [RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3](https://datatracker.ietf.org/doc/html/rfc8446)
-- [OWASP Top 10 Security Risks & Defenses](https://owasp.org/www-project-top-ten/)
+  import java.nio.charset.StandardCharsets;
+  import java.security.MessageDigest;
+
+  public final class ConstantTimeSecurity {
+
+      private ConstantTimeSecurity() {}
+
+      /**
+       * Evaluates two authentication tokens in constant time, eliminating side-channel timing leaks.
+       */
+      public static boolean isTokenValid(String expectedToken, String receivedToken) {
+          if (expectedToken == null || receivedToken == null) {
+              return false;
+          }
+
+          byte[] expectedBytes = expectedToken.getBytes(StandardCharsets.UTF_8);
+          byte[] receivedBytes = receivedToken.getBytes(StandardCharsets.UTF_8);
+
+          // MessageDigest.isEqual executes a bitwise OR across all bytes without early loop termination!
+          return MessageDigest.isEqual(expectedBytes, receivedBytes);
+      }
+  }
+  ```
+
+---
+
+# 7. Summary Comparison & Engineering Reference Matrix
+
+| Security Dimension | Technical Mechanism | Production Best Practice |
+| :--- | :--- | :--- |
+| **Filter Pipeline** | `DelegatingFilterProxy` delegates to `SecurityFilterChain` | Keep stateless REST APIs configured with `SessionCreationPolicy.STATELESS`. |
+| **Password Hashing** | Adaptive Key Derivation Functions (BCrypt, Argon2id) | Use BCrypt (cost 12) or Argon2id; never use MD5 or raw SHA-256. |
+| **JWT Signing** | Asymmetric RS256 with public/private key pairs | Auth server signs with Private Key; microservices verify via JWKS public keys. |
+| **OAuth 2.0 Flow** | Authorization Code Flow with PKCE | Mandatory for SPAs and mobile apps; bans deprecated Implicit Flow. |
+| **CSRF Defense** | Synchronizer token validation on state-modifying verbs | Disable for stateless JWT APIs; enable with Cookie repository for browser cookies. |
+| **IDOR Protection** | Tenant-scoped database queries | Never trust path IDs blindly; verify user ownership in service/query logic. |
+| **Java KeyStore** | Holds private keys and leaf certificates (Who I Am) | Secure with strong passwords; restrict file permissions to `chmod 600`. |
+| **Java TrustStore** | Holds trusted CA public certificates (Whom I Trust) | Import internal corporate CAs into custom truststore; avoid editing global `cacerts`. |
+| **mTLS** | Two-way cryptographic X.509 handshake | Use for zero-trust east-west microservice traffic and high-security B2B banking APIs. |
+
+---
+
+# 8. References & Further Reading
+
+- [Spring Security Reference Documentation (Version 6.x)](https://docs.spring.io/spring-security/reference/)
+- [RFC 7519 - JSON Web Token (JWT) Specification](https://datatracker.ietf.org/doc/html/rfc7519)
+- [RFC 7636 - Proof Key for Code Exchange (PKCE) by OAuth Public Clients](https://datatracker.ietf.org/doc/html/rfc7636)
+- [OWASP Top Ten Web Application Security Risks](https://owasp.org/www-project-top-ten/)
+- [NIST Special Publication 800-63B - Digital Identity Guidelines](https://pages.nist.gov/800-63-3/sp800-63b.html)
+- [RFC 8446 - The Transport Layer Security (TLS) Protocol Version 1.3](https://datatracker.ietf.org/doc/html/rfc8446)

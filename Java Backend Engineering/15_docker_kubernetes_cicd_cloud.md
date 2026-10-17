@@ -143,6 +143,15 @@ flowchart TD
 
 # 1. Docker & Containerization Deep-Dive
 
+> [!NOTE]
+> **Domain Framing: Application Containerization vs. Cloud Platform Infrastructure:**
+> This module details the application engineering lifecycle for Java developers: containerizing Spring Boot apps, tuning JVM memory within cgroups, configuring Kubernetes Deployment/Service manifests, and implementing CI/CD pipelines.
+>
+> For deep cloud infrastructure engineering, etcd control plane mechanics, CNI network virtualization, multi-region hub-and-spoke landing zones, and enterprise GitOps (ArgoCD/Flux), see:
+> - [Cloud Engineering: 08. Containers, Kubernetes & GitOps](../Cloud%20Engineering/08_containers_kubernetes_and_gitops.md)
+> - [Cloud Engineering: 07. CI/CD & Release Engineering](../Cloud%20Engineering/07_cicd_and_release_engineering.md)
+
+
 ---
 
 ### 1.1 Containers vs Virtual Machines
@@ -1065,7 +1074,7 @@ Kubernetes decouples storage administration from developer consumption:
 In modern production Kubernetes clusters, manual SSL certificate renewal is a critical operational anti-pattern. Two primary patterns dominate enterprise certificate automation:
 
 > [!NOTE]
-> For foundational PKI concepts, X.509 chains, TLS 1.3 handshakes, Java KeyStore vs TrustStore architecture, and `keytool`/`openssl` commands, see [10. Security, Identity & Cryptographic Certificate Management - Section 3: Certificate Management, SSL/TLS, Keystores & mTLS](11_security_identity_certificate_management.md#3-certificate-management-ssltls-keystores-mutual-tls-mtls-in-java).
+> For foundational PKI concepts, X.509 chains, TLS 1.3 handshakes, Java KeyStore vs TrustStore architecture, and `keytool`/`openssl` commands, see [10. Security, Identity & Cryptographic Certificate Management - Section 3: Certificate Management, SSL/TLS, Keystores & mTLS](11_security_identity_certificate_management.md#5-public-key-infrastructure-pki-tls-13--certificate-management).
 
 ```mermaid
 flowchart TD
@@ -1705,52 +1714,12 @@ flowchart TD
 
 ### 5.2 Cloud Computing Service Models: IaaS vs PaaS vs CaaS vs FaaS
 
-```mermaid
-flowchart TD
-    subgraph Row1 ["Infrastructure & Container Hosting"]
-        direction LR
-        subgraph IaaS ["IaaS (Azure VMs)"]
-            direction TB
-            I1["Vendor: Hardware, Hypervisor"]
-            I2["You: OS, Patching, Runtime, App, Data"]
-        end
-        subgraph CaaS ["CaaS (Azure AKS)"]
-            direction TB
-            C1["Vendor: Hardware, K8s Control Plane, Node OS"]
-            C2["You: Container Images, K8s Manifests, App"]
-        end
-    end
-
-    subgraph Row2 ["Managed Application & Serverless Platforms"]
-        direction LR
-        subgraph PaaS ["PaaS (App Service)"]
-            direction TB
-            P1["Vendor: Hardware, OS, Java Runtime, Framework"]
-            P2["You: Spring Boot JAR code, Data"]
-        end
-        subgraph FaaS ["FaaS (Azure Functions)"]
-            direction TB
-            F1["Vendor: Everything, Event Triggers, Scale-to-Zero"]
-            F2["You: Single Function Method"]
-        end
-    end
-
-    style Row1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Row2 fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style IaaS fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style CaaS fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style PaaS fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style FaaS fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-
-    style I1 fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style I2 fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style C1 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
-    style C2 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
-    style P1 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
-    style P2 fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
-    style F1 fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style F2 fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
-```
+| Cloud Service Model | Vendor-Managed Infrastructure Layer | Customer-Managed Application Layer | Representative Azure Service | Primary Enterprise Benefit |
+| :--- | :--- | :--- | :--- | :--- |
+| **IaaS (Infrastructure as a Service)** | Physical Datacenter, Power, Hardware, Hypervisor | Virtual Machine OS, OS Patching, Network Routing, Java Runtime, Spring Boot App, Data | Azure Virtual Machines (VMs), Azure Virtual Network (VNet) | Maximum control over low-level kernel, OS libraries, and legacy software configurations. |
+| **CaaS (Containers as a Service)** | Hardware, Hypervisor, K8s Control Plane (API Server, etcd), Worker Node VM OS | Docker / OCI Container Images, Helm Charts, K8s Deployments, Service Mesh, Spring Boot Pods | Azure Kubernetes Service (AKS), Azure Container Apps (ACA) | Portable microservice orchestration, dynamic horizontal pod autoscaling (HPA), and declarative GitOps. |
+| **PaaS (Platform as a Service)** | Hardware, OS, Kernel Patching, Java JDK Runtime, Web Server Container | Spring Boot Executable JAR / WAR, Application Code, Database Schemas | Azure App Service (Linux Java 21), Azure Spring Apps Enterprise | Zero VM or OS maintenance overhead; built-in automated TLS certificates and blue-green deployment slots. |
+| **FaaS (Function as a Service / Serverless)** | Everything: Hardware, OS, Runtime, Scaling to Zero, Event Trigger Plumbing | Isolated Individual Java Function Methods (`apply()`, `accept()`) | Azure Functions (Java Worker), AWS Lambda | True pay-per-execution billing; automated event-driven scale-to-zero for unpredictable bursts. |
 
 ---
 

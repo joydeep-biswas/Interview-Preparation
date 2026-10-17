@@ -52,8 +52,9 @@ flowchart LR
 6. [Exception Handling](#6-exception-handling)
 7. [Functional Error Handling & Railway-Oriented Programming](#7-functional-error-handling-railway-oriented-programming)
 8. [Modern Java Performance, Escape Analysis & JIT Inlining](#8-modern-java-performance-escape-analysis-jit-inlining)
-9. [Summary Comparison & Engineering Reference Matrix](#9-summary-comparison-engineering-reference-matrix)
-10. [References & Further Reading](#10-references-further-reading)
+9. [Production Troubleshooting Playbook](#9-production-troubleshooting-playbook)
+10. [Summary Comparison & Engineering Reference Matrix](#10-summary-comparison--engineering-reference-matrix)
+11. [References & Further Reading](#11-references--further-reading)
 
 ---
 
@@ -127,23 +128,36 @@ public non-sealed class BankTransfer implements PaymentMethod {
 
 Java 21 provides unified Pattern Matching that eliminates boilerplate casting and enables clean functional data decomposition:
 
+#### 1. Exhaustive Pattern Matching in Switch Expressions:
+When matching against a `sealed` hierarchy, the compiler guarantees **exhaustiveness**. If every permitted subtype is covered, no `default` clause is required. If a developer later introduces a new permitted subclass, the compiler immediately flags every unhandled `switch` site with a compile error!
+
 ```java
 public class PatternMatchingDemo {
-    // Java 21 Pattern Matching for switch with exhaustiveness (no default branch needed for sealed types!)
+
+    // Java 21 Pattern Matching for switch with guarded patterns (when)
     public static String getPaymentStatusDescription(PaymentMethod payment) {
         return switch (payment) {
-            case CreditCard cc when cc.isExpired() -> "Credit Card expired";
-            case CreditCard cc -> "Card payment valid";
+            case CreditCard cc when cc.isExpired() -> "Credit Card expired: " + cc.getMaskedNumber();
+            case CreditCard cc when cc.isOverLimit() -> "Credit Card over limit: " + cc.getMaskedNumber();
+            case CreditCard cc -> "Card payment valid: " + cc.getMaskedNumber();
             case Upi upi -> "UPI payment via " + upi.getVpaAddress();
-            case BankTransfer bt -> "Wire transfer pending";
+            case BankTransfer bt -> "Wire transfer pending for routing: " + bt.getRoutingNumber();
+            // No default needed! Compiler proves exhaustiveness from 'sealed interface PaymentMethod'
         };
     }
 
-    // Java 21 Record Patterns with nested deconstruction
-    public static void processOrder(Object obj) {
-        if (obj instanceof OrderItem(String sku, int qty, BigDecimal price)) {
-            System.out.println("Item: " + sku + " x " + qty + " @ $" + price);
+    // Java 21 Record Patterns with Nested Deconstruction
+    public record CustomerName(String firstName, String lastName) {}
+    public record Address(String city, String country) {}
+    public record Customer(CustomerName name, Address address) {}
+    public record Order(String orderId, Customer customer, BigDecimal total) {}
+
+    public static String extractShippingCity(Object obj) {
+        // Nested pattern matching: deconstructs Order -> Customer -> Address in a single expression!
+        if (obj instanceof Order(String id, Customer(CustomerName name, Address(String city, String country)), BigDecimal total)) {
+            return "Shipping order " + id + " for " + name.firstName() + " to " + city + ", " + country;
         }
+        return "Unknown entity";
     }
 }
 ```
@@ -302,17 +316,16 @@ A Functional Interface is an interface that contains **exactly one abstract meth
 
 #### Visual Diagram
 ```mermaid
-flowchart LR
-    subgraph FunctionalInterfaceContract ["@FunctionalInterface Structural Contract"]
-        SamNode["Single Abstract Method (SAM)<br/>R transform(T input) -> Exactly one abstract method required"]
-        DefaultNode["Default Method<br/>default void logTransformation() -> Unlimited implementations allowed"]
-        StaticNode["Static Utility Method<br/>static CryptoTransformer identity() -> Utility helpers allowed"]
-    end
-
-    style FunctionalInterfaceContract fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style SamNode fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
-    style DefaultNode fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style StaticNode fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+classDiagram
+    direction TB
+    class CryptoTransformer~T, R~ {
+        <<interface>>
+        <<@FunctionalInterface>>
+        +transform(T rawInput)* R
+        +logTransformation() void
+        +identity()$ CryptoTransformer
+    }
+    note for CryptoTransformer "SAM Constraint: Exactly 1 abstract method\nDefault & static methods do not violate contract"
 ```
 
 #### Working Code Example
@@ -603,6 +616,118 @@ flowchart TD
 **Primary Source Reference**: [GeeksforGeeks - Parallel Streams in Java](https://www.geeksforgeeks.org/parallel-streams-in-java/)
 
 ---
+
+### Custom Spliterators & Custom Collectors Deep-Dive
+
+#### 1. Implementing a Custom `Spliterator<T>` for Parallel Chunked Processing:
+A `Spliterator` (Splitable Iterator) controls how streams partition data across CPU threads in `ForkJoinPool`:
+* `tryAdvance(Consumer<? super T> action)`: Steps forward one element. Returns `true` if an element existed, `false` otherwise.
+* `trySplit()`: Divides the remaining elements into two partitions. Returns a new `Spliterator` covering roughly half the workload, while `this` retains the rest. If the remaining size is below a threshold or cannot be partitioned, returns `null` to switch to sequential execution.
+* `estimateSize()`: Estimated elements remaining.
+* `characteristics()`: Bitmask flags (`ORDERED`, `DISTINCT`, `SORTED`, `SIZED`, `NONNULL`, `IMMUTABLE`, `CONCURRENT`, `SUBSIZED`).
+
+```java
+package com.enterprise.streams;
+
+import java.util.Spliterator;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+public class FixedBatchSpliterator<T> implements Spliterator<T> {
+
+    private final T[] elements;
+    private int origin;
+    private final int fence;
+    private static final int BATCH_THRESHOLD = 500;
+
+    public FixedBatchSpliterator(T[] elements, int origin, int fence) {
+        this.elements = elements;
+        this.origin = origin;
+        this.fence = fence;
+    }
+
+    @Override
+    public boolean tryAdvance(Consumer<? super T> action) {
+        if (origin < fence) {
+            action.accept(elements[origin++]);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public Spliterator<T> trySplit() {
+        int remaining = fence - origin;
+        if (remaining <= BATCH_THRESHOLD) {
+            return null; // Small chunk: do not split further, execute sequentially on current core!
+        }
+        int mid = origin + (remaining / 2);
+        int oldOrigin = origin;
+        origin = mid; // This spliterator now covers [mid, fence)
+        return new FixedBatchSpliterator<>(elements, oldOrigin, mid); // Sibling covers [oldOrigin, mid)
+    }
+
+    @Override
+    public long estimateSize() {
+        return fence - origin;
+    }
+
+    @Override
+    public int characteristics() {
+        return ORDERED | SIZED | SUBSIZED | IMMUTABLE;
+    }
+
+    public static <E> Stream<E> toParallelStream(E[] array) {
+        return StreamSupport.stream(new FixedBatchSpliterator<>(array, 0, array.length), true);
+    }
+}
+```
+
+#### 2. Building a Custom `Collector<T, A, R>`:
+When standard collectors (`toList`, `groupingBy`) are insufficient, `Collector.of()` constructs custom accumulation pipelines:
+
+```java
+package com.enterprise.streams;
+
+import java.util.*;
+import java.util.stream.Collector;
+
+public class CustomCollectors {
+
+    // Custom Collector: Gathers top-N elements into a bounded PriorityQueue
+    public static <T> Collector<T, ?, List<T>> topN(int n, Comparator<T> comparator) {
+        return Collector.of(
+            // Supplier: Accumulator container
+            () -> new PriorityQueue<T>(n, comparator),
+            // Accumulator: Add element and evict excess
+            (queue, item) -> {
+                queue.offer(item);
+                if (queue.size() > n) {
+                    queue.poll(); // Evict smallest element
+                }
+            },
+            // Combiner: Merge two priority queues (for parallel streams)
+            (q1, q2) -> {
+                while (!q2.isEmpty()) {
+                    q1.offer(q2.poll());
+                    if (q1.size() > n) {
+                        q1.poll();
+                    }
+                }
+                return q1;
+            },
+            // Finisher: Convert PriorityQueue into sorted List
+            queue -> {
+                List<T> result = new ArrayList<>(queue);
+                result.sort(comparator.reversed());
+                return Collections.unmodifiableList(result);
+            },
+            Collector.Characteristics.UNORDERED
+        );
+    }
+}
+```
 
 # 4. `Optional` Type
 
@@ -1195,7 +1320,134 @@ While Stream code is expressive, understanding its mechanical sympathy is crucia
 
 ---
 
-# 9. Summary Comparison & Engineering Reference Matrix
+# 9. Production Troubleshooting Playbook
+
+### Incident 1: Infinite Streams & Unbounded Heap Exhaustion (`OutOfMemoryError`)
+* **Symptom**: Microservice heap grows rapidly within minutes; GC thrashing occurs until the container dies with `java.lang.OutOfMemoryError: Java heap space`.
+* **Root Cause**: Creating an infinite stream using `Stream.iterate()` or `Stream.generate()` without an explicit short-circuiting limit, or attempting to sort an infinite stream:
+  ```java
+  // LETHAL BUG: .sorted() is a stateful intermediate operation that must consume ALL elements!
+  // It buffers infinitely in memory before emitting a single element!
+  Stream.iterate(0, n -> n + 1)
+      .sorted() // NEVER TERMINATES! OOM CRASH!
+      .limit(10)
+      .toList();
+  ```
+* **Production Remedy**:
+  1. Always place `.limit()` **before** any stateful intermediate operation (`sorted()`, `distinct()`).
+  2. Prefer the three-argument bounded `Stream.iterate()` available since Java 9:
+     ```java
+     // Explicit termination predicate prevents runaway stream generation
+     List<Integer> numbers = Stream.iterate(0, n -> n < 1000, n -> n + 1)
+         .toList();
+     ```
+
+---
+
+### Incident 2: Parallel Stream Shared `ForkJoinPool` Starvation
+* **Symptom**: Completely unrelated background services, CompletableFutures, and web request handlers freeze; application thread dumps show `ForkJoinPool.commonPool-worker-*` threads blocked in `WAITING` state on socket reads.
+* **Root Cause**: A developer used `.parallelStream()` or `.stream().parallel()` to execute slow external REST calls or database queries. By default, **all** parallel streams across the entire JVM share a single static thread pool: `ForkJoinPool.commonPool()`, whose parallelism is capped at `Runtime.getRuntime().availableProcessors() - 1`. A few long-running I/O operations in a parallel stream consume all carrier threads, starving the entire application!
+* **Production Remedy**:
+  1. **Strictly Ban Blocking I/O inside Parallel Streams**: Parallel streams are designed solely for CPU-bound computations in memory.
+  2. **Isolate Parallel Execution in Dedicated ForkJoinPool**:
+     ```java
+     ForkJoinPool customPool = new ForkJoinPool(8);
+     try {
+         List<Result> results = customPool.submit(() ->
+             dataList.parallelStream()
+                 .map(this::computeHeavyCpuTask)
+                 .toList()
+         ).get();
+     } finally {
+         customPool.shutdown();
+     }
+     ```
+
+---
+
+### Incident 3: Stream Reuse Exception (`IllegalStateException`)
+* **Symptom**: Code throws `java.lang.IllegalStateException: stream has already been operated upon or closed`.
+* **Root Cause**: Unlike collections, Java Streams are single-use traversals over an underlying data source. Once a terminal operation (`findFirst()`, `collect()`, `count()`) executes, the stream pipeline is permanently consumed and closed:
+  ```java
+  Stream<Order> orderStream = orderList.stream().filter(Order::isVip);
+  long count = orderStream.count(); // Terminal operation 1: Consumes stream!
+  List<Order> vipOrders = orderStream.toList(); // FAILS: IllegalStateException!
+  ```
+* **Production Remedy**:
+  Re-instantiate the stream from the source collection, or chain operations in a single terminal collector using `teeing()`:
+  ```java
+  // Java 12+ teeing collector computes two aggregations in a single traversal!
+  record OrderStats(long count, BigDecimal totalRevenue) {}
+
+  OrderStats stats = orderList.stream()
+      .filter(Order::isVip)
+      .collect(Collectors.teeing(
+          Collectors.counting(),
+          Collectors.reducing(BigDecimal.ZERO, Order::amount, BigDecimal::add),
+          OrderStats::new
+      ));
+  ```
+
+---
+
+### Incident 4: Non-Exhaustive Pattern Matching & Sealed Hierarchy Desynchronization
+* **Symptom**: Upgrading an internal shared library causes microservice compile errors or runtime `MatchException` under Java 21 pattern-matching `switch`.
+* **Root Cause**: A core shared library updates a `sealed interface PaymentMethod` by permitting a new record `record CryptoPayment(String walletId) implements PaymentMethod`. Client microservices utilizing `switch (payment)` without a `default` case fail to compile because the compiler exhaustiveness check detects an unhandled permitted variant.
+* **Production Remedy**:
+  1. **Leverage Compile-Time Enforcement**: This is an intended architectural feature, not a bug! The compiler prevents runtime gaps by forcing developers to handle the newly introduced domain type explicitly:
+     ```java
+     return switch (payment) {
+         case CreditCard cc -> processCard(cc);
+         case BankTransfer bt -> processTransfer(bt);
+         case CryptoPayment cp -> processCrypto(cp); // Newly added branch!
+     };
+     ```
+  2. **Provide Versioned Deprecation Notices**: When adding variants to public sealed hierarchies in shared enterprise libraries, announce breaking domain additions across release notes.
+
+---
+
+### Incident 5: State Mutation Inside Stream Operations (Race Conditions & Lost Updates)
+* **Symptom**: Intermittent data corruption, missing elements, or `ArrayIndexOutOfBoundsException` when processing streams under high traffic.
+* **Root Cause**: Mutating non-thread-safe external collections inside stream intermediate operations (`.peek()`, `.map()`):
+  ```java
+  // CRITICAL ANTI-PATTERN: Mutating shared state inside parallel stream!
+  List<ProcessedOrder> outputList = new ArrayList<>(); // NOT THREAD SAFE!
+  orders.parallelStream()
+      .filter(Order::isValid)
+      .forEach(outputList::add); // LETHAL RACE CONDITION on ArrayList internal elementData array!
+  ```
+* **Production Remedy**:
+  Streams must be pure, side-effect-free functional transformations. Always collect elements via standard collectors:
+  ```java
+  // Thread-safe, lock-free reduction managed by the Stream collector engine
+  List<ProcessedOrder> outputList = orders.parallelStream()
+      .filter(Order::isValid)
+      .map(this::transform)
+      .toList();
+  ```
+
+---
+
+### Incident 6: Accidental Autoboxing Overhead in High-Throughput Stream ETL
+* **Symptom**: High GC Young Gen allocation rate; CPU profiling shows 40% of CPU time spent in `java.lang.Long.valueOf(long)`.
+* **Root Cause**: Using `Stream<Long>` instead of primitive `LongStream` when aggregating millions of numeric metrics or financial transactions:
+  ```java
+  // Incurs 16-byte Long wrapper object allocation per element!
+  Stream<Long> boxedStream = records.stream().map(Record::amountInCents);
+  long total = boxedStream.reduce(0L, Long::sum); // Allocates millions of wrappers!
+  ```
+* **Production Remedy**:
+  Always leverage specialized primitive streams (`IntStream`, `LongStream`, `DoubleStream`):
+  ```java
+  // Zero-allocation primitive traversal over CPU registers
+  long total = records.stream()
+      .mapToLong(Record::amountInCents)
+      .sum();
+  ```
+
+---
+
+# 10. Summary Comparison & Engineering Reference Matrix
 
 | Feature | Introduced JDK | Low-Level Bytecode / JVM Mechanism | Memory & Performance Impact | Production Engineering Rule |
 | :--- | :---: | :--- | :--- | :--- |
@@ -1209,7 +1461,7 @@ While Stream code is expressive, understanding its mechanical sympathy is crucia
 
 ---
 
-# 10. References & Further Reading
+# 11. References & Further Reading
 
 - [Oracle OpenJDK - JDK 21 Features and Specifications](https://openjdk.org/projects/jdk/21/)
 - [JEP 395: Records](https://openjdk.org/jeps/395) — OpenJDK specification for immutable data carriers.
