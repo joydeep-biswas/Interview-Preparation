@@ -76,6 +76,13 @@ A comprehensive, production-grade guide answering Apache Spark and PySpark archi
 17. **Production Data Cleansing & 100x Scale-Up Diagnostics**
     - [Q52. Production Data Cleansing: Filtering Null Identifiers & Dead-Letter Routing](#q52-production-data-cleansing-filtering-null-identifiers--dead-letter-routing)
     - [Q53. Diagnosing Spark Job Slowdown: Scaling from 1M to 100M Records](#q53-diagnosing-spark-job-slowdown-scaling-from-1m-to-100m-records)
+18. **Broadcast Memory Limits, Distributed Locks & Kubernetes Diagnostics**
+    - [Q66. Spark Broadcast Join Exceeding Executor Memory: Failure Modes & Safeguards](#q66-spark-broadcast-join-exceeding-executor-memory-failure-modes--safeguards)
+    - [Q67. Distributed Lock Expiration & Split-Brain Hazard During Long Spark GC Pauses](#q67-distributed-lock-expiration--split-brain-hazard-during-long-spark-gc-pauses)
+    - [Q68. Kubernetes OOMKilled Executor Pod with Low JVM Heap Usage](#q68-kubernetes-oomkilled-executor-pod-with-low-jvm-heap-usage)
+    - [Q69. Spark Repartition vs Coalesce vs RepartitionByRange Execution Mechanics](#q69-spark-repartition-vs-coalesce-vs-repartitionbyrange-execution-mechanics)
+    - [Q70. Multi-Source Customer Record Deduplication Across CRM and ERP in PySpark](#q70-multi-source-customer-record-deduplication-across-crm-and-erp-in-pyspark)
+    - [Q71. PySpark Regional Top 3 Products Sold (Window Ranking Live Coding)](#q71-pyspark-regional-top-3-products-sold-window-ranking-live-coding)
 ---
 
 # 1. Spark Engine Architecture & Execution Lifecycle
@@ -1583,3 +1590,465 @@ def process_and_quarantine_events(raw_events_df: DataFrame, silver_path: str, de
    - **Resolution:** Replace `.collect()` with batch partitioned writes or increase `spark.driver.memory`.
 
 
+
+
+---
+
+# 18. Broadcast Memory Limits, Distributed Locks & Kubernetes Diagnostics
+
+---
+
+### Q66. Spark Broadcast Join Exceeding Executor Memory: Failure Modes & Safeguards
+**Topic Covered:** Broadcast Hash Join (BHJ) Internals, Driver OOM, Torrent Broadcast & Auto-Broadcast Threshold  
+**Question:** What happens under the hood when a Spark Broadcast Join exceeds available executor or driver memory? How do you diagnose and prevent this in high-scale production pipelines?
+
+#### Definition & Core Concepts
+In a Broadcast Hash Join (BHJ):
+1. The driver node collects the entire broadcast DataFrame into its local JVM memory (`driver.collect()`).
+2. The driver serializes the data and distributes it to all executor nodes via the peer-to-peer **Torrent Broadcast protocol**.
+3. Each executor deserializes the dataset into an in-memory hash table in its execution memory pool.
+When the broadcast table is too large:
+- **Driver Failure Mode:** If the table exceeds `spark.driver.memory`, the driver crashes with `java.lang.OutOfMemoryError: Java heap space` during the collect phase.
+- **Executor Failure Mode:** If the broadcast hash table exceeds the executor's available execution memory (`(executor.memory - 300MB) * spark.memory.fraction * spark.memory.executionFraction`), or if multiple broadcast tables are loaded concurrently across multiple CPU task cores, the executor JVM throws an `OutOfMemoryError` or dies from GC pause thrashing.
+- **Broadcast Timeout:** If the driver takes longer than `spark.sql.broadcastTimeout` (default: 300 seconds) to collect and serialize the table, the job fails with `SparkException: Could not execute broadcast in 300 secs`.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph BHJ_Flow ["Broadcast Hash Join Execution Pipeline"]
+        Dim["Dimension Table (>spark.sql.autoBroadcastJoinThreshold)"] --> Collect["1. Driver Collects Table to RAM"]
+        Collect --> DriverCheck{"Fits in spark.driver.memory?"}
+        DriverCheck -- "No" --> DriverOOM["💥 Driver Crash: OutOfMemoryError: Java heap space"]
+        DriverCheck -- "Yes" --> Torrent["2. Torrent Broadcast Protocol to Executors"]
+        Torrent --> ExecCheck{"Fits in Executor Execution RAM?"}
+        ExecCheck -- "No" --> ExecOOM["💥 Executor Crash / Pod Eviction (OOMKilled)"]
+        ExecCheck -- "Yes" --> FastJoin["⚡ Blazing Fast O(1) Local Hash Join (No Shuffle!)"]
+    end
+
+    style BHJ_Flow fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style DriverOOM fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style ExecOOM fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style FastJoin fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### Production Implementation / Code Solution
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import broadcast
+
+spark = SparkSession.builder.appName("BroadcastJoinSafeguards").getOrCreate()
+
+# 1. Inspect and tune automatic broadcast threshold (Default is 10MB: 10485760 bytes)
+# In production, set to -1 to disable automatic broadcast joins if table statistics are unreliable
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "64MB")
+spark.conf.set("spark.sql.broadcastTimeout", "600") # Increase timeout for multi-GB queries
+
+fact_df = spark.table("sales_fact")       # 500 GB fact table
+dim_df = spark.table("product_dimension")  # 200 MB dimension table
+
+# Defensive Check: Explicitly verify size before applying broadcast() hint
+table_size_bytes = spark._jsparkSession.sessionState().executePlan(
+    dim_df._jdf.logicalPlan()
+).optimizedPlan().stats().sizeInBytes()
+
+MAX_SAFE_BROADCAST_BYTES = 100 * 1024 * 1024 # 100 MB Safe Upper Bound
+
+if table_size_bytes <= MAX_SAFE_BROADCAST_BYTES:
+    # Safe to broadcast: No shuffle network exchange
+    joined_df = fact_df.join(broadcast(dim_df), "product_id", "inner")
+else:
+    # Exceeds safe memory limit: Fall back gracefully to Sort-Merge Join (SMJ)
+    # or Shuffle Hash Join (SHJ) to prevent Driver/Executor OOM
+    joined_df = fact_df.join(dim_df, "product_id", "inner")
+
+joined_df.write.format("delta").mode("append").saveAsTable("sales_enriched")
+```
+- **Time Complexity:** $O(N)$ linear time when broadcast fits in memory (eliminates $O(N \log N)$ network shuffle sort); degrades to $O(N \log N)$ under Sort-Merge fallback.
+- **Space Complexity:** $O(M)$ memory on the driver and every single executor, where $M$ is the size of the broadcast dimension.
+
+#### Engineering Implications & Production Pitfalls
+1. **Uncompressed In-Memory Expansion:** A Parquet dimension table that takes 30MB on cloud storage expands to $150	ext{MB}	ext{--}300	ext{MB}$ once deserialized as Java objects in executor memory. Calculating safety based on disk file size rather than memory footprint is the #1 cause of unexpected broadcast OOM crashes.
+2. **Multi-Core Amplification:** An executor configured with `spark.executor.cores = 5` runs 5 tasks concurrently. If each task performs a join with a 200MB broadcast table, all 5 tasks share the cached broadcast reference, but intermediate hash probe states can thrash executor memory.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Distributed Join Strategies](../08_apache_spark_pyspark.md#4-distributed-join-strategies--performance-optimization)*
+
+---
+
+### Q67. Distributed Lock Expiration & Split-Brain Hazard During Long Spark GC Pauses
+**Topic Covered:** Distributed Locks, Lease Expiration, GC Stop-The-World Pauses & Fencing Tokens  
+**Question:** Your distributed ETL lock has a 30-second TTL. A Spark job experiences a 40-second Stop-The-World (STW) Garbage Collection pause. What happens when another worker acquires the lock, and how do you prevent catastrophic data corruption?
+
+#### Definition & Core Concepts
+In distributed systems, distributed locks (via Redis Redlock, ZooKeeper, or DynamoDB) coordinate exclusive pipeline writes:
+1. **The Race Condition:**
+   - Worker A acquires Lock with a 30-second Time-To-Live (TTL).
+   - Worker A enters a severe Java **Full GC Stop-The-World (STW) pause** lasting 40 seconds (pausing all application threads, heartbeats, and lock renewal loops).
+   - At second 30, the lock lease expires. The lock coordinator grants the lock to **Worker B**.
+   - At second 40, Worker A's JVM awakens from the GC pause. Believing it still owns the lock, Worker A issues a write to cloud storage.
+   - **Split-Brain Disaster:** Both Worker A and Worker B mutate storage simultaneously, generating corrupted duplicate files or race-condition overwrites.
+2. **The Fundamental Distributed Solution: Fencing Tokens:**
+   A lock must **never** grant bare access. Every time a lock is acquired, the coordinator increments and issues a monotonically increasing **Fencing Token** (e.g., Token 42 for Worker A, Token 43 for Worker B). Downstream storage (or Delta Lake transaction log) verifies that writes have a token $\ge$ the latest seen token. When Worker A awakens with Token 42, storage rejects its write because Token 43 was already committed.
+
+#### Visual Flow
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Lock as 🔒 Lock Service (TTL: 30s)
+    participant WorkerA as 🐢 Worker A (Spark)
+    participant WorkerB as 🚀 Worker B (Spark)
+    participant Storage as 🗄️ Storage Engine (Fencing Token Check)
+
+    WorkerA->>Lock: Acquire Lock -> Granted (TTL: 30s, Token: 42)
+    Note over WorkerA: 💥 Full GC Stop-The-World Pause (40 Seconds!)
+    Note over Lock: 30s Elapses -> Lease Expires!
+    WorkerB->>Lock: Acquire Lock -> Granted (TTL: 30s, Token: 43)
+    WorkerB->>Storage: Commit Data with Fencing Token 43 -> SUCCESS (Storage Highest Token: 43)
+    Note over WorkerA: Awakes from GC at Second 40!
+    WorkerA->>Storage: Attempts Commit with Stale Token 42
+    Storage-->>WorkerA: ❌ REJECTED! (Token 42 < Current Highest Token 43)
+```
+
+#### Production Implementation / Code Solution
+```python
+import time
+from typing import Optional
+
+class FencedStorageWriter:
+    """
+    Demonstrates optimistic storage concurrency with monotonically increasing fencing tokens.
+    Prevents zombie writes caused by GC pauses or network partitions.
+    """
+    def __init__(self):
+        self._current_fencing_token = 0
+
+    def commit_transaction(self, token: int, file_path: str, record_count: int) -> bool:
+        # Atomic check-and-set: Storage rejects any token older than the highest committed token
+        if token < self._current_fencing_token:
+            raise RuntimeError(
+                f"ZOMBIE WRITE DETECTED: Stale fencing token {token} rejected. "
+                f"Storage has already committed transaction with token {self._current_fencing_token}."
+            )
+
+        # Commit write and advance atomic watermark
+        self._current_fencing_token = token
+        print(f"Successfully committed {record_count} records to {file_path} with token {token}")
+        return True
+```
+- **Time Complexity:** $O(1)$ atomic token comparison in storage metadata.
+- **Space Complexity:** $O(1)$ storage memory for atomic sequence register.
+
+#### Engineering Implications & Production Pitfalls
+1. **Delta Lake Invariant:** Delta Lake eliminates this hazard natively via **Optimistic Concurrency Control (OCC)** on its JSON transaction log (`000042.json`). Even if a Spark worker pauses for 10 minutes, when it attempts to commit `000042.json`, storage detects that Worker B already committed `000042.json` and raises `ConcurrentAppendException` or `ConcurrentTransactionException`, forcing Worker A to re-read and reconcile.
+2. **GC Tuning Mitigation:** While fencing tokens protect storage integrity, tuning the JVM to prevent 40-second pauses is essential. Switching from standard ParallelGC to **Shenandoah GC or ZGC** (`-XX:+UseZGC` or `-XX:+UseG1GC -XX:MaxGCPauseMillis=200`) eliminates multi-second STW pauses.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [05. Distributed Systems and APIs: Distributed Locks & Consensus](../05_distributed_systems_and_apis.md#3-distributed-consensus--state-machines)*
+
+---
+
+### Q68. Kubernetes OOMKilled Executor Pod with Low JVM Heap Usage
+**Topic Covered:** Container Cgroups, JVM Heap vs Off-Heap, MemoryOverhead & Native Netty Buffers  
+**Question:** In a Spark-on-Kubernetes (or Databricks) cluster, an executor pod is abruptly OOMKilled by the OS kernel, but the Spark Web UI shows JVM heap usage never exceeded 60%. Where is the memory being consumed, and how do you resolve it?
+
+#### Definition & Core Concepts
+When running Spark on Kubernetes, Linux enforces container memory limits via **Control Groups (cgroups)**:
+$$	ext{Total Container Memory} = 	ext{JVM Heap} + 	ext{Off-Heap Execution} + 	ext{JVM Overhead (Metaspace, Threads)} + 	ext{OS Page Cache / Native}$$
+In Spark configuration:
+$$	ext{Container Limit} = 	ext{spark.executor.memory} + 	ext{spark.executor.memoryOverhead}$$
+If the total physical memory consumed by all processes in the container exceeds the cgroup quota, the Linux kernel **OOM Killer** immediately terminates the pod (`Exit Code 137 / OOMKilled`), regardless of JVM heap health.
+The memory is consumed in 4 off-heap locations:
+1. **PySpark Python Worker Daemons:** Python code (UDFs, Pandas, NumPy) runs in separate OS child processes (`python3`) outside the JVM heap. If a Pandas UDF processes a 2GB Arrow batch, memory is consumed in native C-memory!
+2. **Off-Heap Netty Shuffle Buffers:** Network shuffle data transfer allocates off-heap direct byte buffers via Netty. High shuffle volume with dozens of concurrent streams spikes off-heap memory.
+3. **JVM Metaspace & Native Stacks:** Class definitions, JIT compiler memory, and thread stack allocations (`1MB` per thread).
+4. **PyArrow / Parquet Decompression:** Native columnar C++ decoders allocate native memory outside the JVM.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph K8sPod ["Kubernetes Executor Pod (cgroup Limit = 10 GB)"]
+        subgraph JVMHeap ["JVM Heap: 6 GB (Configured 7 GB)"]
+            UsedHeap["Active JVM Heap: 4.2 GB (Only 60% Used!)<br/>Spark UI reports: HEALTHY"]
+        end
+
+        subgraph OffHeapOverhead ["Native / Off-Heap Memory (Configured Overhead: 1 GB)"]
+            PyDaemon["Python Worker (PySpark / Arrow): 2.5 GB!"]
+            Netty["Netty Shuffle Direct Buffers: 1.2 GB"]
+            JvmNative["Metaspace & Thread Stacks: 0.8 GB"]
+            TotalOff["Total Off-Heap: 4.5 GB (EXCEEDS 1 GB OVERHEAD!)"]
+            PyDaemon --> TotalOff
+            Netty --> TotalOff
+            JvmNative --> TotalOff
+        end
+
+        TotalMemory["Actual Physical Container Footprint: 4.2 GB + 4.5 GB = 8.7 GB"]
+    end
+
+    K8sKiller["🚨 Linux Kernel OOM Killer:<br/>Container exceeds cgroup limit!<br/>Terminates pod -> Exit Code 137"]
+    TotalMemory --> K8sKiller
+
+    style K8sPod fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style JVMHeap fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style OffHeapOverhead fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style K8sKiller fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+```
+
+#### Production Implementation / Tuning Playbook
+```bash
+# 1. Inspect Pod Termination Reason in Kubernetes CLI
+kubectl describe pod spark-executor-10492 -n spark-jobs | grep -E "OOMKilled|Exit Code"
+# Output: Last State: Terminated, Reason: OOMKilled, Exit Code: 137
+
+# 2. Adjust Spark Sizing Configurations
+# Increase memory overhead from default (max(384MB, 10% of executor.memory)) to 25%-40%
+# for pipelines using PySpark, Pandas UDFs, or heavy shuffling:
+spark-submit   --master k8s://https://k8s-apiserver:443   --conf spark.executor.memory=8g   --conf spark.executor.memoryOverhead=3g   --conf spark.executor.pyspark.memory=2g   --conf spark.sql.execution.arrow.pyspark.enabled=true   --conf spark.sql.execution.arrow.maxRecordsPerBatch=10000   --conf spark.memory.offHeap.enabled=true   --conf spark.memory.offHeap.size=1g
+```
+
+#### Engineering Implications & Production Pitfalls
+1. **The `maxRecordsPerBatch` Arrow Throttle:** PyArrow converts Spark row batches into vectorized Arrow RecordBatches. If a batch contains 500,000 wide rows, the native Arrow memory footprint spikes to multiple gigabytes before Python processes it. Restricting `spark.sql.execution.arrow.maxRecordsPerBatch = 10000` bounds native memory consumption cleanly.
+2. **The `spark.executor.pyspark.memory` Guard:** By default, Spark sets no ceiling on how much memory a Python worker process can allocate. Setting `spark.executor.pyspark.memory` forces Python workers to spill or throw memory errors within Python rather than allowing the kernel to kill the entire executor pod.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Memory Architecture & OOM Debugging](../08_apache_spark_pyspark.md#5-memory-management-and-garbage-collection-internals)*
+
+---
+
+### Q69. Spark Repartition vs Coalesce vs RepartitionByRange Execution Mechanics
+**Topic Covered:** Hash Partitioning, Shuffle Elimination, Range Partitioning & Data Slicing  
+**Question:** Compare `repartition()`, `coalesce()`, and `repartitionByRange()` in Apache Spark. Explain the internal execution mechanics, shuffle implications, and when to use each in production ETL.
+
+#### Definition & Core Concepts
+Controlling the physical distribution of data across partitions dictates network shuffle cost, downstream file sizes, and query performance:
+1. **`repartition(numPartitions)`:**
+   - **Mechanism:** Performs a **Full Network Shuffle** using round-robin or hash partitioning (`hash(col) % N`).
+   - **Use Case:** Increasing partition count (e.g. from 20 to 500) or balancing severe data skew across worker nodes.
+2. **`coalesce(numPartitions)`:**
+   - **Mechanism:** Collapses adjacent existing partitions on the same worker node **without a network shuffle** (exploits locality).
+   - **Limitation:** Can **only decrease** partition count. Attempting to increase partitions with `coalesce()` is a silent no-op.
+   - **Use Case:** Reducing partition count before writing to storage (e.g. merging 200 small partitions into 10 target files).
+3. **`repartitionByRange(numPartitions, *cols)`:**
+   - **Mechanism:** Performs a network shuffle using **Reservoir Sampling** to calculate partition boundary split points, ensuring rows with similar key ranges land in the same partition.
+   - **Use Case:** Preparing data for sorted ranged file output or range-bounded time-series queries.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph RepartitionFlow ["repartition(N): Full Network Shuffle (All-to-All)"]
+        R_In["4 Partitions"] --> R_Shuffle["Shuffle Exchange HashPartitioning"]
+        R_Shuffle --> R_Out["8 Partitions (Evenly Balanced)"]
+    end
+
+    subgraph CoalesceFlow ["coalesce(N): Zero Shuffle (Locality Merge)"]
+        C_P1["Node 1: Part 1"]
+        C_P2["Node 1: Part 2"]
+        C_P3["Node 2: Part 3"]
+        C_P4["Node 2: Part 4"]
+        C_Merge1["Node 1: Merged (Part 1 + 2)"]
+        C_Merge2["Node 2: Merged (Part 3 + 4)"]
+        C_P1 --> C_Merge1
+        C_P2 --> C_Merge1
+        C_P3 --> C_Merge2
+        C_P4 --> C_Merge2
+    end
+
+    style RepartitionFlow fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style CoalesceFlow fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+```
+
+#### Production Implementation / Code Solution
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+spark = SparkSession.builder.appName("PartitioningMechanics").getOrCreate()
+raw_df = spark.read.parquet("raw_telemetry/") # 1,000 input partitions
+
+# Scenario 1: Downstream computation is heavy; balance data evenly across cluster
+# Full shuffle balances load across 200 workers
+balanced_df = raw_df.repartition(200)
+
+# Scenario 2: Heavy filtering reduces dataset by 95% (only 50MB remains across 200 tasks)
+filtered_df = balanced_df.filter(col("status") == "CRITICAL_ERROR")
+
+# Avoid writing 200 tiny 250KB files to S3/ADLS
+# Use coalesce(1) to avoid an unnecessary network shuffle before write
+filtered_df.coalesce(2).write.format("delta").mode("append").save("alerts_gold/")
+
+# Scenario 3: Pre-sort time series data across partitions for high-efficiency range scans
+range_sorted_df = raw_df.repartitionByRange(50, col("event_date"), col("event_timestamp"))
+range_sorted_df.write.format("parquet").save("time_series_curated/")
+```
+- **Time Complexity:**
+  - `repartition()`: $O(N \log N)$ shuffle exchange with disk I/O serialization.
+  - `coalesce()`: $O(N)$ linear scan without network transfer.
+  - `repartitionByRange()`: $O(N \log N)$ with two-phase reservoir sampling.
+- **Space Complexity:** `coalesce()` uses $O(1)$ intermediate network buffer; `repartition()` requires disk shuffle spool memory.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Coalesce Upstream Collapse Trap:** Calling `df.coalesce(1)` at the end of a DAG can cause Spark's Catalyst optimizer to collapse the *entire upstream pipeline* into a single task! A pipeline intended to process 500GB across 100 workers runs on 1 core and OOMs. If upstream work must remain parallel, use `repartition(1)` or enforce a cache barrier.
+2. **Skew Hazard in Coalesce:** Coalesce merges partitions greedily based on node locality. If Node 1 had 500MB and Node 2 had 10MB, `coalesce(2)` can produce 1 massive 500MB partition and 1 tiny 10MB partition. Use `repartition()` if uniform partition sizing is essential.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Partition Management](../08_apache_spark_pyspark.md#3-core-transformations-actions-and-rdddataframe-mechanics)*
+
+---
+
+### Q70. Multi-Source Customer Record Deduplication Across CRM and ERP in PySpark
+**Topic Covered:** Record Linkage, Source Precedence Rules, Window Deduplication & PySpark Live Coding  
+**Question:** How would you deduplicate customer records arriving from two distinct sources (CRM and ERP) with conflicting addresses and timestamps using PySpark, giving precedence to ERP updates?
+
+#### Definition & Core Concepts
+In enterprise customer master data management (MDM), customer profiles arrive asynchronously from heterogeneous systems:
+- **ERP:** Source of truth for billing, tax IDs, and financial addresses.
+- **CRM:** Source of truth for sales contacts and phone numbers, but frequently out of date.
+When conflicting records share the same `customer_id` or unified `tax_identifier`:
+1. Assign priority weighting to source systems: `CASE WHEN source = 'ERP' THEN 1 ELSE 2 END`.
+2. Apply `Window.partitionBy("customer_id").orderBy(col("source_priority").asc(), col("updated_at").desc())`.
+3. Filter where `ROW_NUMBER() = 1` to extract the authoritative golden record.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph HeterogeneousSources ["Disparate Upstream Feeds"]
+        ERP["ERP Record: ID 101 | Address: New York | Updated: 2024-10-10 | Priority: 1"]
+        CRM["CRM Record: ID 101 | Address: Boston   | Updated: 2024-10-15 | Priority: 2"]
+    end
+
+    subgraph UnionStaging ["Unified Staged Schema"]
+        Union["unionByName(allowMissingColumns=True)"]
+        ERP --> Union
+        CRM --> Union
+    end
+
+    subgraph GoldenResolution ["Window Ranking Resolution"]
+        Rank["ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY source_priority ASC, updated_at DESC)"]
+        Union --> Rank
+        Winner["Winner: ERP Record 101 (Source Priority 1 supersedes newer CRM timestamp)"]
+        Rank --> Winner
+    end
+
+    style HeterogeneousSources fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style UnionStaging fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style GoldenResolution fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### Production Implementation / Code Solution
+```python
+from pyspark.sql import SparkSession, Window
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.appName("MDM_Customer_Deduplication").getOrCreate()
+
+crm_df = spark.table("raw_crm.customers").withColumn("source_system", F.lit("CRM"))
+erp_df = spark.table("raw_erp.customers").withColumn("source_system", F.lit("ERP"))
+
+# Standardize and union across schemas
+combined_df = crm_df.unionByName(erp_df, allowMissingColumns=True)
+
+# Assign deterministic source priority: ERP (1) supersedes CRM (2)
+prioritized_df = combined_df.withColumn(
+    "source_priority",
+    F.when(F.col("source_system") == "ERP", 1)
+     .when(F.col("source_system") == "CRM", 2)
+     .otherwise(99)
+)
+
+# Window specification: Prioritize source authority first, then newest timestamp
+dedup_window = (
+    Window.partitionBy("customer_id")
+    .orderBy(
+        F.col("source_priority").asc(),
+        F.col("updated_at").desc(),
+        F.col("ingestion_id").desc() # Final deterministic tiebreaker
+    )
+)
+
+golden_customers_df = (
+    prioritized_df
+    .withColumn("rank_order", F.row_number().over(dedup_window))
+    .filter(F.col("rank_order") == 1)
+    .drop("rank_order", "source_priority")
+)
+
+golden_customers_df.write.format("delta").mode("overwrite").saveAsTable("silver.dim_customer_golden")
+```
+- **Time Complexity:** $O(N \log(N/K))$ distributed sort across partitioned customer keys.
+- **Space Complexity:** $O(N)$ distributed shuffle memory for window execution.
+
+#### Engineering Implications & Production Pitfalls
+1. **Survivorship Merging (Field-Level Coalesce):** In advanced MDM, business rules require taking the *address* from ERP, but preserving the *marketing email* from CRM if ERP has NULL. In PySpark, this is achieved by applying `F.first(col, ignorenulls=True).over(window)` for individual attributes before filtering.
+2. **Data Skew on Generic IDs:** If corrupted upstream records populate dummy IDs (e.g. `customer_id = '00000000'` or `NULL`), millions of rows hash to a single partition, triggering severe task stragglers. Filter null/dummy keys into a quarantine table before executing the window deduplication.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Production PySpark Engineering](../08_apache_spark_pyspark.md#7-production-pyspark-job-design-and-maintenance)*
+
+---
+
+### Q71. PySpark Regional Top 3 Products Sold (Window Ranking Live Coding)
+**Topic Covered:** PySpark Window Functions, Dense Ranking & Aggregation Pipelines  
+**Question:** Write a PySpark job to calculate the top 3 best-selling products by quantity sold in each geographical region from a fact sales DataFrame.
+
+#### Definition & Core Concepts
+Finding top $N$ items per partition requires a multi-stage distributed execution:
+1. **Aggregate:** Compute total volume per `(region, product_id)`. Pre-aggregating reduces record volume by orders of magnitude before ranking.
+2. **Window Specification:** Partition by `region` and order by `total_quantity_sold DESC`.
+3. **Ranking Semantics:** Use `DENSE_RANK()` if ties should share the same spot without skipping positions, or `ROW_NUMBER()` for strict top 3 cutoff.
+4. **Filter:** Restrict to `rank <= 3`.
+
+#### Visual Flow
+```mermaid
+flowchart LR
+    Fact["fact_sales:<br/>(order_id, region, product_id, qty)"] --> Agg["1. groupBy('region', 'product_id')<br/>.agg(sum('qty'))"]
+    Agg --> WindowRank["2. dense_rank().over(<br/>Window.partitionBy('region')<br/>.orderBy(desc('total_sold')))"]
+    WindowRank --> Filter["3. filter(col('rank') <= 3)"]
+    Filter --> Output["Final Regional Top 3 Matrix"]
+
+    style Fact fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Agg fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style WindowRank fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Output fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### Production Implementation / Code Solution
+```python
+from pyspark.sql import SparkSession, Window
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.appName("Top3ProductsPerRegion").getOrCreate()
+
+# Sample Schema: fact_sales (sale_id, region, product_id, quantity_sold, sale_timestamp)
+sales_df = spark.table("gold.fact_sales")
+
+# Stage 1: Pre-aggregate volume per region and product
+regional_product_sales = (
+    sales_df
+    .groupBy("region", "product_id")
+    .agg(F.sum("quantity_sold").alias("total_units_sold"))
+)
+
+# Stage 2: Define window ranking specification
+region_window = (
+    Window.partitionBy("region")
+    .orderBy(F.col("total_units_sold").desc())
+)
+
+# Stage 3: Rank and extract top 3 products
+top_3_regional_products = (
+    regional_product_sales
+    .withColumn("product_rank", F.dense_rank().over(region_window))
+    .filter(F.col("product_rank") <= 3)
+    .orderBy("region", "product_rank")
+)
+
+top_3_regional_products.show(truncate=False)
+```
+- **Time Complexity:** $O(S + U \log(U/R))$ where $S$ is sales rows, $U$ is unique region-product pairs, and $R$ is regions.
+- **Space Complexity:** $O(U)$ shuffle memory across execution tasks.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Pre-Aggregation Mandate:** Never run the window ranking function directly on raw line-item transactions! Applying `dense_rank()` across 500 million unaggregated sales transactions incurs massive shuffle costs and executor memory spills. Grouping by `(region, product_id)` first shrinks the dataset to a few thousand rows per region.
+2. **Handling Regional Data Skew:** If one region (e.g. `US-EAST`) accounts for 70% of total global sales, that single window partition will become a straggler task. Enable Spark 3.x Adaptive Query Execution (`spark.sql.adaptive.skewJoin.enabled = true`) to dynamically split skewed partitions.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: PySpark Transformations & Windowing](../08_apache_spark_pyspark.md#3-core-transformations-actions-and-rdddataframe-mechanics)*

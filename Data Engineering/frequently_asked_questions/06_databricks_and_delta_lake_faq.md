@@ -47,6 +47,9 @@ A comprehensive, production-grade guide answering Databricks and Delta Lake inte
     - [Q27. Source-to-Target Data Validation Framework for Delta Lake Migrations](#q27-source-to-target-data-validation-framework-for-delta-lake-migrations)
     - [Q28. Diagnosing and Tuning Gold-Layer Delta Table Dashboard Performance](#q28-diagnosing-and-tuning-gold-layer-delta-table-dashboard-performance)
     - [Q29. Manual Versioning & Snapshots in Parquet vs Delta ACID Transaction Logs](#q29-manual-versioning--snapshots-in-parquet-vs-delta-acid-transaction-logs)
+13. **Medallion Data Reconciliation & Programmatic Notebook Orchestration**
+    - [Q33. Tracing Record Discrepancies Across Bronze, Silver, and Gold Tables](#q33-tracing-record-discrepancies-across-bronze-silver-and-gold-tables)
+    - [Q34. Executing Databricks Notebooks Programmatically: dbutils.notebook.run vs Databricks Workflows](#q34-executing-databricks-notebooks-programmatically-dbutilsnotebookrun-vs-databricks-workflows)
 ---
 
 # 1. Delta Lake Architecture & ACID Transaction Internals
@@ -1081,3 +1084,162 @@ df.write.parquet(output_path)
    SELECT * FROM gold.orders VERSION AS OF 42;
    ```
 
+
+
+---
+
+# 13. Medallion Data Reconciliation & Programmatic Notebook Orchestration
+
+---
+
+### Q33. Tracing Record Discrepancies Across Bronze, Silver, and Gold Tables
+**Topic Covered:** Medallion Audit Lineage, Row Attrition Tracking, Quarantine Tables & Delta Time Travel  
+**Question:** A downstream Gold reporting table contains fewer records than expected. How would you systematically trace the discrepancy and locate missing records across Bronze, Silver, and Gold layers in Databricks Delta Lake?
+
+#### Definition & Core Concepts
+In the Medallion Architecture, data flows sequentially through Bronze (raw append), Silver (cleaned/deduplicated), and Gold (business aggregates). When Gold reports record loss, the discrepancy stems from one of 4 attrition gates:
+1. **Bronze Ingestion Drop:** File discovery mode in Auto Loader missed files due to misconfigured path globbing or poisoned files dumped into `_rescued_data`.
+2. **Silver Cleansing / Quarantine Rejection:** Data quality rules (`CHECK (email IS NOT NULL AND amount > 0)`) filtered invalid records into a Dead-Letter Queue (DLQ) or quarantine table.
+3. **Inner Join Attrition:** Joining Silver transactions with an incomplete dimension (e.g., newly introduced `store_id` not yet present in `dim_store`) silently drops matching fact rows.
+4. **Gold Aggregation Grouping / Having:** Aggregations with `HAVING count(*) >= threshold` or date window boundaries excluding edge records.
+Delta Lake provides native audit primitives to trace this pipeline deterministically: `DESCRIBE HISTORY`, table tags, and Time Travel.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    GoldAlert["🚨 Gold Table Missing 50,000 Records: Expected 1,000,000 -> Found 950,000"] --> Trace1["1. Audit Bronze Raw Table<br/>Run count(*) & inspect Auto Loader _rescued_data column"]
+    Trace1 --> CheckBronze{"Did Bronze receive all 1,000,000?"}
+    CheckBronze -- "No" --> BronzeLoss["Root Cause: Source file ingestion failure or Auto Loader glob mismatch"]
+    CheckBronze -- "Yes" --> Trace2["2. Audit Silver Quality Quarantine<br/>Inspect silver.quarantine_orders"]
+
+    Trace2 --> CheckQuarantine{"Were records quarantined?"}
+    CheckQuarantine -- "Yes: 30,000 in DLQ" --> QualityLoss["Root Cause: Strict validation gate caught schema/null violations"]
+    CheckQuarantine -- "No / Unaccounted" --> Trace3["3. Check Inner Join Attrition<br/>Anti-join Silver Fact against Dimensions"]
+
+    Trace3 --> DimensionLoss["Root Cause: 20,000 Fact rows dropped by INNER JOIN on missing dim_store keys!"]
+
+    style GoldAlert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style Trace1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Trace2 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Trace3 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style BronzeLoss fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style QualityLoss fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style DimensionLoss fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+```
+
+#### Production Implementation / Diagnostic Playbook
+```sql
+-- Step 1: Inspect Delta Transaction History to verify commit metrics
+DESCRIBE HISTORY bronze.orders;
+DESCRIBE HISTORY silver.orders;
+DESCRIBE HISTORY gold.daily_sales_summary;
+
+-- Step 2: Check for records quarantined due to schema or null violations in Silver
+SELECT error_reason, COUNT(*) as dropped_count
+FROM silver.orders_quarantine
+WHERE ingestion_date = CURRENT_DATE()
+GROUP BY error_reason;
+
+-- Step 3: Anti-Join Audit: Detect records dropped due to missing dimensional foreign keys
+SELECT 
+    COUNT(*) AS dropped_fact_records,
+    COUNT(DISTINCT s.store_id) AS missing_store_keys
+FROM silver.orders s
+LEFT ANTI JOIN gold.dim_store d ON s.store_id = d.store_id
+WHERE s.order_date = CURRENT_DATE();
+
+-- Step 4: Time Travel Reconciliation: Compare Gold table metrics before and after the batch run
+SELECT 'Version_41' AS snapshot, COUNT(*) AS row_cnt, SUM(revenue) AS total_rev 
+FROM gold.daily_sales_summary VERSION AS OF 41
+UNION ALL
+SELECT 'Version_42' AS snapshot, COUNT(*) AS row_cnt, SUM(revenue) AS total_rev 
+FROM gold.daily_sales_summary VERSION AS OF 42;
+```
+- **Time Complexity:** $O(B + S + G)$ distributed hash scans across medallion layers.
+- **Space Complexity:** $O(1)$ Delta log metadata lookup.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Dangerous Silent Inner Join:** In dimensional warehousing, never use raw `INNER JOIN` against slowly changing or late-arriving dimensions! If a transaction references a newly opened store not yet synchronized to `dim_store`, an inner join drops the fact record silently with zero errors. Always use an `OUTER JOIN` and assign unmatched records to an **Inferred Member (`store_key = -1, "Unknown Store"`)**.
+2. **Delta History Retention:** By default, Delta Lake preserves transaction log history for 30 days (`delta.logRetentionDuration = 'interval 30 days'`). Never run `VACUUM RETAIN 0 HOURS` in production, as it destroys historical Parquet files and eliminates the ability to Time Travel and trace discrepancy regressions.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [09. Databricks & Delta Lake: Transaction Logs & Time Travel](../09_databricks_and_delta_lake.md#2-delta-transaction-log--acid-internals)*
+
+---
+
+### Q34. Executing Databricks Notebooks Programmatically: dbutils.notebook.run vs Databricks Workflows
+**Topic Covered:** Notebook Orchestration, Parameter Passing, Multi-Task Workflows & Concurrency Limits  
+**Question:** How would you execute one notebook from another in Databricks? Compare `dbutils.notebook.run()` versus Databricks Multi-Task Workflows for production ETL orchestration.
+
+#### Definition & Core Concepts
+In Databricks, orchestrating modular processing steps across notebooks is achieved through two distinct execution paradigms:
+1. **`dbutils.notebook.run(path, timeout_seconds, arguments)`:**
+   - **Execution Model:** Synchronous programmatic invocation executed within the calling notebook's JVM context or ephemeral child session.
+   - **Parameter Passing:** Passes widget arguments as a dictionary; captures return value via `dbutils.notebook.exit("result_json")`.
+   - **Concurrency & Cost:** All sub-notebooks execute sequentially on the same active interactive/job cluster unless explicitly parallelized via Python `ThreadPoolExecutor`.
+   - **Limitation:** Inability to visualize complex multi-branch DAG dependencies; cluster failures crash the entire orchestration tree.
+2. **Databricks Workflows (Multi-Task Jobs):**
+   - **Execution Model:** Declarative, cloud-native orchestration managed by Databricks control plane.
+   - **Concurrency & Cost:** Tasks can run concurrently across independent, task-specialized ephemeral Job Clusters (e.g., GPU cluster for ML task, high-memory cluster for ETL task), reducing cloud compute costs by up to 50%.
+   - **Enterprise Features:** Native visual DAG editor, conditional task branching (`if/else`, `RunIf`), retries, repair-and-run, and lineage observability.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph MethodA ["Method A: Programmatic dbutils.notebook.run()"]
+        Parent["Parent Orchestrator Notebook"] --> Child1["dbutils.notebook.run('bronze_etl', 600, {'env': 'prod'})"]
+        Child1 --> Child2["dbutils.notebook.run('silver_etl', 1200, {'env': 'prod'})"]
+        Child2 --> ReturnVal["Captures JSON string from dbutils.notebook.exit()"]
+        NoteA["Runs sequentially on single shared cluster<br/>Hard to debug multi-step failures"]
+    end
+
+    subgraph MethodB ["Method B: Databricks Workflows (Multi-Task DAG)"]
+        Task1["Task 1: Ingestion<br/>(Cluster: 2 Workers)"] --> Task2["Task 2: Transformation<br/>(Cluster: 8 Workers)"]
+        Task1 --> Task3["Task 3: Validation<br/>(Cluster: Serverless)"]
+        Task2 --> Task4["Task 4: Gold Aggregate"]
+        Task3 --> Task4
+        NoteB["Visual DAG, task-level retries, independent cluster sizing,<br/>Repair-and-run without re-executing Task 1"]
+    end
+
+    style MethodA fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style MethodB fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+```
+
+#### Production Implementation / Code Solution
+```python
+# Calling Sub-Notebooks Programmatically with Error Handling and Concurrency
+import json
+from concurrent.futures import ThreadPoolExecutor
+
+def run_child_notebook(table_name: str) -> dict:
+    """Executes a child notebook with parameters and handles return payloads."""
+    try:
+        response_str = dbutils.notebook.run(
+            path="/Shared/ETL/transform_table",
+            timeout_seconds=900,
+            arguments={"target_table": table_name, "batch_id": "BATCH_20241017"}
+        )
+        return json.loads(response_str)
+    except Exception as e:
+        return {"status": "FAILED", "table": table_name, "error": str(e)}
+
+# Parallel execution of 3 independent dimension notebooks
+tables = ["dim_customer", "dim_store", "dim_promotion"]
+with ThreadPoolExecutor(max_workers=3) as executor:
+    results = list(executor.map(run_child_notebook, tables))
+
+print("Execution Results:", results)
+
+# Inside the Child Notebook: Return metadata cleanly upon completion
+# output_payload = json.dumps({"status": "SUCCESS", "records_processed": 145000})
+# dbutils.notebook.exit(output_payload)
+```
+- **Time Complexity:** $O(N)$ sequential or $O(N/P)$ parallel invocation where $P$ is worker threads.
+- **Space Complexity:** $O(1)$ memory on parent driver.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Silent Driver Hang:** `dbutils.notebook.run()` is blocking. If a child notebook enters an infinite loop or hangs on a database lock, the parent driver hangs until `timeout_seconds` is reached. Always specify an explicit non-zero timeout (default is 0 = infinite wait!).
+2. **Production Mandate:** In enterprise environments, never use `dbutils.notebook.run()` as your primary scheduler. Use Databricks Asset Bundles (DABs) to define declarative Databricks Workflows in YAML and version them in Git.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [09. Databricks & Delta Lake: Databricks Asset Bundles & Workflows](../09_databricks_and_delta_lake.md#7-databricks-asset-bundles-dabs--cicd)*

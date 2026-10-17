@@ -56,6 +56,13 @@ A comprehensive, production-grade guide answering Azure Data Factory (ADF), ETL 
     - [ADF Q20. Resilient Sub-Task Retry Logic Without Full Pipeline Reprocessing](#adf-q20-resilient-sub-task-retry-logic-without-full-pipeline-reprocessing)
     - [ADF Q21. Slowly Changing Dimensions (SCD Type 2) in ADF Mapping Data Flows](#adf-q21-slowly-changing-dimensions-scd-type-2-in-adf-mapping-data-flows)
     - [ADF Q22. Multi-Database On-Prem SQL Ingestion to ADLS Gen2 & Azure Synapse Analytics](#adf-q22-multi-database-on-prem-sql-ingestion-to-adls-gen2--azure-synapse-analytics)
+15. **Airflow Task Execution, Upstream SLA Cascades & Production Reliability Triage**
+    - [Q54. Making ETL Pipelines Idempotent After Partial Failures and Airflow Retries](#q54-making-etl-pipelines-idempotent-after-partial-failures-and-airflow-retries)
+    - [Q55. Strict Airflow Task Sequential Execution & Failure Handling (T1 >> T2 >> T3)](#q55-strict-airflow-task-sequential-execution--failure-handling-t1--t2--t3)
+    - [Q56. Upstream Dependency Cascade & Critical Path Delay Propagation](#q56-upstream-dependency-cascade--critical-path-delay-propagation)
+    - [Q57. Reusable Metadata-Driven ETL Framework with Multi-Source Ingestion & Dynamic Validation](#q57-reusable-metadata-driven-etl-framework-with-multi-source-ingestion--dynamic-validation)
+    - [Q58. Relational Source (PostgreSQL) 90% CPU Spike During Ingestion: Diagnostic Playbook](#q58-relational-source-postgresql-90-cpu-spike-during-ingestion-diagnostic-playbook)
+    - [Q59. Production Deployment Failure Rate Spike: Rollback vs Fix-Forward Decision Matrix](#q59-production-deployment-failure-rate-spike-rollback-vs-fix-forward-decision-matrix)
 ---
 
 # 1. Core ETL Architecture: Idempotency, Checkpointing & Deduplication
@@ -1143,3 +1150,482 @@ flowchart LR
    `@{dataset().DatabaseName}`, `@{dataset().SchemaName}`, `@{dataset().TableName}` to ingest hundreds of tables without creating separate ADF pipelines.
 
 
+
+
+---
+
+# 15. Airflow Task Execution, Upstream SLA Cascades & Production Reliability Triage
+
+---
+
+### Q54. Making ETL Pipelines Idempotent After Partial Failures and Airflow Retries
+**Topic Covered:** Pipeline Idempotency, Atomic Partition Overwrites, Staging Swaps & Retry Safety  
+**Question:** Your ETL pipeline fails after successfully writing 60% of records. Airflow triggers an automatic task retry, resulting in duplicate records in downstream tables. How do you design and refactor the pipeline to be strictly idempotent?
+
+#### Definition & Core Concepts
+An operation is **idempotent** if executing it multiple times produces the exact same system state as executing it once:
+$$f(f(x)) = f(x)$$
+Pipelines that write data using raw non-transactional appends (`INSERT INTO` or `df.write.mode("append")`) violate idempotency. If a task writes 600,000 rows out of 1,000,000 before crashing on network timeout, Airflow's retry writes all 1,000,000 rows again, producing 1,600,000 rows with 600,000 duplicates.
+The three production patterns to enforce strict idempotency are:
+1. **Dynamic Partition Overwrites:** Overwrite only the specific partition slice being processed (`replaceWhere` or `insertOverwrite` on `date = '2024-10-17'`).
+2. **Deterministic Upsert (Delta MERGE):** Match incoming records on business primary key (`ON target.order_id = source.order_id`).
+3. **Staging Table Atomic Swap:** Write 100% of the data to a temporary/staging table (`orders_stg_batch_123`). Once validated, execute an atomic metadata swap or partitioned rename into production (`ALTER TABLE orders SWAP WITH orders_stg`).
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph NonIdempotent ["❌ Non-Idempotent Append (Duplicates Produced)"]
+        Run1["Attempt 1: Writes 60% (600k rows) -> Network Timeout!"]
+        Retry1["Airflow Retry: Writes 100% (1,000k rows)"]
+        Corrupt["Result: 1,600k rows (600,000 DUPLICATES!)"]
+        Run1 --> Retry1 --> Corrupt
+    end
+
+    subgraph IdempotentSwap ["✅ Idempotent Staging Table & Partition Overwrite"]
+        Stg["1. Write to Ephemeral Staging: orders_stg_run_42"]
+        Validate{"2. Check Quality & Row Count"}
+        Swap["3. Atomic Partition Overwrite / Table Swap<br/>INSERT OVERWRITE TABLE orders PARTITION (date='2024-10-17')"]
+        Clean["4. Drop Staging Table"]
+        Stg --> Validate -- "Pass" --> Swap --> Clean
+        Validate -- "Fail" --> Abort["Abort & Rollback: Zero target contamination"]
+    end
+
+    style NonIdempotent fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style IdempotentSwap fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+```
+
+#### Production Implementation / Code Solution
+```python
+from pyspark.sql import SparkSession
+from delta.tables import DeltaTable
+import sys
+
+def execute_idempotent_load(spark: SparkSession, batch_date: str, raw_input_path: str):
+    """
+    Executes strictly idempotent write using Delta Lake replaceWhere partition overwrite.
+    Guarantees that re-running this task 100 times produces identical target state.
+    """
+    # 1. Read source data for batch partition
+    incoming_df = spark.read.parquet(raw_input_path).filter(f"order_date = '{batch_date}'")
+
+    # 2. Idempotent Target Overwrite: Only replaces the specific target partition
+    (
+        incoming_df.write
+        .format("delta")
+        .mode("overwrite")
+        .option("replaceWhere", f"order_date = '{batch_date}'") # Atomic partition replace
+        .saveAsTable("gold.fact_orders")
+    )
+    print(f"Successfully and idempotently loaded partition order_date = '{batch_date}'")
+
+# Alternative: SQL Atomic Staging Swap for Cloud Warehouses (Snowflake / BigQuery)
+"""
+BEGIN TRANSACTION;
+  -- Truncate staging table scoped to execution run
+  CREATE OR REPLACE TEMPORARY TABLE stg_orders AS SELECT * FROM raw_stream WHERE dt = '2024-10-17';
+  
+  -- Atomic delete of target partition followed by insertion
+  DELETE FROM fact_orders WHERE order_date = '2024-10-17';
+  INSERT INTO fact_orders SELECT * FROM stg_orders;
+COMMIT;
+"""
+```
+- **Time Complexity:** $O(N)$ linear write. Replacing a partition in Delta Lake updates metadata pointers in $O(1)$.
+- **Space Complexity:** $O(N)$ temporary staging allocation; old Parquet files cleaned up during subsequent `VACUUM`.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Dangerous Global Overwrite Trap:** A common junior bug is executing `df.write.mode("overwrite").saveAsTable("orders")` without `replaceWhere`. This **wipes out the entire table across all history**, deleting years of data! Always qualify partition-scoped overwrites.
+2. **Transaction Timeouts during MERGE:** If using `MERGE INTO` across a 50 TB unpartitioned table, the scan required to detect matching keys can take 45 minutes, causing lock timeouts. Always prune target partitions in the merge predicate (`ON target.order_date = source.order_date AND target.order_id = source.order_id`).
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [10. Data Pipeline Design & Ingestion: Idempotency Patterns](../10_data_pipeline_design_and_ingestion.md#1-ingestion-paradigms-batch-micro-batch--streaming)*
+
+---
+
+### Q55. Strict Airflow Task Sequential Execution & Failure Handling (`T1 >> T2 >> T3`)
+**Topic Covered:** Airflow DAG Construction, Task Dependencies, Trigger Rules & Failure Callbacks  
+**Question:** You need tasks T1, T2, and T3 to execute strictly in order ($T_1 	o T_2 	o T_3$). How would you define dependencies, pass context between tasks, and handle failures defensively?
+
+#### Definition & Core Concepts
+In Apache Airflow, DAG task dependencies define an execution graph:
+1. **Dependency Syntax:** The bitshift operator `T1 >> T2 >> T3` or `.set_downstream()` establishes that $T_2$ is downstream of $T_1$, and $T_3$ is downstream of $T_2$.
+2. **Trigger Rules:** By default, Airflow tasks use `trigger_rule = TriggerRule.ALL_SUCCESS`. If $T_1$ fails, $T_2$ and $T_3$ are marked as `UPSTREAM_FAILED` and skipped.
+3. **Defensive Failure Handling:**
+   - **Retries with Exponential Backoff:** Automatically retry transient network failures without alerting on-call engineers for self-healing hiccups (`retries=3, retry_delay=timedelta(minutes=2), retry_exponential_backoff=True`).
+   - **Failure Callbacks (`on_failure_callback`):** Dispatch structured alerts to PagerDuty/Slack with task execution dates, log URLs, and stack traces.
+   - **Cleanup Finalizer (`TriggerRule.ALL_DONE`):** Ensure a teardown task ($T_{cleanup}$) executes regardless of whether upstream tasks succeeded or failed, preventing compute cluster leaks.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph HappyPath ["Normal Sequential Execution (ALL_SUCCESS)"]
+        T1["Task 1: Extract & Stage<br/>(Retries: 3, Backoff: 2m)"] --> T2["Task 2: Transform & Validate"]
+        T2 --> T3["Task 3: Promote to Production"]
+    end
+
+    subgraph FailureBranch ["Failure & Teardown Architecture"]
+        T1 -- "Failure after 3 retries" --> FailAlert["🚨 on_failure_callback<br/>Alerts PagerDuty / Slack with Log Link"]
+        T2 -.->|"Skipped (UPSTREAM_FAILED)"| T3
+        T1 & T2 & T3 --> Clean["Task 4: Cleanup Ephemeral Cluster<br/>(trigger_rule = TriggerRule.ALL_DONE)"]
+    end
+
+    style HappyPath fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style FailureBranch fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style Clean fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### Production Implementation / Code Solution
+```python
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
+
+def alert_slack_on_failure(context):
+    """Dispatches rich diagnostic metadata to Slack/PagerDuty when a task fails."""
+    ti = context.get('task_instance')
+    dag_id = context.get('dag').dag_id
+    execution_date = context.get('execution_date')
+    log_url = ti.log_url
+    print(f"SLACK ALERT: DAG {dag_id} Task {ti.task_id} FAILED at {execution_date}. Logs: {log_url}")
+
+default_args = {
+    'owner': 'data_platform',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'retries': 3,                                # 3 automated retries
+    'retry_delay': timedelta(minutes=2),         # Initial 2-minute delay
+    'retry_exponential_backoff': True,           # 2m -> 4m -> 8m
+    'max_retry_delay': timedelta(minutes=15),
+    'on_failure_callback': alert_slack_on_failure
+}
+
+with DAG(
+    dag_id='strict_sequential_orders_pipeline',
+    default_args=default_args,
+    start_date=datetime(2024, 1, 1),
+    schedule_interval='@daily',
+    catchup=False,
+    max_active_runs=1
+) as dag:
+
+    def extract_task(**kwargs):
+        print("T1: Extracting raw data from source database...")
+        # Push dynamic metadata (e.g. ingested batch row count) to XCom
+        kwargs['ti'].xcom_push(key='row_count', value=540000)
+
+    def transform_task(**kwargs):
+        ti = kwargs['ti']
+        # Pull context from T1 safely
+        count = ti.xcom_pull(task_ids='t1_extract', key='row_count')
+        print(f"T2: Transforming {count} records...")
+
+    def promote_task(**kwargs):
+        print("T3: Promoting transformed data to production Gold layer...")
+
+    def cleanup_resources(**kwargs):
+        print("T4: Tearing down temporary staging schemas & ephemeral compute...")
+
+    t1 = PythonOperator(task_id='t1_extract', python_callable=extract_task)
+    t2 = PythonOperator(task_id='t2_transform', python_callable=transform_task)
+    t3 = PythonOperator(task_id='t3_promote', python_callable=promote_task)
+    
+    # Teardown task runs regardless of upstream success or failure
+    t_clean = PythonOperator(
+        task_id='t4_cleanup', 
+        python_callable=cleanup_resources,
+        trigger_rule=TriggerRule.ALL_DONE
+    )
+
+    # Strict sequential dependency definition
+    t1 >> t2 >> t3 >> t_clean
+```
+- **Time Complexity:** $O(T_1 + T_2 + T_3)$ linear execution.
+- **Space Complexity:** $O(1)$ scheduler metadata footprint.
+
+#### Engineering Implications & Production Pitfalls
+1. **The XCom Megabyte Explosion:** Airflow stores XCom return values in its backend metadata database (Postgres / MySQL). Never pass entire DataFrames, CSV blobs, or huge JSON dictionaries through XCom! Pass only lightweight metadata pointers (e.g. S3 file URIs or row counts). Passing $>10	ext{MB}$ payloads locks the Airflow scheduler database.
+2. **`depends_on_past` Deadlocks:** Setting `depends_on_past=True` means today's run cannot start until yesterday's run succeeds. If an engineer forgets to clear or resolve a single failed run from 3 weeks ago, all future scheduled DAG runs freeze indefinitely.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [12. Orchestration: Airflow & dbt: Airflow DAG Architecture](../12_orchestration_airflow_and_dbt.md#1-apache-airflow-internals-and-execution-runtime)*
+
+---
+
+### Q56. Upstream Dependency Cascade & Critical Path Delay Propagation
+**Topic Covered:** Pipeline Dependency Chains, Critical Path Analysis, Sensor Deadlocks & Pool Starvation  
+**Question:** Pipeline A depends on Pipeline B, and Pipeline B depends on Pipeline C ($C 	o B 	o A$). Pipeline C suffers a major performance degradation. Why can Pipeline A miss its SLA even if its own internal transformations run at blazing speed? How do you prevent cascade failures?
+
+#### Definition & Core Concepts
+In enterprise data platforms, data marts ($A$) consume transformed dimensional models ($B$), which consume ingested raw tables ($C$).
+When upstream Pipeline $C$ slows down:
+1. **Critical Path Propagation:** The total wall-clock completion time of Pipeline $A$ is bounded by the sum of its serial dependency chain:
+   $$	ext{Completion Time}_A = T_{	ext{start}} + 	ext{Duration}_C + 	ext{Duration}_B + 	ext{Duration}_A$$
+   Even if $	ext{Duration}_A$ is only 5 minutes, if $	ext{Duration}_C$ explodes from 20 minutes to 4 hours, Pipeline $A$ will miss its 6:00 AM SLA by over 3 hours.
+2. **Airflow Sensor Deadlocks & Pool Starvation:**
+   If Pipeline $A$ waits for Pipeline $B$ using an `ExternalTaskSensor` configured in default **`mode='poke'`**, the sensor worker thread blocks an Airflow worker slot continuously for 4 hours! With multiple sensor tasks waiting simultaneously, all worker pool slots are exhausted (`Pool Starvation`). Other unrelated pipelines across the company cannot find an available worker slot and freeze.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph CascadeDelay ["Dependency Delay Propagation"]
+        C["Pipeline C (Raw Ingestion): Explodes from 20m -> 240m (4 Hours!)"] --> B["Pipeline B (Silver Cleansing): Starts 3.5 Hours Late!"]
+        B --> A["Pipeline A (Gold Executive Mart): Transformations take 5 min, but misses SLA by 3 hours!"]
+    end
+
+    subgraph SensorDeadlock ["Worker Pool Starvation Disaster (mode='poke')"]
+        SensorA["Sensor A (Waiting for B): Consumes Worker Slot 1"]
+        SensorB["Sensor B (Waiting for C): Consumes Worker Slot 2"]
+        SensorOther["Sensor X (Waiting): Consumes Worker Slot 3"]
+        Exhaustion["🚨 Airflow Worker Pool (Capacity: 3/3 FULL)<br/>Zero slots available! Entire company DAG execution freezes!"]
+        SensorA & SensorB & SensorOther --> Exhaustion
+    end
+
+    style CascadeDelay fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style SensorDeadlock fill:#7f1d1d,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+```
+
+#### Production Architectural Solution: Reschedule Mode & Data Contracts
+```python
+from airflow.sensors.external_task import ExternalTaskSensor
+from datetime import timedelta
+
+# Best Practice: Always use mode='reschedule' for external dependency sensors
+wait_for_upstream_silver = ExternalTaskSensor(
+    task_id='wait_for_pipeline_b',
+    external_dag_id='pipeline_b_silver_cleansing',
+    external_task_id='promote_to_silver',
+    # mode='reschedule' releases the worker slot between checks!
+    mode='reschedule',
+    poke_interval=180,           # Check every 3 minutes
+    timeout=60 * 60 * 4,         # Timeout after 4 hours
+    soft_fail=False              # Mark task as failed if timeout exceeded
+)
+```
+
+#### Architectural Defenses:
+1. **Sensor `reschedule` Mode:** Never use `mode='poke'` for long waits. `mode='reschedule'` frees the worker slot back to the pool and sleeps in the database until the next check.
+2. **Data Contracts & SLA Envelopes:** Enforce strict SLAs with upstream teams. If Pipeline $C$ misses its 2:00 AM SLA watermark, trigger an immediate alert, bypass the real-time wait, and run Pipeline $A$ using the previous day's snapshot with a "Stale Data" disclaimer on executive dashboards.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [12. Orchestration: Airflow & dbt: Orchestration Anti-Patterns](../12_orchestration_airflow_and_dbt.md#2-advanced-dag-authoring--best-practices)*
+
+---
+
+### Q57. Reusable Metadata-Driven ETL Framework with Multi-Source Ingestion & Dynamic Validation
+**Topic Covered:** Metadata-Driven Architecture, Dynamic DAG Generation, Rule Engines & Factory Patterns  
+**Question:** How would you build a reusable, configuration-driven ETL framework supporting multiple heterogeneous data sources (RDBMS, S3, APIs) with pluggable validation rules without writing custom pipeline code for every table?
+
+#### Definition & Core Concepts
+In high-scale enterprise environments with thousands of tables, hardcoding a separate pipeline for each entity is an unmaintainable anti-pattern. A **Metadata-Driven ETL Framework** decouples pipeline orchestration logic from business definitions:
+1. **Configuration Store:** Ingestion rules, source schemas, watermarks, and target tables are defined in declarative YAML/JSON files or a database control catalog.
+2. **Reader & Writer Abstractions (Factory Pattern):** A generalized engine dynamically instantiates connectors (Postgres, Oracle, S3, REST) based on configuration.
+3. **Pluggable Quality Rules Engine:** Declarative assertion checks (e.g. `not_null`, `unique`, `regex_match`, `range_check`) are evaluated dynamically before table promotion.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    Config["📄 Metadata Config (YAML / DB Catalog):<br/>- Source: PostgreSQL<br/>- Target: Delta Lake<br/>- Rules: [not_null(id), min_val(amount, 0)]"] --> Engine["🚀 Reusable Ingestion Engine"]
+    
+    subgraph EngineInternals ["Engine Processing Lifecycle"]
+        Factory["1. Connector Factory: Instantiates JDBC / S3 Reader"]
+        Ingest["2. Chunked Extraction & Staging"]
+        Validator["3. Dynamic Rule Validator: Evaluates Assertion Matrix"]
+        Router{"All Validations Passed?"}
+        Factory --> Ingest --> Validator --> Router
+    end
+
+    Router -- "Pass" --> Target["4a. Idempotent MERGE into Target Silver Table"]
+    Router -- "Fail" --> Quarantine["4b. Route Poison Records to Quarantine DLQ"]
+
+    style Config fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style EngineInternals fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style Target fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Quarantine fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+```
+
+#### Production Implementation / Code Solution
+```python
+from typing import Dict, Any, List
+import yaml
+
+# Sample Metadata Configuration Schema (config/tables/orders.yaml)
+CONFIG_YAML = """
+table_name: fact_orders
+source:
+  type: postgres
+  connection_id: pg_sales_prod
+  query: "SELECT order_id, customer_id, amount, status, updated_at FROM orders WHERE updated_at >= '{watermark}'"
+target:
+  format: delta
+  path: "abfss://lakehouse@storage.dfs.core.windows.net/silver/fact_orders"
+  primary_keys: ["order_id"]
+quality_rules:
+  - column: order_id
+    rule: not_null
+  - column: amount
+    rule: positive_number
+"""
+
+class ReusableETLEngine:
+    """Executes generic, configuration-driven extraction, validation, and loading."""
+    def __init__(self, config_dict: Dict[str, Any]):
+        self.config = config_dict
+
+    def validate_dataset(self, df):
+        """Applies configured quality rules dynamically."""
+        for rule_def in self.config.get("quality_rules", []):
+            col_name = rule_def["column"]
+            rule_type = rule_def["rule"]
+            
+            if rule_type == "not_null":
+                null_count = df.filter(f"{col_name} IS NULL").count()
+                if null_count > 0:
+                    raise ValueError(f"Quality Gate Failed: {null_count} nulls in {col_name}")
+            elif rule_type == "positive_number":
+                neg_count = df.filter(f"{col_name} <= 0").count()
+                if neg_count > 0:
+                    raise ValueError(f"Quality Gate Failed: {neg_count} non-positive values in {col_name}")
+        print("All data quality validation checks passed successfully.")
+
+    def run_pipeline(self, watermark: str):
+        print(f"Executing dynamic pipeline for {self.config['table_name']} from watermark {watermark}...")
+        # Step 1: Extract data via connector factory
+        # Step 2: Validate via rules engine
+        # Step 3: Write idempotently to Delta Lake
+```
+- **Time Complexity:** $O(N)$ single pass extraction and validation.
+- **Space Complexity:** $O(1)$ configuration memory footprint.
+
+#### Engineering Implications & Production Pitfalls
+1. **Dynamic DAG Compilation Overhead in Airflow:** If using dynamic DAG generation from 1,000 YAML files, avoid parsing all YAML files on every Airflow scheduler loop! The scheduler parses Python files every 30 seconds; parsing 1,000 files in Python freezes the scheduler process. Pre-generate Python DAG files or cache configuration in memory.
+2. **Extensibility:** Use established frameworks like **Great Expectations** or **Soda Core** for the validation engine rather than inventing custom regex engines.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [10. Data Pipeline Design & Ingestion: Metadata-Driven Frameworks](../10_data_pipeline_design_and_ingestion.md#4-metadata-driven-ingestion-frameworks)*
+
+---
+
+### Q58. Relational Source (PostgreSQL) 90% CPU Spike During Ingestion: Diagnostic Playbook
+**Topic Covered:** OLTP Source Protection, Query Optimization, Connection Pooling & Read Replica Routing  
+**Question:** During peak ingestion, your ETL batch query causes the source PostgreSQL database CPU to surge to 90%, triggering alerts from the application team. What would you check first before scaling the database or adding replicas?
+
+#### Definition & Core Concepts
+Analytical batch queries running against production OLTP databases can degrade transactional performance. When a source PostgreSQL instance reaches 90% CPU during ETL:
+1. **Missing Index on Incremental Watermark:** The extraction runs `WHERE updated_at >= $watermark`. If `updated_at` lacks an index, PostgreSQL executes a **Sequential Scan (`Seq Scan`)**, reading hundreds of gigabytes of disk pages into buffer cache and thrashing CPU cores for every extraction!
+2. **Table Bloat & Stale Statistics:** High-churn tables with dead tuples cause Postgres to scan dead row versions. Run `VACUUM ANALYZE` to update query planner statistics.
+3. **Unbounded / Non-Chunked Extraction:** Attempting to extract 10,000,000 rows in a single monolithic query saturates memory and locks workers. Use keyset chunking (`WHERE id BETWEEN 1 AND 50000`).
+4. **Read-Only Replica Routing:** Production ETL should **never** query the primary write master. Route analytical queries to an asynchronous physical streaming read replica (`hot_standby`).
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    Alert["🚨 PostgreSQL CPU Spike: 90% during ETL Ingestion Run"] --> Step1["1. Identify Offending Query via pg_stat_activity"]
+    Step1 --> Step2["2. Run EXPLAIN (ANALYZE, BUFFERS) on Extraction SQL"]
+    
+    Step2 --> CheckScan{"Sequential Scan on Millions of Rows?"}
+    CheckScan -- "Yes: Missing Index" --> Fix1["Fix 1: CREATE INDEX CONCURRENTLY ON orders(updated_at);<br/>Swaps 15-minute Seq Scan for 200ms Index Scan!"]
+    CheckScan -- "No: Index Used" --> CheckReplica{"Querying Primary Write Master?"}
+
+    CheckReplica -- "Yes: Production Write DB" --> Fix2["Fix 2: Point Connection String to Read-Only Streaming Replica"]
+    CheckReplica -- "No: On Replica" --> Fix3["Fix 3: Implement Keyset Batch Chunking<br/>(Extract in 50k row slices to throttle CPU)"]
+
+    style Alert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style Step1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Fix1 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Fix2 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Fix3 fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+```
+
+#### Production Implementation / Diagnostic Playbook
+```sql
+-- Step 1: Identify active queries consuming high CPU and execution time
+SELECT 
+    pid,
+    usename,
+    client_addr,
+    state,
+    now() - query_start AS duration,
+    query
+FROM pg_stat_activity
+WHERE state = 'active'
+ORDER BY duration DESC;
+
+-- Step 2: Inspect execution plan of the incremental extraction query
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, customer_id, amount, updated_at
+FROM orders
+WHERE updated_at >= CURRENT_DATE - INTERVAL '1 day';
+
+-- Step 3: Resolution 1 - Create B-Tree index concurrently without locking production writes
+CREATE INDEX CONCURRENTLY idx_orders_updated_at 
+ON orders (updated_at);
+
+-- Step 4: Resolution 2 - Chunked Ingestion Query (Throttles CPU to <15%)
+SELECT order_id, customer_id, amount, updated_at
+FROM orders
+WHERE updated_at >= :last_watermark
+  AND order_id BETWEEN :chunk_start_id AND :chunk_end_id;
+```
+- **Time Complexity:** Replacing sequential scan $O(N)$ with index seek reduces query time from $O(N) 	o O(\log N + K)$ where $K$ is matching records.
+- **Space Complexity:** $O(1)$ additional CPU overhead once indexed.
+
+#### Engineering Implications & Production Pitfalls
+1. **The `CREATE INDEX` Table Lock Disaster:** Running `CREATE INDEX idx_orders ON orders(updated_at)` on a production database takes an `AccessExclusiveLock`, blocking all application writes and causing an immediate production outage! In production PostgreSQL, **always** specify `CREATE INDEX CONCURRENTLY`.
+2. **Replication Lag on Read Replicas:** If querying an asynchronous read replica, check replication lag (`pg_last_xact_replay_timestamp()`). If the replica is 10 minutes behind, extracting by `updated_at >= NOW() - 5m` will miss the most recent transactions.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [04. Database Internals & Performance: PostgreSQL Internals & Query Tuning](../04_database_internals_and_performance.md#1-storage-engine-internals-b-trees-lsm-trees--page-layouts)*
+
+---
+
+### Q59. Production Deployment Failure Rate Spike: Rollback vs Fix-Forward Decision Matrix
+**Topic Covered:** Release Engineering, Blast Radius Containment, MTTR & Data Platform Rollback Protocols  
+**Question:** A new data pipeline deployment causes task failure rates to spike from 0.1% to 4.0%. How do you decide whether to roll back immediately or attempt a fix-forward? What metrics and architectural blast radius drive that decision?
+
+#### Definition & Core Concepts
+In production data engineering, a spike in pipeline failure rates (from $0.1\%$ baseline to $4.0\%$) indicates that thousands of transactions or partition batches are failing or becoming corrupted.
+The decision between an **Immediate Automated Rollback** and a **Fix-Forward** is governed by Mean Time to Resolution (MTTR), Data Integrity Risk, and Downstream Blast Radius:
+1. **The Rollback Rule (Default Production Invariant):**
+   - **Roll Back Immediately IF:**
+     - Data corruption / duplicate mutations are occurring in production tables.
+     - Root cause is unknown or estimated fix-and-test time exceeds the consumer SLA window ($>30$ minutes).
+     - Downstream consumers (financial reporting, executive dashboards) rely on table accuracy.
+2. **The Fix-Forward Rule (Strict Exception):**
+   - **Fix Forward ONLY IF:**
+     - The root cause is trivial and verified (e.g. an incorrect environment variable, missing secret, or typo in a connection string).
+     - The fix can be committed, tested, and deployed in $<10$ minutes.
+     - The failure caused zero partial writes or corrupt data (pure read failure with clean retryability).
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    Alert["🚨 Failure Rate Spikes: 0.1% -> 4.0% Post-Deployment"] --> CheckData{"Did Failure Cause Corrupted / Duplicate Data Writes?"}
+    CheckData -- "YES: Data Integrity At Risk" --> Rollback["⛔ IMMEDIATE ROLLBACK!<br/>1. Revert Git release tag to previous stable commit<br/>2. Revert Delta tables using RESTORE VERSION AS OF<br/>3. Re-run previous version to fulfill SLA"]
+    
+    CheckData -- "NO: Pure Read / Connection Failure" --> CheckTime{"Can Root Cause be Fixed & Verified in < 15 Minutes?"}
+    CheckTime -- "NO: Complex Debugging Needed" --> Rollback
+    CheckTime -- "YES: Known Minor Fix" --> FixForward["⚡ FIX FORWARD:<br/>Apply patch, deploy hotfix, monitor failure metrics"]
+
+    style Alert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style Rollback fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style FixForward fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+```
+
+#### Production Incident Runbook: Delta Lake Automated Rollback
+```sql
+-- Step 1: Revert corrupted Delta Lake table to previous stable commit instantly
+-- Eliminates manual data repair and wipes out corrupt partition writes in seconds
+RESTORE TABLE gold.fact_orders TO VERSION AS OF 108;
+
+-- Step 2: Verify table restoration in transaction history
+DESCRIBE HISTORY gold.fact_orders;
+-- Shows commit operation: 'RESTORE' to version 108
+```
+
+#### Engineering Implications & Production Pitfalls
+1. **The Fix-Forward Sunk Cost Trap:** Under pressure during a Sev-1 outage, engineers often believe "the fix is just 5 minutes away." 45 minutes and 3 failed hotfix attempts later, the data warehouse is in a catastrophic state and downstream business operations have missed their morning regulatory window. Always enforce a **15-minute rollback hard deadline**.
+2. **Blue/Green Pipeline Deployments:** Prevent this dilemma entirely by deploying new pipelines in parallel (Blue/Green). Run the new version alongside the stable version in staging or shadow mode. Validate data diffs before routing production consumers to the new pipeline.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [14. Data Governance, Security, and Observability: Incident Management](../14_data_governance_security_and_observability.md#4-data-governance-regulations-gdpr-ccpa-hipaa--compliance)*

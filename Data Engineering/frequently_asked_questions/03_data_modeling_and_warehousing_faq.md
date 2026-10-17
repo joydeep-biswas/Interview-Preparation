@@ -45,6 +45,12 @@ A comprehensive, production-grade guide answering dimensional modeling, data war
     - [Q23. Microsoft Fabric Lakehouse vs Fabric Warehouse: Architectural Comparison](#q23-microsoft-fabric-lakehouse-vs-fabric-warehouse-architectural-comparison)
     - [Q24. End-to-End Database Design: Movie Ticket Booking Platform](#q24-end-to-end-database-design-movie-ticket-booking-platform)
     - [Q25. Schema Evolution & Safe Data Model Migration in Active Pipelines](#q25-schema-evolution--safe-data-model-migration-in-active-pipelines)
+16. **Physical Table Life Cycles, Payment Schemas & Data Discrepancy Diagnostics**
+    - [Q26. Transient Tables vs Temporary Tables in Enterprise Warehouses](#q26-transient-tables-vs-temporary-tables-in-enterprise-warehouses)
+    - [Q27. Swipe Payment API Relational Schema & Idempotent Ledger Design](#q27-swipe-payment-api-relational-schema--idempotent-ledger-design)
+    - [Q28. University Relational Database Schema Design (Colleges, Students, Professors)](#q28-university-relational-database-schema-design-colleges-students-professors)
+    - [Q29. High-Velocity Web Traffic Event Log Schema (Clicks/Swipes)](#q29-high-velocity-web-traffic-event-log-schema-clicksswipes)
+    - [Q30. Data Integrity Discrepancy Between Data Warehouse and Source Post-Incremental Load](#q30-data-integrity-discrepancy-between-data-warehouse-and-source-post-incremental-load)
 ---
 
 # 1. OLTP vs OLAP Architecture & Normalization vs Denormalization
@@ -1354,3 +1360,527 @@ sequenceDiagram
 4. **Automated Schema Evolution Guards:** In Spark/Delta pipelines, use `.option("mergeSchema", "true")` for additive changes, but enforce strict data contracts via Great Expectations or Delta Expectations to prevent silent corruptions.
 
 
+
+
+---
+
+# 16. Physical Table Life Cycles, Payment Schemas & Data Discrepancy Diagnostics
+
+---
+
+### Q26. Transient Tables vs Temporary Tables in Enterprise Warehouses
+**Topic Covered:** Physical Table Lifecycles, Session Scoping, Fail-Safe & Storage Costs  
+**Question:** Describe the differences between transient tables and temporary tables in modern cloud data warehouses (e.g., Snowflake, BigQuery, Databricks). When would you choose one over the other in production ETL pipelines?
+
+#### Definition & Core Concepts
+Cloud data warehouses manage table durability, session binding, and disaster recovery through distinct table types:
+1. **Temporary Tables (`CREATE TEMPORARY TABLE`):**
+   - **Lifecycle:** Bound strictly to the user connection / session that created them. Dropped automatically when the session terminates or cluster restarts.
+   - **Isolation:** Completely invisible to other concurrent sessions, avoiding naming collisions in parallel pipelines.
+   - **Disaster Recovery:** Zero Fail-Safe, 0–1 day Time Travel.
+   - **Use Case:** Intermediate ETL transformation staging, scratchpad joins, and session-scoped aggregations.
+2. **Transient Tables (`CREATE TRANSIENT TABLE`):**
+   - **Lifecycle:** Persistent across sessions until explicitly dropped (`DROP TABLE`). Visible to all authenticated users with grants.
+   - **Disaster Recovery:** Supports Time Travel (up to 1 day in Snowflake), but **NO Fail-Safe period** (the secondary 7-day disaster recovery tier maintained by cloud storage).
+   - **Cost Profile:** Substantially cheaper storage than permanent tables because no multi-terabyte 7-day Fail-Safe snapshots are maintained.
+   - **Use Case:** Daily ETL staging tables, ODS (Operational Data Stores), and intermediate medallion tables that can be easily recreated from source in the event of an outage.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph PermanentTable ["Permanent Table (Full Disaster Recovery)"]
+        P1["Visible: All Sessions"]
+        P2["Time Travel: 0 to 90 Days"]
+        P3["Fail-Safe: Mandatory 7 Days (Highest Storage Cost)"]
+    end
+
+    subgraph TransientTable ["Transient Table (Cost-Optimized ETL)"]
+        T1["Visible: All Sessions"]
+        T2["Time Travel: 0 to 1 Day"]
+        T3["Fail-Safe: NONE (Zero Fail-Safe Storage Fees)"]
+    end
+
+    subgraph TemporaryTable ["Temporary Table (Session Scratchpad)"]
+        Temp1["Visible: ONLY Creating Session"]
+        Temp2["Time Travel: 0 to 1 Day (Session Bound)"]
+        Temp3["Fail-Safe: NONE (Dropped Automatically on Disconnect)"]
+    end
+
+    style PermanentTable fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style TransientTable fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style TemporaryTable fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+```
+
+#### Production Implementation / Code Solution
+```sql
+-- Pattern 1: Session-scoped temporary table for ephemeral ELT deduplication
+CREATE OR REPLACE TEMPORARY TABLE staging_orders_session_scratch AS
+SELECT 
+    order_id,
+    customer_id,
+    amount,
+    order_timestamp,
+    ROW_NUMBER() OVER(PARTITION BY order_id ORDER BY order_timestamp DESC) as rn
+FROM raw_orders_stream
+WHERE order_date = CURRENT_DATE();
+
+-- Pattern 2: Multi-step ETL persistent transient table for cross-task Airflow pipelines
+CREATE OR REPLACE TRANSIENT TABLE raw_ods.stg_orders_transient (
+    order_id VARCHAR(64) NOT NULL,
+    customer_id VARCHAR(64) NOT NULL,
+    amount DECIMAL(18, 4),
+    order_timestamp TIMESTAMP_NTZ,
+    ingestion_batch_id VARCHAR(128)
+)
+DATA_RETENTION_TIME_IN_DAYS = 1; -- 1 Day Time Travel, 0 Days Fail-Safe
+
+-- Atomic merge from transient staging into production permanent warehouse table
+MERGE INTO analytics_gold.fact_orders tgt
+USING (SELECT * FROM raw_ods.stg_orders_transient WHERE ingestion_batch_id = 'BATCH_20241017') src
+ON tgt.order_id = src.order_id
+WHEN MATCHED THEN 
+    UPDATE SET tgt.amount = src.amount, tgt.updated_at = CURRENT_TIMESTAMP()
+WHEN NOT MATCHED THEN 
+    INSERT (order_id, customer_id, amount, created_at)
+    VALUES (src.order_id, src.customer_id, src.amount, src.order_timestamp);
+```
+- **Time Complexity:** $O(1)$ DDL allocation overhead. Data ingestion into transient tables mirrors permanent table throughput without Fail-Safe snapshotting.
+- **Space Complexity:** Saves up to 40%–60% of storage cost compared to permanent tables with heavy churn (eliminating 7-day Fail-Safe history).
+
+#### Engineering Implications & Production Pitfalls
+1. **The Fail-Safe Cost Trap on Large Churning Tables:** If you truncate and reload a 10 TB permanent table daily, Snowflake retains 10 TB in Time Travel plus 70 TB in 7-day Fail-Safe! The storage bill explodes. Switching daily staging tables to `TRANSIENT` saves tens of thousands of dollars monthly.
+2. **Session Disconnection in Microservice Orchestration:** If using ADF, Airflow, or dbt where each task opens an independent connection or executes across separate worker nodes, a `TEMPORARY TABLE` created in Task 1 will **not exist in Task 2**. For multi-activity DAGs, always use `TRANSIENT` tables scoped with a unique pipeline execution run ID.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Storage Formats & Physical Design](../06_data_architecture_and_modeling.md#2-dimensional-modeling-deep-dive-kimball-vs-inmon-vs-data-vault-20)*
+
+---
+
+### Q27. Swipe Payment API Relational Schema & Idempotent Ledger Design
+**Topic Covered:** Financial Ledger Modeling, Idempotency Keys, Double-Entry Bookkeeping & POS States  
+**Question:** Explain how you would model a card-present “swipe payment” API in a relational database. Detail the tables, constraints, transaction lifecycle, and double-entry ledger design.
+
+#### Definition & Core Concepts
+Modeling card-present (Point of Sale / POS) payments requires zero loss tolerance, strict idempotency, auditability, and double-entry accounting invariants:
+1. **Authorization vs. Capture:** In swipe transactions, an **Authorization** places an immediate hold on the customer's credit limit; **Capture/Settlement** clears the funds days later. These are distinct state changes and must not overwrite historical states.
+2. **Idempotency Keys:** Network retries from POS terminals must never double-charge. A unique, client-generated `idempotency_key` guarantees that repeated requests return the original authorization response without creating a duplicate debit.
+3. **Double-Entry Bookkeeping:** Money cannot be created or destroyed. Every transaction must consist of balanced debits and credits across financial accounts:
+   $$\sum 	ext{Debits} = \sum 	ext{Credits}$$
+
+#### Visual Flow
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as 💳 Customer / POS Terminal
+    participant API as 🚀 Payment Gateway API
+    participant DB as 🗄️ Relational Core (Postgres/Spanner)
+    participant Ledger as 📚 Double-Entry Ledger
+
+    Customer->>API: POST /v1/payments/swipe (idempotency_key="pos_terminal_942_tx_881")
+    API->>DB: Check idempotency_key in payment_intents table
+    alt Key Exists
+        DB-->>API: Return existing payment_intent (Status: AUTHORIZED)
+        API-->>Customer: 200 OK (Cached Response)
+    else New Request
+        API->>DB: INSERT payment_intent (Status: PENDING)
+        API->>API: Execute Card Network Handshake (Visa/Mastercard)
+        API->>DB: UPDATE payment_intent (Status: AUTHORIZED)
+        API->>Ledger: INSERT journal_entry & 2 ledger_lines (Debit Customer Hold, Credit Clearing)
+        API-->>Customer: 201 Created (Authorization Code: "AUTH77281")
+    end
+```
+
+#### Production Implementation / Code Solution
+```sql
+-- 1. Payment Intents Table: Enforces terminal idempotency and POS hardware audit
+CREATE TABLE payment_intents (
+    intent_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    idempotency_key VARCHAR(128) NOT NULL UNIQUE,  -- Prevents duplicate terminal charges
+    terminal_id VARCHAR(64) NOT NULL,
+    merchant_id VARCHAR(64) NOT NULL,
+    card_token VARCHAR(128) NOT NULL,              -- Tokenized PAN (Strict PCI-DSS compliance)
+    amount DECIMAL(18, 4) NOT NULL CHECK (amount > 0),
+    currency_code CHAR(3) NOT NULL,
+    status VARCHAR(32) NOT NULL CHECK (status IN ('PENDING', 'AUTHORIZED', 'CAPTURED', 'VOIDED', 'FAILED')),
+    auth_code VARCHAR(32),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Financial Accounts Table (Customer, Merchant Escrow, Interchange Clearing)
+CREATE TABLE ledger_accounts (
+    account_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_name VARCHAR(128) NOT NULL,
+    account_type VARCHAR(32) NOT NULL CHECK (account_type IN ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE')),
+    currency_code CHAR(3) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- 3. Double-Entry Journal Entries (Transaction Header)
+CREATE TABLE journal_entries (
+    entry_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    intent_id UUID NOT NULL REFERENCES payment_intents(intent_id),
+    posted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    description VARCHAR(255) NOT NULL
+);
+
+-- 4. Balanced Ledger Postings (Lines must sum to zero)
+CREATE TABLE ledger_postings (
+    posting_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entry_id UUID NOT NULL REFERENCES journal_entries(entry_id),
+    account_id UUID NOT NULL REFERENCES ledger_accounts(account_id),
+    -- Positive for Debit, Negative for Credit (or explicit debit/credit columns)
+    amount DECIMAL(18, 4) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Defensive Check: Verify zero-sum invariant across every journal entry
+CREATE OR REPLACE FUNCTION verify_journal_balance() 
+RETURNS TRIGGER AS $$
+DECLARE
+    entry_sum DECIMAL(18, 4);
+BEGIN
+    SELECT COALESCE(SUM(amount), 0) INTO entry_sum
+    FROM ledger_postings
+    WHERE entry_id = NEW.entry_id;
+
+    -- Enforce zero-sum invariant
+    IF entry_sum <> 0 THEN
+        RAISE EXCEPTION 'Double-entry violation: Journal entry % debits and credits do not balance (sum = %)', NEW.entry_id, entry_sum;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+- **Time Complexity:** $O(1)$ indexed lookup on `idempotency_key` via B-Tree index; $O(1)$ transaction commit across normalized tables.
+- **Space Complexity:** $O(T)$ where $T$ is the number of financial transactions (roughly $1	ext{ KB}$ per transaction across audit tables).
+
+#### Engineering Implications & Production Pitfalls
+1. **PCI-DSS Compliance Invariant:** Never store raw Primary Account Numbers (PAN), CVVs, or unencrypted magnetic stripe track data in relational tables. Store only PCI-tokenized references (`card_token`) provided by the certified payment HSM/vault.
+2. **Distributed Transaction Contention:** High-volume merchants process hundreds of swipes per second. Updating an account balance column directly (`UPDATE accounts SET balance = balance + amount`) creates massive row-level write lock contention (`RowExclusiveLock`). Always record ledger postings as immutable append-only events, computing balance on-the-fly or via periodic asynchronous snapshotting.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Relational Normalization & Event Ledgers](../06_data_architecture_and_modeling.md#1-foundations-of-data-modeling-relational-vs-dimensional)*
+
+---
+
+### Q28. University Relational Database Schema Design (Colleges, Students, Professors)
+**Topic Covered:** 3NF Normalization, Composite Primary Keys, Foreign Keys & Cardinality Constraints  
+**Question:** Design an optimal, normalized relational database schema for a university system encompassing colleges, departments, students, professors, and course enrollments.
+
+#### Definition & Core Concepts
+A university system models complex many-to-many ($M:N$) relationships, hierarchical department ownership, and temporal enrollment states.
+To achieve Third Normal Form (3NF) without data redundancy:
+1. **Hierarchy:** A College owns multiple Departments ($1:N$). A Department employs multiple Professors ($1:N$).
+2. **Courses & Offerings:** A Course is a catalog template ($1:N$ to Sections/Offerings). A specific Section is taught by a Professor in a given semester ($1:N$).
+3. **Enrollments:** A Student enrolls in multiple Course Sections, and each Section contains multiple Students ($M:N$). This requires a bridge/junction table (`enrollments`) with a composite key or unique constraint on `(student_id, section_id)`.
+
+#### Visual Flow
+```mermaid
+erDiagram
+    COLLEGES ||--o{ DEPARTMENTS : contains
+    DEPARTMENTS ||--o{ PROFESSORS : employs
+    DEPARTMENTS ||--o{ COURSES : offers
+    COURSES ||--o{ SECTIONS : schedules
+    PROFESSORS ||--o{ SECTIONS : instructs
+    STUDENTS ||--o{ ENROLLMENTS : registers
+    SECTIONS ||--o{ ENROLLMENTS : fulfills
+
+    COLLEGES {
+        uuid college_id PK
+        string name
+        string dean_name
+    }
+    DEPARTMENTS {
+        uuid department_id PK
+        uuid college_id FK
+        string department_name
+    }
+    PROFESSORS {
+        uuid professor_id PK
+        uuid department_id FK
+        string full_name
+        string email
+    }
+    COURSES {
+        uuid course_id PK
+        uuid department_id FK
+        string course_code
+        int credit_hours
+    }
+    SECTIONS {
+        uuid section_id PK
+        uuid course_id FK
+        uuid professor_id FK
+        string semester
+        int academic_year
+    }
+    STUDENTS {
+        uuid student_id PK
+        uuid major_department_id FK
+        string full_name
+        date enrollment_date
+    }
+    ENROLLMENTS {
+        uuid enrollment_id PK
+        uuid student_id FK
+        uuid section_id FK
+        string letter_grade
+        timestamp enrolled_at
+    }
+```
+
+#### Production Implementation / Code Solution
+```sql
+-- 1. Colleges Dimension
+CREATE TABLE colleges (
+    college_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    college_name VARCHAR(128) NOT NULL UNIQUE,
+    campus_location VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Academic Departments
+CREATE TABLE departments (
+    department_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    college_id UUID NOT NULL REFERENCES colleges(college_id) ON DELETE RESTRICT,
+    department_name VARCHAR(128) NOT NULL,
+    department_code VARCHAR(10) NOT NULL UNIQUE, -- e.g., 'CS', 'EE', 'MATH'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Faculty / Professors
+CREATE TABLE professors (
+    professor_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    department_id UUID NOT NULL REFERENCES departments(department_id),
+    full_name VARCHAR(128) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    tenure_status VARCHAR(32) NOT NULL CHECK (tenure_status IN ('TENURED', 'TENURE_TRACK', 'ADJUNCT', 'VISITING')),
+    hire_date DATE NOT NULL
+);
+
+-- 4. Course Catalog (Template)
+CREATE TABLE courses (
+    course_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    department_id UUID NOT NULL REFERENCES departments(department_id),
+    course_code VARCHAR(16) NOT NULL UNIQUE, -- e.g., 'CS-401'
+    title VARCHAR(255) NOT NULL,
+    credit_hours SMALLINT NOT NULL CHECK (credit_hours BETWEEN 1 AND 6)
+);
+
+-- 5. Course Sections (Specific semester offering taught by a faculty member)
+CREATE TABLE course_sections (
+    section_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id UUID NOT NULL REFERENCES courses(course_id) ON DELETE RESTRICT,
+    professor_id UUID NOT NULL REFERENCES professors(professor_id),
+    semester VARCHAR(16) NOT NULL CHECK (semester IN ('FALL', 'SPRING', 'SUMMER', 'WINTER')),
+    academic_year SMALLINT NOT NULL CHECK (academic_year >= 2000),
+    max_capacity SMALLINT NOT NULL DEFAULT 40,
+    CONSTRAINT uq_course_section_semester UNIQUE (course_id, section_id, semester, academic_year)
+);
+
+-- 6. Students
+CREATE TABLE students (
+    student_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    major_department_id UUID REFERENCES departments(department_id),
+    full_name VARCHAR(128) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    enrollment_date DATE NOT NULL,
+    academic_standing VARCHAR(32) DEFAULT 'ACTIVE'
+);
+
+-- 7. Bridge/Junction: Student Course Enrollments
+CREATE TABLE enrollments (
+    enrollment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
+    section_id UUID NOT NULL REFERENCES course_sections(section_id) ON DELETE RESTRICT,
+    letter_grade CHAR(2) CHECK (letter_grade IN ('A+', 'A', 'B', 'C', 'D', 'F', 'W', 'IP')),
+    enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Prevent duplicate registration by the same student in the same section
+    CONSTRAINT uq_student_section UNIQUE (student_id, section_id)
+);
+```
+- **Time Complexity:** $O(1)$ lookups via primary and foreign key indexes (`B-Tree`).
+- **Space Complexity:** $O(S + E)$ where $S$ is students and $E$ is enrollments.
+
+#### Engineering Implications & Production Pitfalls
+1. **Cascading Delete Hazards (`ON DELETE CASCADE`):** Applying `ON DELETE CASCADE` on `departments` or `courses` risks accidentally wiping out hundreds of historical course transcripts when a department reorganizes. In academic and financial systems, always use `ON DELETE RESTRICT` on master dimensions and implement soft deletion (`is_deleted = TRUE`).
+2. **Surrogate Keys vs Composite Keys:** While `(student_id, section_id)` uniquely identifies an enrollment, using a surrogate `enrollment_id UUID PRIMARY KEY` with a `UNIQUE (student_id, section_id)` constraint simplifies downstream foreign key relationships (e.g. `assignment_submissions` linking to `enrollment_id`).
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Relational Foundations & Normal Forms](../06_data_architecture_and_modeling.md#1-foundations-of-data-modeling-relational-vs-dimensional)*
+
+---
+
+### Q29. High-Velocity Web Traffic Event Log Schema (Clicks/Swipes)
+**Topic Covered:** Telemetry Schemas, Partitioning Strategies, Columnar Encoding & Write Scalability  
+**Question:** Design an optimal schema to store high-velocity event logs (such as clicks, swipes, and impressions) for a web platform generating 50,000 events per second.
+
+#### Definition & Core Concepts
+High-velocity web traffic ($50,000	ext{ events/sec} pprox 4.32	ext{ billion events/day}$) breaks standard row-oriented relational databases (e.g. Postgres) due to WAL saturation, page lock contention, and index maintenance overhead.
+The optimal architectural design employs:
+1. **Append-Only Columnar Storage:** Use Parquet / Delta Lake / ClickHouse / Snowflake rather than row tables.
+2. **Coarse-Grained Temporal Partitioning:** Partition by `event_date` (`year/month/day`) to ensure each partition folder contains hundreds of megabytes (avoiding the small file problem).
+3. **Clustering / Liquid Clustering Keys:** Order rows within files by `(event_type, tenant_id, session_id)` to enable file pruning and min/max metadata skipping.
+4. **Semi-Structured Payload Isolation:** Extract top-level query filters (`event_type`, `user_id`, `device_os`, `url_path`) as typed columns, leaving dynamic event-specific attributes inside a compressed `JSON` / `VARIANT` column.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    Events["📱 Web Clients & Mobile Apps (50k Events/Sec)"] --> Broker["1. Ingestion Broker (Kafka / Event Hubs)"]
+    Broker --> StreamEngine["2. Spark Streaming / Auto Loader"]
+    StreamEngine --> DeltaTable["3. Partitioned Lakehouse Storage (Delta Lake / Parquet)"]
+
+    subgraph SchemaLayout ["Optimal Columnar Schema Architecture"]
+        Col1["event_timestamp (TimestampNTZ)"]
+        Col2["event_date (Date - Partition Key)"]
+        Col3["event_id (UUID / Hash)"]
+        Col4["user_id (String - Z-ORDER / Clustered)"]
+        Col5["event_name (String: 'click', 'swipe')"]
+        Col6["device_category (Low-cardinality enum)"]
+        Col7["properties_payload (VARIANT / JSON Compressed)"]
+    end
+
+    DeltaTable --> SchemaLayout
+
+    style Events fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Broker fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style StreamEngine fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style DeltaTable fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+```
+
+#### Production Implementation / Code Solution
+```sql
+-- Delta Lake / Databricks SQL Table Definition for High-Velocity Telemetry
+CREATE OR REPLACE TABLE telemetry_silver.user_interaction_events (
+    event_id STRING NOT NULL,
+    event_timestamp TIMESTAMP NOT NULL,
+    event_date DATE NOT NULL GENERATED ALWAYS AS (CAST(event_timestamp AS DATE)),
+    event_name STRING NOT NULL,          -- e.g. 'ui_button_click', 'feed_swipe_left'
+    user_id STRING,                      -- Nullable for unauthenticated visitors
+    session_id STRING NOT NULL,
+    client_ip STRING,
+    device_os STRING,                   -- 'iOS', 'Android', 'Windows', 'MacOS'
+    app_version STRING,
+    page_url STRING,
+    -- Flexible payload for event-specific attributes (JSON dictionary)
+    event_payload VARIANT,
+    -- Pipeline ingestion metadata
+    ingestion_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+)
+USING DELTA
+PARTITIONED BY (event_date)
+CLUSTER BY (event_name, user_id, session_id); -- Delta Liquid Clustering for query pruning
+
+-- Querying the optimized event log with sub-second response times
+SELECT 
+    event_name,
+    device_os,
+    COUNT(*) as total_interactions,
+    COUNT(DISTINCT user_id) as unique_users,
+    -- Extracting nested JSON payload attributes efficiently
+    AVG(CAST(event_payload:swipe_velocity_px AS DOUBLE)) as avg_swipe_velocity
+FROM telemetry_silver.user_interaction_events
+WHERE event_date = CURRENT_DATE()
+  AND event_name = 'feed_swipe_left'
+GROUP BY event_name, device_os;
+```
+- **Time Complexity:** Ingestion runs at $O(1)$ append; analytical queries achieve $O(\log F)$ partition and metadata pruning where $F$ is file count.
+- **Space Complexity:** Columnar Snappy/ZSTD compression reduces raw JSON footprint by $80\%	ext{--}90\%$ ($50	ext{k events/sec}$ compresses from $4.3	ext{ TB/day}$ to $pprox 500	ext{ GB/day}$).
+
+#### Engineering Implications & Production Pitfalls
+1. **The Over-Partitioning Disaster:** Never partition by `event_timestamp` down to the hour or minute (e.g. `/year/month/day/hour/minute`). This generates millions of tiny 5KB files, overwhelming the cloud storage object catalog and killing Spark driver memory. Partition by `event_date` only, and cluster by user/session.
+2. **Schema Drift in JSON Payloads:** Mobile app updates frequently add or rename payload fields. Storing dynamic attributes in a typed `VARIANT` column allows schema evolution without requiring `ALTER TABLE ADD COLUMN` operations that risk breaking downstream analytical ingestion.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [07. File Formats and Storage: Parquet, ORC, Delta & Columnar Compression](../07_file_formats_and_storage.md#1-columnar-storage-mechanics-parquet--orc)*
+
+---
+
+### Q30. Data Integrity Discrepancy Between Data Warehouse and Source Post-Incremental Load
+**Topic Covered:** Data Reconciliation, Watermarking Skew, Soft Deletes & Uncommitted Transaction Anomalies  
+**Question:** After completing an incremental ETL load, the Data Warehouse and the source transactional system report different aggregate values (e.g., total daily revenue or active order counts). How could this discrepancy occur, and how do you systematically diagnose and fix it?
+
+#### Definition & Core Concepts
+Data reconciliation discrepancies between source OLTP databases and target OLAP warehouses are among the most critical production incidents in data engineering. They typically stem from 4 underlying mechanical root causes:
+1. **The Late-Arriving Update / In-Flight Transaction Phenomenon:**
+   The extraction query uses `WHERE updated_at >= $last_watermark`. If a long-running source transaction began at `10:00:00` with an `updated_at` of `10:00:00`, but did not commit until `10:05:01`, an incremental extraction running at `10:05:00` misses that row forever because the watermark advances past `10:05:00`.
+2. **Hard Deletes in Source Without CDC:**
+   Source applications executing `DELETE FROM orders WHERE order_id = 99` leave no audit trail. An incremental append or merge will never see the deletion, causing the Data Warehouse to retain phantom records and over-report revenue.
+3. **Timezone & Daylight Savings Offsets:**
+   The source database stores timestamps in local time (e.g., `EST`) while the warehouse converts or defaults to `UTC`, causing boundary sales to shift across date partitions.
+4. **Non-Deterministic Pipeline Joins:**
+   Joining against an unversioned dimensional table during extraction captures dimensional attributes that changed mid-flight, causing metric divergence.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    Alert["🚨 Metric Discrepancy: Source Total = $1,050,000 vs DW Total = $1,020,000 (-$30k)"] --> Step1["1. Quantify Discrepancy Granularity<br/>Is difference isolated to a specific hour, status, or tenant?"]
+    Step1 --> Step2{"2. Check for Hard Deletes"}
+    Step2 -- "Source Count < DW Count" --> HardDelete["Root Cause: Source hard-deleted rows without tombstone<br/>Solution: Enable CDC (Debezium/Goldengate) or Anti-Join audit"]
+    Step2 -- "Source Count > DW Count" --> Step3{"3. Audit In-Flight Transactions & Watermarks"}
+    Step3 -- "Timestamp Gap Found" --> WatermarkLag["Root Cause: Long-running transaction committed after watermark extracted<br/>Solution: High-watermark lookback window (buffer overlap)"]
+    Step3 -- "Counts Match, Revenue Differs" --> Step4["4. Precision / Multi-Currency Skew<br/>Float precision loss or stale exchange rate join"]
+
+    style Alert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    style Step1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style HardDelete fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style WatermarkLag fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style Step4 fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#fff
+```
+
+#### Production Implementation / Diagnostic Playbook
+```sql
+-- Step 1: Run bi-directional hash-diff reconciliation between source slice and warehouse
+-- (Executed via federated query or staged source snapshot)
+WITH source_slice AS (
+    SELECT 
+        order_id,
+        order_amount,
+        status,
+        updated_at,
+        MD5(CONCAT(order_id, '|', order_amount::TEXT, '|', status)) AS src_hash
+    FROM source_db.orders
+    WHERE updated_at >= '2024-10-16 00:00:00' AND updated_at < '2024-10-17 00:00:00'
+),
+warehouse_slice AS (
+    SELECT 
+        order_id,
+        order_amount,
+        status,
+        updated_at,
+        MD5(CONCAT(order_id, '|', order_amount::TEXT, '|', status)) AS dw_hash
+    FROM analytics_gold.fact_orders
+    WHERE order_date = '2024-10-16'
+)
+SELECT 
+    COALESCE(s.order_id, w.order_id) AS order_id,
+    s.order_amount AS source_amount,
+    w.order_amount AS warehouse_amount,
+    s.status AS source_status,
+    w.status AS warehouse_status,
+    CASE 
+        WHEN s.order_id IS NULL THEN 'PHANTOM_RECORD_IN_DW (Likely Hard Deleted in Source)'
+        WHEN w.order_id IS NULL THEN 'MISSING_FROM_DW (In-Flight Transaction or Watermark Skip)'
+        WHEN s.src_hash <> w.dw_hash THEN 'VALUE_MISMATCH (Partial Mutation or Float Precision)'
+    END AS discrepancy_root_cause
+FROM source_slice s
+FULL OUTER JOIN warehouse_slice w ON s.order_id = w.order_id
+WHERE s.src_hash IS NULL OR w.dw_hash IS NULL OR s.src_hash <> w.dw_hash;
+
+-- Step 2: Fix for Watermark Slippage: Implement Overlapping Watermark Window in ETL
+-- Extract with a 15-minute lookback buffer to catch committed in-flight transactions
+-- and rely on idempotent MERGE to eliminate duplicates
+SELECT * FROM source_orders
+WHERE updated_at >= (CAST(:last_watermark AS TIMESTAMP) - INTERVAL '15 minutes')
+  AND updated_at < :current_run_timestamp;
+```
+- **Time Complexity:** $O(S + W)$ hash-join reconciliation across source and target partition slices.
+- **Space Complexity:** $O(S + W)$ memory footprint in reconciliation jobs.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Dangerous Watermark Exact Match:** A naive incremental pattern runs `WHERE updated_at > :prev_max_watermark`. Never use exact boundary matching without a safety overlap. A 10-to-30 minute lookback window combined with an idempotent `MERGE INTO ... WHEN MATCHED THEN UPDATE` eliminates in-flight transaction dropouts completely.
+2. **Log-Based CDC as the Definitive Solution:** Incremental loads based on query timestamps (`updated_at`) are inherently fragile because they cannot track hard deletes or schema drops. Mission-critical platforms must deploy log-based Change Data Capture (Debezium, Fivetran, Qlik) that parses the database WAL / transaction log directly.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [14. Data Governance, Security, and Observability: Data Quality & Anomaly Detection](../14_data_governance_security_and_observability.md#2-data-observability-the-5-pillars)*

@@ -116,6 +116,11 @@ All questions are organized by **Recommended Chronological Study Order** across 
 
 
 ---
+68. **`[Medium]`** Cartesian Product Mechanics: What does `SELECT * FROM A, B` return when Table A has 10 rows and Table B has 20 rows? What happens if Table A is truncated? → [Solution](01_sql_faq.md#q68-cartesian-product-mechanics--empty-table-zero-multiplication)
+69. **`[Hard]`** How would you calculate a rolling seven-day moving average of daily revenue when some dates are completely missing from the transactions table? → [Solution](01_sql_faq.md#q69-rolling-seven-day-average-with-missing-dates-calendar-spine--frame-semantics)
+70. **`[Medium]`** Write an SQL query using window functions to find the most recent designation and department of each employee from a historical job changes audit table. → [Solution](01_sql_faq.md#q70-most-recent-designation-per-employee-using-window-functions)
+71. **`[Hard]`** One business unit sees another unit’s confidential data in a downstream analytical report with no cache involved. What would you check first, and how would you resolve the incident? → [Solution](01_sql_faq.md#q71-cross-tenant-data-leakage-triage-in-analytical-reports-no-cache-involved)
+
 
 # **02. Python & Programming Concepts**
 *Companion Deep-Dive Guide: [`02_python_and_programming_faq.md`](02_python_and_programming_faq.md) (28 Questions & Production Solutions)*
@@ -156,6 +161,14 @@ All questions are organized by **Recommended Chronological Study Order** across 
 
 
 ---
+29. **`[Medium]`** Merge overlapping intervals and analyze time and space complexity under CPython Timsort. → [Solution](02_python_and_programming_faq.md#q16-merge-overlapping-intervals--complexity-analysis)
+30. **`[Medium]`** Implement a function to find the length of the longest substring without repeating characters using the two-pointer sliding window technique. → [Solution](02_python_and_programming_faq.md#q17-longest-substring-without-repeating-characters-sliding-window)
+31. **`[Medium]`** How would you find the first non-repeating element in an unbounded, continuous streaming series of transactions or tokens? → [Solution](02_python_and_programming_faq.md#q18-first-non-repeating-element-in-a-data-stream)
+32. **`[Medium]`** Detect a cycle in a pointer chain using Floyd's Tortoise and Hare algorithm and explain its application to DAG workflow scheduling. → [Solution](02_python_and_programming_faq.md#q19-linked-list-cycle-detection-floyds-tortoise-and-hare-algorithm)
+33. **`[Medium]`** Given an $m 	imes n$ 2D binary grid, count the number of connected components (Number of Islands) using iterative BFS. → [Solution](02_python_and_programming_faq.md#q20-number-of-islands-boolean-matrix-connected-components-via-bfsdfs)
+34. **`[Medium]`** Given an integer array, return the $K$ most frequent elements using Min-Heap vs Bucket Sort complexity trade-offs. → [Solution](02_python_and_programming_faq.md#q21-top-k-frequent-elements-in-an-array-min-heap-vs-quickselect)
+35. **`[Easy]`** In Python, how do you extract unique values from a dictionary? Compare memory complexity between `set(d.values())` and `dict.fromkeys()`. → [Solution](02_python_and_programming_faq.md#q22-python-dictionary-unique-value-extraction-mechanics)
+
 
 # **03. Data Modeling & Warehousing**
 *Companion Deep-Dive Guide: [`03_data_modeling_and_warehousing_faq.md`](03_data_modeling_and_warehousing_faq.md) (25 Questions & Production Solutions)*
@@ -193,6 +206,12 @@ All questions are organized by **Recommended Chronological Study Order** across 
 
 
 ---
+26. **`[Medium]`** Describe the differences between transient tables and temporary tables in modern cloud data warehouses (Snowflake, Databricks). When should you choose each? → [Solution](03_data_modeling_and_warehousing_faq.md#q26-transient-tables-vs-temporary-tables-in-enterprise-warehouses)
+27. **`[Hard]`** Design an optimal relational schema for a card-present "swipe payment" API with idempotency keys, authorization/capture lifecycles, and double-entry ledger bookkeeping. → [Solution](03_data_modeling_and_warehousing_faq.md#q27-swipe-payment-api-relational-schema--idempotent-ledger-design)
+28. **`[Medium]`** Design a 3NF normalized relational schema for a university system encompassing colleges, departments, professors, courses, and student enrollments. → [Solution](03_data_modeling_and_warehousing_faq.md#q28-university-relational-database-schema-design-colleges-students-professors)
+29. **`[Hard]`** Design an optimal columnar schema to store high-velocity event logs (50,000 clicks/swipes per second) balancing write throughput and low-latency queries. → [Solution](03_data_modeling_and_warehousing_faq.md#q29-high-velocity-web-traffic-event-log-schema-clicksswipes)
+30. **`[Hard]`** After an incremental ETL load, the Data Warehouse and source system show different aggregate values. What root causes produce this discrepancy, and how do you triage it? → [Solution](03_data_modeling_and_warehousing_faq.md#q30-data-integrity-discrepancy-between-data-warehouse-and-source-post-incremental-load)
+
 
 # **04. Cloud & Distributed Systems**
 *Companion Deep-Dive Guide: [`04_cloud_and_distributed_systems_faq.md`](04_cloud_and_distributed_systems_faq.md) (16 Questions & Production Solutions)*
@@ -220,6 +239,11 @@ All questions are organized by **Recommended Chronological Study Order** across 
 16. **`[Expert]`** Suppose your pipeline needs to run across AWS and Azure together (multi-cloud). How would you design secure, performant, and cost-effective data federation? → [Solution](04_cloud_and_distributed_systems_faq.md#q10-multi-cloud-architecture-aws--azure-secure-federation)
 
 ---
+17. **`[Medium]`** What is the difference between Change Data Capture (CDC) and Change Data Tracking (CDT)? When should a data architect choose log-based CDC over SQL Server Change Tracking? → [Solution](04_cloud_and_distributed_systems_faq.md#q17-change-data-capture-cdc-vs-change-data-tracking-cdt-internals)
+18. **`[Medium]`** Compare Data Lake Storage (ADLS Gen2 / S3 with HNS) versus traditional flat Object/Blob Storage in big data architectures. → [Solution](04_cloud_and_distributed_systems_faq.md#q18-data-lake-storage-vs-raw-blob-storage-architectural-evaluation)
+19. **`[Hard]`** Your data pipeline depends sequentially on 5 upstream microservices, each offering a 99.9% uptime SLA. What is the mathematical compound pipeline availability, and how do you achieve 99.95%? → [Solution](04_cloud_and_distributed_systems_faq.md#q19-compound-upstream-sla-availability--distributed-system-reliability-analysis)
+20. **`[Hard]`** A downstream ingestion worker periodically crashes with `Connection reset` (`ECONNRESET`) on idle connections. What stateful firewall timeout causes this, and how do you resolve it? → [Solution](04_cloud_and_distributed_systems_faq.md#q20-intermittent-connection-reset-econnreset-on-idle-api-connections)
+
 
 # **05. Apache Spark & PySpark Architecture**
 *Companion Deep-Dive Guide: [`05_apache_spark_and_pyspark_faq.md`](05_apache_spark_and_pyspark_faq.md) (65 Questions & Production Solutions)*
@@ -299,6 +323,13 @@ All questions are organized by **Recommended Chronological Study Order** across 
 
 
 ---
+66. **`[Hard]`** What happens under the hood when a Spark Broadcast Join exceeds available executor or driver memory? How do you diagnose and prevent broadcast OOMs? → [Solution](05_apache_spark_and_pyspark_faq.md#q66-spark-broadcast-join-exceeding-executor-memory-failure-modes--safeguards)
+67. **`[Hard]`** Your distributed ETL lock has a 30-second TTL. A Spark job experiences a 40-second Stop-The-World GC pause. What happens when another worker acquires the lock, and how do fencing tokens prevent corruption? → [Solution](05_apache_spark_and_pyspark_faq.md#q67-distributed-lock-expiration--split-brain-hazard-during-long-spark-gc-pauses)
+68. **`[Hard]`** A Spark executor pod is OOMKilled on Kubernetes, but the Spark Web UI shows JVM heap usage was only 60%. Where is off-heap memory consumed, and how do you fix it? → [Solution](05_apache_spark_and_pyspark_faq.md#q68-kubernetes-oomkilled-executor-pod-with-low-jvm-heap-usage)
+69. **`[Medium]`** Compare `repartition()`, `coalesce()`, and `repartitionByRange()` in Spark: execution mechanics, shuffle implications, and production selection rules. → [Solution](05_apache_spark_and_pyspark_faq.md#q69-spark-repartition-vs-coalesce-vs-repartitionbyrange-execution-mechanics)
+70. **`[Medium]`** How would you deduplicate customer records arriving from two distinct sources (CRM and ERP) with conflicting addresses and timestamps using PySpark? → [Solution](05_apache_spark_and_pyspark_faq.md#q70-multi-source-customer-record-deduplication-across-crm-and-erp-in-pyspark)
+71. **`[Medium]`** Write a PySpark job to calculate the top 3 best-selling products by quantity sold in each geographical region from a fact sales DataFrame. → [Solution](05_apache_spark_and_pyspark_faq.md#q71-pyspark-regional-top-3-products-sold-window-ranking-live-coding)
+
 
 # **06. Databricks & Delta Lake**
 *Companion Deep-Dive Guide: [`06_databricks_and_delta_lake_faq.md`](06_databricks_and_delta_lake_faq.md) (32 Questions & Production Solutions)*
@@ -343,6 +374,9 @@ All questions are organized by **Recommended Chronological Study Order** across 
 
 
 ---
+33. **`[Hard]`** A Gold reporting table contains fewer records than expected. How would you systematically trace the discrepancy and locate missing records across Bronze, Silver, and Gold in Delta Lake? → [Solution](06_databricks_and_delta_lake_faq.md#q33-tracing-record-discrepancies-across-bronze-silver-and-gold-tables)
+34. **`[Medium]`** How would you execute one notebook from another in Databricks? Compare `dbutils.notebook.run()` versus Databricks Multi-Task Workflows for enterprise orchestration. → [Solution](06_databricks_and_delta_lake_faq.md#q34-executing-databricks-notebooks-programmatically-dbutilsnotebookrun-vs-databricks-workflows)
+
 
 # **07. Unity Catalog & Data Governance**
 *Companion Deep-Dive Guide: [`07_unity_catalog_faq.md`](07_unity_catalog_faq.md) (15 Questions & Production Solutions)*
@@ -478,6 +512,13 @@ All questions are organized by **Recommended Chronological Study Order** across 
 
 
 ---
+54. **`[Hard]`** Your ETL pipeline fails after writing 60% of records. Airflow retries the task and duplicates appear. How do you design and refactor the pipeline to be strictly idempotent? → [Solution](09_etl_data_pipelines_and_adf_faq.md#q54-making-etl-pipelines-idempotent-after-partial-failures-and-airflow-retries)
+55. **`[Medium]`** Make Airflow tasks T1, T2, and T3 execute strictly in order ($T_1 \to T_2 \to T_3$). How would you define dependencies, pass XCom context, and handle failures defensively? → [Solution](09_etl_data_pipelines_and_adf_faq.md#q55-strict-airflow-task-sequential-execution--failure-handling-t1--t2--t3)
+56. **`[Hard]`** Pipeline A depends on Pipeline B, which depends on Pipeline C. Pipeline C slows dramatically. Why can Pipeline A miss its SLA even if its own code runs fast, and how do you prevent sensor deadlocks? → [Solution](09_etl_data_pipelines_and_adf_faq.md#q56-upstream-dependency-cascade--critical-path-delay-propagation)
+57. **`[Hard]`** How would you build a reusable, configuration-driven ETL framework supporting heterogeneous data sources with pluggable validation rules without writing custom code per table? → [Solution](09_etl_data_pipelines_and_adf_faq.md#q57-reusable-metadata-driven-etl-framework-with-multi-source-ingestion--dynamic-validation)
+58. **`[Hard]`** During peak ETL ingestion, the source PostgreSQL database CPU surges to 90%, causing application alerts. What would you check and optimize before scaling or adding replicas? → [Solution](09_etl_data_pipelines_and_adf_faq.md#q58-relational-source-postgresql-90-cpu-spike-during-ingestion-diagnostic-playbook)
+59. **`[Hard]`** A new pipeline deployment causes task failure rates to spike from 0.1% to 4.0%. How do you decide whether to roll back immediately or attempt a fix-forward? → [Solution](09_etl_data_pipelines_and_adf_faq.md#q59-production-deployment-failure-rate-spike-rollback-vs-fix-forward-decision-matrix)
+
 
 # **10. Data Engineering Architecture & System Design**
 *Companion Deep-Dive Guide: [`10_system_design_and_architecture_faq.md`](10_system_design_and_architecture_faq.md) (21 Questions & Production Solutions)*
@@ -509,3 +550,6 @@ All questions are organized by **Recommended Chronological Study Order** across 
 20. **`[Expert]`** A critical regulatory report contains inconsistent customer balances. How would you investigate and resolve the issue? Regulatory incident containment. → [Solution](10_system_design_and_architecture_faq.md#enterprise-regulatory-data-platform-bitemporal-modeling--audit-lineage)
 21. **`[Expert]`** Enterprise System Design Capstone: Global Real-Time Analytics Lakehouse — complete multi-region ingestion, medallion transformation, and ultra-low-latency serving blueprint. → [Solution](10_system_design_and_architecture_faq.md#enterprise-system-design-capstone-global-real-time-analytics-lakehouse)
 \n
+22. **`[Hard]`** You are modernizing a legacy data platform (Hadoop/Oracle) to a cloud lakehouse. Which domain would you migrate first, and how do you execute a phased Strangler Fig rollout? → [Solution](10_system_design_and_architecture_faq.md#q22-legacy-data-platform-modernization-migration-strategy--domain-prioritization)
+23. **`[Expert]`** A major business event next week will generate a 10x surge in data volume. Outline your end-to-end load testing strategy and technical optimization playbook across Kafka, Spark, storage, and Data Warehousing. → [Solution](10_system_design_and_architecture_faq.md#q23-10x-data-volume-surge-readiness-load-testing--end-to-end-optimization-playbook)
+

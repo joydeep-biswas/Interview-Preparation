@@ -49,6 +49,14 @@ A comprehensive, production-grade guide answering Python and core programming in
 15. **Monotonic Stacks & High-Scale Log Stream Analysis**
     - [Q14. The Stock Span Problem via Monotonic Stack](#q14-the-stock-span-problem-via-monotonic-stack)
     - [Q15. Large-Scale Log File Analysis & Most Frequently Accessed Database Tables](#q15-large-scale-log-file-analysis--most-frequently-accessed-database-tables)
+16. **Core Algorithmic Patterns & Stream Processing Mechanics**
+    - [Q16. Merge Overlapping Intervals & Complexity Analysis](#q16-merge-overlapping-intervals--complexity-analysis)
+    - [Q17. Longest Substring Without Repeating Characters (Sliding Window)](#q17-longest-substring-without-repeating-characters-sliding-window)
+    - [Q18. First Non-Repeating Element in a Data Stream](#q18-first-non-repeating-element-in-a-data-stream)
+    - [Q19. Linked List Cycle Detection (Floyd's Tortoise and Hare Algorithm)](#q19-linked-list-cycle-detection-floyds-tortoise-and-hare-algorithm)
+    - [Q20. Number of Islands (Boolean Matrix Connected Components via BFS/DFS)](#q20-number-of-islands-boolean-matrix-connected-components-via-bfsdfs)
+    - [Q21. Top K Frequent Elements in an Array (Min-Heap vs QuickSelect)](#q21-top-k-frequent-elements-in-an-array-min-heap-vs-quickselect)
+    - [Q22. Python Dictionary Unique Value Extraction Mechanics](#q22-python-dictionary-unique-value-extraction-mechanics)
 ---
 
 # 1. Large File Processing & 10GB CSV Memory Optimization
@@ -1666,3 +1674,563 @@ def get_most_frequently_accessed_tables(log_file_path: Path, top_n: int = 10) ->
 1. **Schema Qualification:** A query referencing `orders` and another referencing `gold.orders` refer to the same logical table. Normalize table names by lowercasing and stripping quotes/brackets.
 2. **Subqueries & Aliases:** Naive regex matching can accidentally capture subquery aliases (e.g. `FROM (SELECT * FROM a) t`). Enhance regex to ignore SQL reserved keywords (`LATERAL`, `UNNEST`) and subquery parentheses.
 
+
+
+---
+
+# 16. Core Algorithmic Patterns & Stream Processing Mechanics
+
+---
+
+### Q16. Merge Overlapping Intervals & Complexity Analysis
+**Topic Covered:** Interval Scheduling, Array Sorting & Disjoint Segment Merging  
+**Question:** Given a collection of intervals, merge all overlapping intervals and analyze the time and space complexity of your solution.
+
+#### Definition & Core Concepts
+In data engineering, merging intervals is fundamental for sessionization (combining contiguous user web sessions), timeline compression (merging overlapping sensor uptime windows), and range query optimization.
+Two intervals $[start_A, end_A]$ and $[start_B, end_B]$ overlap if and only if $start_B \le end_A$ (assuming the list is sorted by start time: $start_A \le start_B$). When an overlap occurs, the merged interval spans $[start_A, \max(end_A, end_B)]$.
+Under the hood, CPython uses Timsort ($O(N \log N)$ worst-case, adaptive stable merge/insertion sort) when calling `intervals.sort(key=lambda x: x[0])`. Once sorted, merging is completed in a single $O(N)$ linear pass.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph Raw ["1. Raw Unsorted Intervals"]
+        R1["[1, 3]"]
+        R2["[8, 10]"]
+        R3["[2, 6]"]
+        R4["[15, 18]"]
+    end
+
+    subgraph Sorted ["2. Timsort by Start Key O(N log N)"]
+        S1["[1, 3]"] --> S2["[2, 6]"] --> S3["[8, 10]"] --> S4["[15, 18]"]
+    end
+
+    subgraph Merging ["3. Linear Scan & Boundary Comparison"]
+        M1["Compare [1, 3] & [2, 6]: 2 <= 3 -> Merge to [1, max(3,6)] = [1, 6]"]
+        M2["Compare [1, 6] & [8, 10]: 8 > 6 -> Disjoint -> Emit [1, 6], Start [8, 10]"]
+        M3["Compare [8, 10] & [15, 18]: 15 > 10 -> Disjoint -> Emit [8, 10], Emit [15, 18]"]
+    end
+
+    subgraph Output ["4. Consolidated Output"]
+        O1["[[1, 6], [8, 10], [15, 18]]"]
+    end
+
+    Raw --> Sorted --> Merging --> Output
+
+    style Raw fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#93c5fd
+    style Sorted fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Merging fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style Output fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+```
+
+#### Production Implementation / Code Solution
+```python
+from typing import List
+
+def merge_intervals(intervals: List[List[int]]) -> List[List[int]]:
+    """
+    Merges all overlapping contiguous and intersecting intervals.
+    Handles empty lists, singletons, and fully nested intervals cleanly.
+    """
+    if not intervals:
+        return []
+
+    # Sort in-place by start time to eliminate O(N) memory allocation from sorted()
+    intervals.sort(key=lambda x: x[0])
+
+    merged: List[List[int]] = [intervals[0]]
+
+    for current in intervals[1:]:
+        prev = merged[-1]
+        # Check boundary collision: current interval starts before or at previous end
+        if current[0] <= prev[1]:
+            # Expand upper boundary to encompass nesting (e.g., [1, 8] and [2, 5] -> [1, 8])
+            prev[1] = max(prev[1], current[1])
+        else:
+            # Disjoint interval discovered; append new reference frame
+            merged.append(current)
+
+    return merged
+```
+- **Time Complexity:** $O(N \log N)$ governed strictly by Timsort sorting; the subsequent linear merge pass operates in $O(N)$.
+- **Space Complexity:** $O(N)$ auxiliary space for the output array in Python (or $O(1)$ additional space beyond the output if mutating in-place).
+
+#### Engineering Implications & Production Pitfalls
+1. **Out-of-Order Sensor Streams:** In distributed pipelines (Kafka/Spark), events arrive out-of-order due to network partitions. Sorting by timestamp before running interval reducers is mandatory; skipping the sort causes fragmented, incorrect duplicate intervals.
+2. **Memory Footprint in Spark:** When merging billions of intervals in PySpark, grouping all intervals for a partition into Python memory via `groupByKey()` triggers executor OOM. Always sort partitions using `sortWithinPartitions()` and apply a stateful mapPartitions iterator.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [03. Python for Data Engineering: Algorithmic Optimization](../03_python_for_data_engineering.md#8-algorithmic-optimization-complexity-and-defensive-programming)*
+
+---
+
+### Q17. Longest Substring Without Repeating Characters (Sliding Window)
+**Topic Covered:** Two-Pointer Sliding Window, Hash Maps & Substring Deduplication  
+**Question:** Implement a function to find the length of the longest substring without repeating characters using the sliding window technique.
+
+#### Definition & Core Concepts
+The sliding window technique maintains a dynamic contiguous slice $[left, right]$ over a string or token stream. Rather than testing all $O(N^2)$ substrings in $O(N^3)$ time, the two-pointer sliding window tracks character frequencies or last-seen indices in a hash map.
+As the `right` pointer traverses forward:
+1. If character `char` was seen at `index >= left`, a duplicate exists within the active window.
+2. Shift `left` immediately to `index + 1`, pruning all invalid duplicate prefixes in $O(1)$ without backtracking.
+3. Calculate the candidate length $(right - left + 1)$ and update the maximum.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph SlidingWindow ["Dynamic Window Traversal: s = 'p w w k e w'"]
+        W1["Window [0..0]: 'p' -> Max = 1<br/>Map: {'p': 0}"]
+        W2["Window [0..1]: 'p w' -> Max = 2<br/>Map: {'p': 0, 'w': 1}"]
+        W3["Window [2..2]: Duplicate 'w' at idx 1 >= left(0)<br/>Jump left to 1+1=2. Substring: 'w' -> Max = 2"]
+        W4["Window [2..3]: 'w k' -> Max = 2<br/>Map: {'w': 2, 'k': 3}"]
+        W5["Window [2..4]: 'w k e' -> Max = 3<br/>Map: {'w': 2, 'k': 3, 'e': 4}"]
+        W6["Window [3..5]: Duplicate 'w' at idx 2 >= left(2)<br/>Jump left to 2+1=3. Substring: 'k e w' -> Max = 3"]
+        W1 --> W2 --> W3 --> W4 --> W5 --> W6
+    end
+
+    style SlidingWindow fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style W1 fill:#1f2937,stroke:#64748b,stroke-width:1px,color:#fff
+    style W2 fill:#1f2937,stroke:#64748b,stroke-width:1px,color:#fff
+    style W3 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style W4 fill:#1f2937,stroke:#64748b,stroke-width:1px,color:#fff
+    style W5 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style W6 fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+```
+
+#### Production Implementation / Code Solution
+```python
+from typing import Dict
+
+def length_of_longest_substring(s: str) -> int:
+    """
+    Computes length of longest contiguous substring containing distinct characters.
+    Uses hash map of last seen indices for O(N) single-pass execution.
+    """
+    last_seen: Dict[str, int] = {}
+    max_len = 0
+    left = 0
+
+    for right, char in enumerate(s):
+        # If character seen inside current active window, skip left pointer past previous occurrence
+        if char in last_seen and last_seen[char] >= left:
+            left = last_seen[char] + 1
+        else:
+            current_window_len = right - left + 1
+            if current_window_len > max_len:
+                max_len = current_window_len
+
+        # Record latest absolute position of character
+        last_seen[char] = right
+
+    return max_len
+```
+- **Time Complexity:** $O(N)$ where $N$ is the length of string $s$. Each character is processed at most twice (by right pointer and left pointer jump).
+- **Space Complexity:** $O(\min(N, M))$ auxiliary space for the hash map, where $M$ is the size of the character set (ASCII = 128, Unicode extended).
+
+#### Engineering Implications & Production Pitfalls
+1. **The Stale Index Trap:** A common bug is checking `if char in last_seen:` and setting `left = last_seen[char] + 1` without checking `last_seen[char] >= left`. If an earlier character reappears outside the current window, `left` will incorrectly move backwards, corrupting the window.
+2. **Stream Tokenization:** In NLP and clickstream token parsing, sliding windows are used to discover unique n-grams or session tokens before transmitting to vector embedding pipelines.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [03. Python for Data Engineering: String and Array Mechanics](../03_python_for_data_engineering.md#2-advanced-python-fundamentals-for-data-pipelines)*
+
+---
+
+### Q18. First Non-Repeating Element in a Data Stream
+**Topic Covered:** Stream Ingestion, Frequency Dictionaries & Queue Ordering  
+**Question:** How would you find the first non-repeating element in a continuous data stream of transactions or tokens?
+
+#### Definition & Core Concepts
+In continuous stream ingestion (e.g. tracking unique IP addresses, fraud flags, or user tokens), elements arrive sequentially. Determining the first non-repeating character or ID requires:
+1. Identifying elements that have appeared exactly once ($count = 1$).
+2. Preserving the historical arrival order of candidates.
+Using a standard hash map alone requires a second pass over the input. In an infinite or high-throughput stream, a second pass is impossible. The production solution pairs a **Frequency Map** (or visited set) with an **Ordered Queue** (`collections.deque` or `OrderedDict`):
+- As elements arrive, increment their counter.
+- Prune duplicate elements eagerly from the queue head ($O(1)$ amortized eviction).
+
+#### Visual Flow
+```mermaid
+flowchart LR
+    Stream["Stream Event: 'a' -> 'b' -> 'a' -> 'c'"] --> Ingest{"Inspect Counter & Queue"}
+    Ingest -->|Event 'a' count=1| Q1["Queue: ['a']<br/>First Unique: 'a'"]
+    Ingest -->|Event 'b' count=1| Q2["Queue: ['a', 'b']<br/>First Unique: 'a'"]
+    Ingest -->|Event 'a' count=2| Evict["Queue Head 'a' count > 1<br/>Pop Left!"]
+    Evict --> Q3["Queue: ['b']<br/>First Unique: 'b'"]
+    Ingest -->|Event 'c' count=1| Q4["Queue: ['b', 'c']<br/>First Unique: 'b'"]
+
+    style Stream fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Ingest fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Q1 fill:#1f2937,stroke:#64748b,stroke-width:1px,color:#fff
+    style Q2 fill:#1f2937,stroke:#64748b,stroke-width:1px,color:#fff
+    style Evict fill:#1f2937,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style Q3 fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style Q4 fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+```
+
+#### Production Implementation / Code Solution
+```python
+from collections import deque, defaultdict
+from typing import Optional, Hashable
+
+class StreamFirstUniqueTracker:
+    """
+    Maintains the first non-repeating element across an unbounded streaming series.
+    Provides O(1) amortized insertion and O(1) retrieval.
+    """
+    def __init__(self):
+        self._counts = defaultdict(int)
+        self._queue = deque()
+
+    def add(self, item: Hashable) -> None:
+        """Processes a new event arriving from the stream."""
+        self._counts[item] += 1
+        # Only enqueue on the very first occurrence to prevent unbounded queue growth
+        if self._counts[item] == 1:
+            self._queue.append(item)
+
+        # Lazy eviction: discard stale items from queue front that are no longer unique
+        while self._queue and self._counts[self._queue[0]] > 1:
+            self._queue.popleft()
+
+    def get_first_unique(self) -> Optional[Hashable]:
+        """Returns the oldest element with frequency == 1, or None if no unique items exist."""
+        return self._queue[0] if self._queue else None
+```
+- **Time Complexity:** $O(1)$ amortized time per `add()` call (each item enters the deque once and leaves the deque at most once); $O(1)$ time for `get_first_unique()`.
+- **Space Complexity:** $O(U)$ where $U$ is the number of distinct elements seen across the stream.
+
+#### Engineering Implications & Production Pitfalls
+1. **Unbounded State Store Memory Leak:** If a stream runs continuously for months with millions of unique IDs, `self._counts` will consume gigabytes of memory. In production streaming engines (Flink/Spark), state stores must be configured with a State Time-To-Live (TTL) or watermarking eviction strategy.
+2. **Alternative OrderedDict Pattern:** Python 3.7+ dictionaries maintain insertion order. An `OrderedDict` with `od.pop(key)` allows deletion of repeated keys, keeping the dictionary size strictly bounded to unique candidates.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [03. Python for Data Engineering: Advanced Data Structures](../03_python_for_data_engineering.md#2-advanced-python-fundamentals-for-data-pipelines)*
+
+---
+
+### Q19. Linked List Cycle Detection (Floyd's Tortoise and Hare Algorithm)
+**Topic Covered:** Pointer Manipulation, Memory Topology & Cycle Diagnostics  
+**Question:** How do you detect a cycle in a linked list, and what is its significance in distributed data engineering pipelines?
+
+#### Definition & Core Concepts
+In computer science, a cycle occurs in a singly linked list if a node's `next` pointer points back to an earlier node in the chain. In Data Engineering, cycle detection is critical for:
+- Validating Directed Acyclic Graphs (DAGs) in workflow orchestrators (Airflow, Prefect, Dagster) where task circularity causes deadlocks.
+- Data lineage loops in catalog tracking where Table A derives from Table B, which derives from Table A.
+Floyd's Cycle-Finding Algorithm (Tortoise and Hare) uses two pointers moving at different speeds:
+- `slow` advances 1 node per iteration.
+- `fast` advances 2 nodes per iteration.
+If no cycle exists, `fast` reaches `None` ($O(N)$ termination). If a cycle of length $C$ exists, each step decreases the relative distance between `fast` and `slow` by 1 node modulo $C$. `fast` is mathematically guaranteed to lap and collide with `slow` in $\le N$ steps, requiring strictly $O(1)$ memory.
+
+#### Visual Flow
+```mermaid
+flowchart LR
+    subgraph ListWithCycle ["Linked List Topology with Loop: (3) -> (2) -> (0) -> (-4) -> back to (2)"]
+        N1["Node 3"] --> N2["Node 2"]
+        N2 --> N3["Node 0"]
+        N3 --> N4["Node -4"]
+        N4 -->|"Cycle Edge"| N2
+    end
+
+    subgraph Collision ["Floyd's Two Pointers"]
+        P1["Step 0: slow=3, fast=3"]
+        P2["Step 1: slow=2, fast=0"]
+        P3["Step 2: slow=0, fast=2"]
+        P4["Step 3: slow=-4, fast=-4 (COLLISION!) -> Cycle Confirmed"]
+        P1 --> P2 --> P3 --> P4
+    end
+
+    style ListWithCycle fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Collision fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style N4 fill:#1f2937,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+```
+
+#### Production Implementation / Code Solution
+```python
+from typing import Optional
+
+class ListNode:
+    def __init__(self, val: int = 0, next: Optional['ListNode'] = None):
+        self.val = val
+        self.next = next
+
+def has_cycle(head: Optional[ListNode]) -> bool:
+    """
+    Detects cycles in pointer chains using Floyd's Tortoise and Hare algorithm.
+    Guarantees O(1) auxiliary space without hashing node objects.
+    """
+    if not head or not head.next:
+        return False
+
+    slow = head
+    fast = head
+
+    while fast and fast.next:
+        slow = slow.next          # Advance slow by 1 step
+        fast = fast.next.next     # Advance fast by 2 steps
+
+        # Pointer reference identity comparison (memory address equality)
+        if slow is fast:
+            return True
+
+    return False
+```
+- **Time Complexity:** $O(N)$ where $N$ is the total count of nodes. In a cycle, fast catches slow within one loop traversal.
+- **Space Complexity:** $O(1)$ strictly constant memory (two pointer references).
+
+#### Engineering Implications & Production Pitfalls
+1. **Hash Set vs Floyd's:** A naive solution stores visited node IDs in a Python `set()`. While $O(N)$ time, it incurs $O(N)$ memory overhead ($>80	ext{MB}$ for 1,000,000 nodes). Floyd's algorithm uses 0 additional heap memory.
+2. **DAG vs General Graph Cycles:** Linked list cycle detection works on linear pointer sequences. For arbitrary DAG validation (Airflow pipeline tasks with multiple fan-in/fan-out edges), use **Kahn's Algorithm (Topological Sort via In-Degree counts)** or **DFS with 3-color marking (White/Gray/Black)**.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [05. Distributed Systems and APIs: Graph & DAG Processing](../05_distributed_systems_and_apis.md#3-distributed-consensus--state-machines)*
+
+---
+
+### Q20. Number of Islands (Boolean Matrix Connected Components via BFS/DFS)
+**Topic Covered:** 2D Grid Graph Traversal, Breadth-First Search & Connected Components  
+**Question:** Given an m x n 2D binary grid where '1' represents land and '0' represents water, count the number of islands (connected components horizontally or vertically).
+
+#### Definition & Core Concepts
+In spatial data engineering and computer vision (satellite imagery, geospatial clustering, sensor heatmaps), the "Number of Islands" problem models connected component discovery.
+A grid is modeled as an undirected graph where each cell $(r, c)$ with value `'1'` has up to 4 neighbors: $(r-1, c)$, $(r+1, c)$, $(r, c-1)$, and $(r, c+1)$.
+When a `'1'` is discovered during a linear grid scan:
+1. Increment the island counter by 1.
+2. Trigger Breadth-First Search (BFS) or Depth-First Search (DFS) to traverse all reachable connected `'1'`s.
+3. Sink/mark visited land by mutating the cell to `'0'` (in-place) or tracking in a visited bitmask to avoid infinite loops and duplicate counts.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph GridScan ["1. Sequential Scan of 2D Matrix"]
+        Cell["Inspect (r, c)"]
+        IsLand{"Cell == '1'?"}
+        Cell --> IsLand
+        IsLand -- "No" --> NextCell["Advance to next coordinate"]
+        IsLand -- "Yes" --> FoundIsland["Increment island_count += 1"]
+    end
+
+    subgraph FloodFill ["2. BFS Flood Fill Traversal"]
+        FoundIsland --> Enqueue["Queue.append((r, c)) & mutate grid[r][c] = '0'"]
+        Enqueue --> PopQ["Pop (curr_r, curr_c)"]
+        PopQ --> Check4["Explore 4 Cardinal Neighbors: North, South, East, West"]
+        Check4 --> Sink["If Neighbor == '1': mutate to '0' & Queue.append()"]
+        Sink --> HasMore{"Queue Empty?"}
+        HasMore -- "No" --> PopQ
+        HasMore -- "Yes" --> NextCell
+    end
+
+    style GridScan fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style FloodFill fill:#1e293b,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style FoundIsland fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style Sink fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+```
+
+#### Production Implementation / Code Solution
+```python
+from collections import deque
+from typing import List
+
+def num_islands(grid: List[List[str]]) -> int:
+    """
+    Counts connected components in a 2D binary grid using iterative BFS.
+    Mutates visited cells in-place to '0' to avoid recursion stack overflow.
+    """
+    if not grid or not grid[0]:
+        return 0
+
+    rows, cols = len(grid), len(grid[0])
+    island_count = 0
+    # 4-directional cardinal shifts: (row_delta, col_delta)
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == '1':
+                island_count += 1
+                grid[r][c] = '0'  # Mark root cell visited
+                queue = deque([(r, c)])
+
+                # Iterative BFS avoids CPython recursion limit (1000 frames)
+                while queue:
+                    curr_r, curr_c = queue.popleft()
+                    for dr, dc in directions:
+                        nr, nc = curr_r + dr, curr_c + dc
+                        if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == '1':
+                            grid[nr][nc] = '0'  # Sink neighbor eagerly upon enqueue
+                            queue.append((nr, nc))
+
+    return island_count
+```
+- **Time Complexity:** $O(M 	imes N)$ where $M$ is row count and $N$ is column count. Every cell is visited a constant number of times.
+- **Space Complexity:** $O(\min(M, N))$ in the worst case (full grid of land) for the BFS queue holding the diagonal perimeter.
+
+#### Engineering Implications & Production Pitfalls
+1. **Recursion Limit Exceeded with DFS:** In Python, recursive DFS on a $1,000 	imes 1,000$ grid will instantly trigger `RecursionError: maximum recursion depth exceeded` (default sys.getrecursionlimit is 1000). Always use iterative BFS with `collections.deque` in production Python services.
+2. **Eager Visited Marking:** A critical concurrency and memory bug is marking `grid[nr][nc] = '0'` upon *dequeue* rather than upon *enqueue*. Delayed marking allows adjacent nodes to enqueue the same unvisited neighbor multiple times, causing exponential memory explosion.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [03. Python for Data Engineering: Graph & Spatial Algorithms](../03_python_for_data_engineering.md#8-algorithmic-optimization-complexity-and-defensive-programming)*
+
+---
+
+### Q21. Top K Frequent Elements in an Array (Min-Heap vs QuickSelect)
+**Topic Covered:** Frequency Hashing, Heap Priority Queues & QuickSelect Optimization  
+**Question:** Given an integer array nums and an integer k, return the k most frequent elements. Discuss optimal time and space complexity trade-offs.
+
+#### Definition & Core Concepts
+In clickstream aggregation, search telemetry, and recommendation feeds, identifying the top $K$ frequent items (top products, most active users, trending hashtags) is a constant operational requirement.
+Three distinct architectural approaches exist:
+1. **Full Sort:** Build frequency map ($O(N)$), sort entries by frequency ($O(U \log U)$ where $U$ is unique keys). Inefficient when $K \ll U$.
+2. **Bounded Min-Heap ($O(N \log K)$):** Maintain a binary min-heap capped at size $K$. When heap exceeds size $K$, pop the minimum. The remaining $K$ elements are the top frequencies.
+3. **Bucket Sort ($O(N)$ linear time):** Group keys into an array of buckets where `bucket[freq]` stores a list of elements with that exact count. Traverse buckets in reverse order from $N$ down to 1.
+
+#### Visual Flow
+```mermaid
+flowchart TD
+    subgraph Stream ["Input: nums = [1, 1, 1, 2, 2, 3], k = 2"]
+        Freq["1. Frequency Map: {1: 3, 2: 2, 3: 1}"]
+    end
+
+    subgraph MinHeapMethod ["Method A: Min-Heap of Size K = 2 O(N log K)"]
+        H1["Push (3, 1) -> Heap: [(3, 1)]"]
+        H2["Push (2, 2) -> Heap: [(2, 2), (3, 1)]"]
+        H3["Push (1, 3) -> Heap exceeds K=2 -> heappop() discards (1, 3)"]
+        H4["Heap holds: [2, 1] (Top 2 items)"]
+        H1 --> H2 --> H3 --> H4
+    end
+
+    subgraph BucketMethod ["Method B: Bucket Sort O(N) Linear Time"]
+        B1["Index 1: [3]"]
+        B2["Index 2: [2]"]
+        B3["Index 3: [1]"]
+        Scan["Traverse reverse: Take from Index 3 -> [1], then Index 2 -> [2] -> Result: [1, 2]"]
+    end
+
+    Freq --> MinHeapMethod
+    Freq --> BucketMethod
+
+    style Stream fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style MinHeapMethod fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
+    style BucketMethod fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+```
+
+#### Production Implementation / Code Solution
+```python
+import heapq
+from collections import Counter
+from typing import List
+
+def top_k_frequent_heap(nums: List[int], k: int) -> List[int]:
+    """
+    Min-heap approach: Ideal when k is small and dataset fits in memory.
+    Time Complexity: O(N log K). Space: O(N + K).
+    """
+    counts = Counter(nums)
+    # heapq.nlargest internally uses a min-heap of size k
+    return [item for item, _ in heapq.nlargest(k, counts.items(), key=lambda x: x[1])]
+
+def top_k_frequent_bucket(nums: List[int], k: int) -> List[int]:
+    """
+    Bucket sort approach: Guarantees strict O(N) linear time execution.
+    Space Complexity: O(N) for bucket allocations.
+    """
+    counts = Counter(nums)
+    n = len(nums)
+    # Buckets indexed from 0 to n (maximum possible frequency is n)
+    buckets: List[List[int]] = [[] for _ in range(n + 1)]
+
+    for num, freq in counts.items():
+        buckets[freq].append(num)
+
+    result: List[int] = []
+    # Iterate backwards from highest frequency bucket down to 1
+    for freq in range(n, 0, -1):
+        for num in buckets[freq]:
+            result.append(num)
+            if len(result) == k:
+                return result
+
+    return result
+```
+- **Time Complexity:**
+  - `top_k_frequent_heap`: $O(N \log K)$ where $N$ is total elements and $K$ is target count.
+  - `top_k_frequent_bucket`: $O(N)$ strictly linear time.
+- **Space Complexity:** $O(N)$ auxiliary space for frequencies and buckets.
+
+#### Engineering Implications & Production Pitfalls
+1. **Streaming Heavy Hitters (Count-Min Sketch):** When calculating top $K$ frequent items across distributed petabyte streams (e.g. billions of Kafka events), in-memory hash maps cause OOM. Production architectures deploy probabilistic streaming algorithms like **Count-Min Sketch** or the **Space-Saving Algorithm** with bounded memory.
+2. **Spark Distributed Aggregation:** In PySpark, avoiding full shuffles on top $K$ requires combining `reduceByKey()` to sum partitions locally before running `.takeOrdered(k, key=lambda x: -x[1])`.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [03. Python for Data Engineering: Algorithmic Optimization](../03_python_for_data_engineering.md#8-algorithmic-optimization-complexity-and-defensive-programming)*
+
+---
+
+### Q22. Python Dictionary Unique Value Extraction Mechanics
+**Topic Covered:** Dictionary Primitives, Hash Tables & Set Deduplication  
+**Question:** In Python, how do you extract unique values from a dictionary? Provide a code snippet and explain the memory and time complexity under CPython.
+
+#### Definition & Core Concepts
+A Python dictionary (`dict`) maps hashable keys to arbitrary values. While keys are guaranteed unique by hash-table invariants, values frequently contain duplicates:
+- `data = {"a": 10, "b": 20, "c": 10, "d": 30}`
+Extracting unique values requires iterating over the dictionary's values view and eliminating duplicates.
+Under the hood in CPython (PEP 468 & PEP 509):
+1. `d.values()` returns a lightweight `dict_values` view object ($O(1)$ memory, referencing underlying compact table).
+2. Passing the view into `set(d.values())` constructs a hash table of unique elements, computing the hash of each value and inserting into a dynamic table with open addressing and perturbation probing.
+
+#### Visual Flow
+```mermaid
+flowchart LR
+    Dict["dict: {'u1': 'US', 'u2': 'IN', 'u3': 'US', 'u4': 'UK'}"] --> ValuesView["1. d.values()<br/>O(1) Memory View"]
+    ValuesView --> HashLookup{"2. set() Construction"}
+    HashLookup -->|"Hash 'US' -> Insert"| S1["Set: {'US'}"]
+    HashLookup -->|"Hash 'IN' -> Insert"| S2["Set: {'US', 'IN'}"]
+    HashLookup -->|"Hash 'US' -> Collision Detected & Skipped"| S2
+    HashLookup -->|"Hash 'UK' -> Insert"| S3["Set: {'US', 'IN', 'UK'}"]
+    S3 --> Output["Unique Values: ['US', 'IN', 'UK']"]
+
+    style Dict fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ValuesView fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style HashLookup fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style S3 fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#a7f3d0
+    style Output fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+```
+
+#### Production Implementation / Code Solution
+```python
+from typing import Dict, Any, List, Set
+
+def get_unique_values(d: Dict[Any, Any]) -> List[Any]:
+    """
+    Extracts deduplicated values from a dictionary.
+    Handles unhashable nested types (lists, dicts) defensively.
+    """
+    try:
+        # Standard O(N) extraction for hashable values
+        return list(set(d.values()))
+    except TypeError:
+        # Fallback for dictionaries containing unhashable values (e.g. lists or sub-dicts)
+        unique_list = []
+        for val in d.values():
+            if val not in unique_list:
+                unique_list.append(val)
+        return unique_list
+
+def get_unique_values_order_preserving(d: Dict[Any, Any]) -> List[Any]:
+    """
+    Extracts unique values while preserving their first seen chronological order.
+    Leverages dict.fromkeys() in Python 3.7+ O(N).
+    """
+    return list(dict.fromkeys(d.values()))
+```
+- **Time Complexity:**
+  - Standard `set(d.values())`: $O(N)$ average time where $N$ is the number of keys.
+  - Fallback unhashable list scan: $O(N 	imes U)$ where $U$ is unique values.
+- **Space Complexity:** $O(U)$ auxiliary space for the output set/list.
+
+#### Engineering Implications & Production Pitfalls
+1. **The Unhashable Type Exception:** In data pipelines ingesting semi-structured JSON, dictionary values often contain lists (e.g. `{"tags": ["admin", "ops"]}`). Passing `set(d.values())` raises `TypeError: unhashable type: 'list'`. Defensive pipeline code must handle or serialize non-primitive values.
+2. **Order Preservation:** If downstream reporting requires order preservation, `set()` destroys order due to pseudorandom hash bucket ordering. Always use `list(dict.fromkeys(d.values()))` to retain first-seen order.
+
+#### Core Curriculum Cross-Reference
+*Deep-dive theoretical reference: See [03. Python for Data Engineering: Collections & Performance Mechanics](../03_python_for_data_engineering.md#2-advanced-python-fundamentals-for-data-pipelines)*
