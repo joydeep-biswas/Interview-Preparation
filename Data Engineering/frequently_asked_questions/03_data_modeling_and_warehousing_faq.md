@@ -7,57 +7,57 @@ A comprehensive, production-grade guide answering dimensional modeling, data war
 ## Table of Contents & Question Mapping
 
 1. **OLTP vs OLAP Architecture & Normalization vs Denormalization**
-   - [Q9. OLTP vs OLAP Architecture & Why Analytical Queries Bypass OLTP](#q9-oltp-vs-olap-architecture--why-analytical-queries-bypass-oltp)
-   - [Q4. Normalization vs Denormalization in Data Warehouses](#q4-normalization-vs-denormalization-in-data-warehouses)
+   - [Q1. OLTP vs OLAP Architecture & Why Analytical Queries Bypass OLTP](#q1-oltp-vs-olap-architecture--why-analytical-queries-bypass-oltp)
+   - [Q2. Normalization vs Denormalization in Data Warehouses](#q2-normalization-vs-denormalization-in-data-warehouses)
 2. **Data Lake vs Data Warehouse vs Data Lakehouse**
-   - [Q11. Data Lake vs Data Warehouse vs Data Lakehouse Architecture](#q11-data-lake-vs-data-warehouse-vs-data-lakehouse-architecture)
-   - [Q17. Medallion Architecture (Bronze, Silver, Gold) in the Modern Lakehouse](#q17-medallion-architecture-bronze-silver-gold-in-the-modern-lakehouse)
+   - [Q3. Data Lake vs Data Warehouse vs Data Lakehouse Architecture](#q3-data-lake-vs-data-warehouse-vs-data-lakehouse-architecture)
+   - [Q4. Medallion Architecture (Bronze, Silver, Gold) in the Modern Lakehouse](#q4-medallion-architecture-bronze-silver-gold-in-the-modern-lakehouse)
 3. **Dimensional Modeling Foundations: Star vs Snowflake Schemas**
-   - [Q2 & Q6. Star Schema vs Snowflake Schema Architecture & Selection Criteria](#q2--q6-star-schema-vs-snowflake-schema-architecture--selection-criteria)
-   - [Q12. Sales Fact Table Design with Product and Customer Dimensions](#q12-sales-fact-table-design-with-product-and-customer-dimensions)
+   - [Q5. Star Schema vs Snowflake Schema Architecture & Selection Criteria](#q5-star-schema-vs-snowflake-schema-architecture--selection-criteria)
+   - [Q6. Sales Fact Table Design with Product and Customer Dimensions](#q6-sales-fact-table-design-with-product-and-customer-dimensions)
 4. **Row-Oriented vs Columnar Storage & Physical Optimization**
    - [Q7. Row-Oriented vs Columnar Physical Storage Mechanics](#q7-row-oriented-vs-columnar-physical-storage-mechanics)
-   - [Q18. Partitioning vs Bucketing in Big Data Systems](#q18-partitioning-vs-bucketing-in-big-data-systems)
+   - [Q8. Partitioning vs Bucketing in Big Data Systems](#q8-partitioning-vs-bucketing-in-big-data-systems)
 5. **Domain Data Model Design: Vendor Payment System**
-   - [Q1. End-to-End Data Model Design: Vendor Payment System](#q1-end-to-end-data-model-design-vendor-payment-system)
+   - [Q9. End-to-End Data Model Design: Vendor Payment System](#q9-end-to-end-data-model-design-vendor-payment-system)
 6. **Domain Data Model Design: Lending Book Architecture**
-   - [Q3. End-to-End Data Model Design: Lending Book Architecture](#q3-end-to-end-data-model-design-lending-book-architecture)
+   - [Q10. End-to-End Data Model Design: Lending Book Architecture](#q10-end-to-end-data-model-design-lending-book-architecture)
 7. **Slowly Changing Dimensions (SCD Types 1, 2, 3) in Spark & Delta Lake**
-   - [Q5. Slowly Changing Dimensions (SCD Types 1, 2, 3) in Spark & Delta Lake](#q5-slowly-changing-dimensions-scd-types-1-2-3-in-spark--delta-lake)
+   - [Q11. Slowly Changing Dimensions (SCD Types 1, 2, 3) in Spark & Delta Lake](#q11-slowly-changing-dimensions-scd-types-1-2-3-in-spark--delta-lake)
 8. **Handling Inferred Members & Late-Arriving Dimensions**
-   - [Q8. Handling Inferred Members & Late-Arriving Dimensions](#q8-handling-inferred-members--late-arriving-dimensions)
+   - [Q12. Handling Inferred Members & Late-Arriving Dimensions](#q12-handling-inferred-members--late-arriving-dimensions)
 9. **Global Multi-Currency Sales Modeling & Daily Exchange Rates**
-   - [Q10. Multi-Currency Sales Fact Modeling & Daily Exchange Rate Joins](#q10-multi-currency-sales-fact-modeling--daily-exchange-rate-joins)
+   - [Q13. Multi-Currency Sales Fact Modeling & Daily Exchange Rate Joins](#q13-multi-currency-sales-fact-modeling--daily-exchange-rate-joins)
 10. **Large-Scale User Watch-History & Telemetry Data Modeling**
-    - [Q13. Global User Watch-History Data Model at Scale](#q13-global-user-watch-history-data-model-at-scale)
-    - [Q14. High-Throughput Log Data Modeling: Fast Writes vs Fast Reads](#q14-high-throughput-log-data-modeling-fast-writes-vs-fast-reads)
+    - [Q14. Global User Watch-History Data Model at Scale](#q14-global-user-watch-history-data-model-at-scale)
+    - [Q15. High-Throughput Log Data Modeling: Fast Writes vs Fast Reads](#q15-high-throughput-log-data-modeling-fast-writes-vs-fast-reads)
 11. **Schema Evolution & Versioned Warehouse Schemas Across Multiple Teams**
-    - [Q15. Managing Schema Evolution & Versioning Across Multiple Analytics Teams](#q15-managing-schema-evolution--versioning-across-multiple-analytics-teams)
+    - [Q16. Managing Schema Evolution & Versioning Across Multiple Analytics Teams](#q16-managing-schema-evolution--versioning-across-multiple-analytics-teams)
 12. **Data Governance, Audit Lineage & OLTP-to-OLAP Consistency**
-    - [Q16. Enterprise Data Governance, Lineage & Consistency Guarantees](#q16-enterprise-data-governance-lineage--consistency-guarantees)
+    - [Q17. Enterprise Data Governance, Lineage & Consistency Guarantees](#q17-enterprise-data-governance-lineage--consistency-guarantees)
 13. **Data Lakehouse Security, Data Privacy & PII Protection**
-    - [Q19. Securing Sensitive Customer Data, PII & Enforcing Row-Level Access Controls](#q19-securing-sensitive-customer-data-pii--enforcing-row-level-access-controls)
+    - [Q18. Securing Sensitive Customer Data, PII & Enforcing Row-Level Access Controls](#q18-securing-sensitive-customer-data-pii--enforcing-row-level-access-controls)
 14. **Multi-Dimensional Aggregations & High-Scale Table Operations**
-    - [Q20. Dimensional Data Modeling for Multi-Level Sales (Product, Vendor, Location)](#q20-dimensional-data-modeling-for-multi-level-sales-product-vendor-location)
-    - [Q21. Managing and Querying Billion-Row Tables in Analytical Warehouses](#q21-managing-and-querying-billion-row-tables-in-analytical-warehouses)
-    - [Q22. Enterprise Cloud Storage Cost Optimization in Data Lakes & Warehouses](#q22-enterprise-cloud-storage-cost-optimization-in-data-lakes--warehouses)
+    - [Q19. Dimensional Data Modeling for Multi-Level Sales (Product, Vendor, Location)](#q19-dimensional-data-modeling-for-multi-level-sales-product-vendor-location)
+    - [Q20. Managing and Querying Billion-Row Tables in Analytical Warehouses](#q20-managing-and-querying-billion-row-tables-in-analytical-warehouses)
+    - [Q21. Enterprise Cloud Storage Cost Optimization in Data Lakes & Warehouses](#q21-enterprise-cloud-storage-cost-optimization-in-data-lakes--warehouses)
 15. **Next-Generation Analytical Storage & Concurrency Architecture**
-    - [Q23. Microsoft Fabric Lakehouse vs Fabric Warehouse: Architectural Comparison](#q23-microsoft-fabric-lakehouse-vs-fabric-warehouse-architectural-comparison)
-    - [Q24. End-to-End Database Design: Movie Ticket Booking Platform](#q24-end-to-end-database-design-movie-ticket-booking-platform)
-    - [Q25. Schema Evolution & Safe Data Model Migration in Active Pipelines](#q25-schema-evolution--safe-data-model-migration-in-active-pipelines)
+    - [Q22. Microsoft Fabric Lakehouse vs Fabric Warehouse: Architectural Comparison](#q22-microsoft-fabric-lakehouse-vs-fabric-warehouse-architectural-comparison)
+    - [Q23. End-to-End Database Design: Movie Ticket Booking Platform](#q23-end-to-end-database-design-movie-ticket-booking-platform)
+    - [Q24. Schema Evolution & Safe Data Model Migration in Active Pipelines](#q24-schema-evolution--safe-data-model-migration-in-active-pipelines)
 16. **Physical Table Life Cycles, Payment Schemas & Data Discrepancy Diagnostics**
-    - [Q26. Transient Tables vs Temporary Tables in Enterprise Warehouses](#q26-transient-tables-vs-temporary-tables-in-enterprise-warehouses)
-    - [Q27. Swipe Payment API Relational Schema & Idempotent Ledger Design](#q27-swipe-payment-api-relational-schema--idempotent-ledger-design)
-    - [Q28. University Relational Database Schema Design (Colleges, Students, Professors)](#q28-university-relational-database-schema-design-colleges-students-professors)
-    - [Q29. High-Velocity Web Traffic Event Log Schema (Clicks/Swipes)](#q29-high-velocity-web-traffic-event-log-schema-clicksswipes)
-    - [Q30. Data Integrity Discrepancy Between Data Warehouse and Source Post-Incremental Load](#q30-data-integrity-discrepancy-between-data-warehouse-and-source-post-incremental-load)
+    - [Q25. Transient Tables vs Temporary Tables in Enterprise Warehouses](#q25-transient-tables-vs-temporary-tables-in-enterprise-warehouses)
+    - [Q26. Swipe Payment API Relational Schema & Idempotent Ledger Design](#q26-swipe-payment-api-relational-schema--idempotent-ledger-design)
+    - [Q27. University Relational Database Schema Design (Colleges, Students, Professors)](#q27-university-relational-database-schema-design-colleges-students-professors)
+    - [Q28. High-Velocity Web Traffic Event Log Schema (Clicks/Swipes)](#q28-high-velocity-web-traffic-event-log-schema-clicksswipes)
+    - [Q29. Data Integrity Discrepancy Between Data Warehouse and Source Post-Incremental Load](#q29-data-integrity-discrepancy-between-data-warehouse-and-source-post-incremental-load)
 ---
 
 # 1. OLTP vs OLAP Architecture & Normalization vs Denormalization
 
 ---
 
-### Q9. OLTP vs OLAP Architecture & Why Analytical Queries Bypass OLTP
+### Q1. OLTP vs OLAP Architecture & Why Analytical Queries Bypass OLTP
 **Topic Covered:** Relational Systems vs Distributed Analytical Warehouses  
 **Question:** Difference between OLTP and OLAP systems — and why you don't report directly off OLTP.
 
@@ -78,7 +78,7 @@ A comprehensive, production-grade guide answering dimensional modeling, data war
 
 ---
 
-### Q4. Normalization vs Denormalization in Data Warehouses
+### Q2. Normalization vs Denormalization in Data Warehouses
 **Topic Covered:** Normal Forms (3NF) vs Dimensional Flattening & Query Performance  
 **Question:** Normal Forms and Normalization vs Denormalization (why warehouses denormalize on purpose).
 
@@ -96,7 +96,7 @@ In relational theory, 3NF ensures no data redundancy by splitting entities into 
 
 ---
 
-### Q11. Data Lake vs Data Warehouse vs Data Lakehouse Architecture
+### Q3. Data Lake vs Data Warehouse vs Data Lakehouse Architecture
 **Topic Covered:** Modern Lakehouse Architecture & Storage Engine Evolution  
 **Question:** How do you design a data lake vs a data warehouse, and when would you use each?
 
@@ -147,7 +147,7 @@ flowchart TD
 
 ---
 
-### Q17. Medallion Architecture (Bronze, Silver, Gold) in the Modern Lakehouse
+### Q4. Medallion Architecture (Bronze, Silver, Gold) in the Modern Lakehouse
 *(Grouped together: Medallion pattern definition, tier-by-tier flow, and data lakehouse advantages)*  
 **Topic Covered:** Bronze/Silver/Gold Lakehouse Architecture, Data Quality Promotion, ACID Guarantees  
 **Questions Covered:**
@@ -230,7 +230,7 @@ gold_daily_kpi.write.format("delta").mode("overwrite").saveAsTable("gold.daily_s
 
 ---
 
-### Q2 & Q6. Star Schema vs Snowflake Schema Architecture & Selection Criteria
+### Q5. Star Schema vs Snowflake Schema Architecture & Selection Criteria
 **Topic Covered:** Dimensional Modeling Foundations & Schema Selection Trade-offs  
 **Questions Covered:**
 - **Q2**: Star vs Snowflake Schema — differences and when to choose one over the other.
@@ -283,7 +283,7 @@ flowchart TD
 
 ---
 
-### Q12. Sales Fact Table Design with Product and Customer Dimensions
+### Q6. Sales Fact Table Design with Product and Customer Dimensions
 **Topic Covered:** Kimball Fact Table DDL, Surrogate Keys & Grain Definition  
 **Question:** Explain dimensional modeling and how you would design a sales fact table with product and customer dimensions.
 
@@ -371,7 +371,7 @@ CREATE TABLE fact_retail_sales (
 
 ---
 
-### Q18. Partitioning vs Bucketing in Big Data Systems
+### Q8. Partitioning vs Bucketing in Big Data Systems
 *(Grouped together: Physical data layout, directory partitioning, hash bucketing, and shuffle optimization)*  
 **Topic Covered:** Physical File Layout, Directory Pruning, Hash Partitioning & Co-located Joins  
 **Questions Covered:**
@@ -441,7 +441,7 @@ joined_df = spark.sql("""
 
 ---
 
-### Q1. End-to-End Data Model Design: Vendor Payment System
+### Q9. End-to-End Data Model Design: Vendor Payment System
 **Topic Covered:** Financial Event Modeling, Invoice-Payment Granularity & Fact Lineage  
 **Question:** Design a Vendor Payment System (Fact vs Dimension, Business Events mapping, Granularity, Payment Batch vs Order-Level Tracking).
 
@@ -503,7 +503,7 @@ flowchart TD
 
 ---
 
-### Q3. End-to-End Data Model Design: Lending Book Architecture
+### Q10. End-to-End Data Model Design: Lending Book Architecture
 **Topic Covered:** Loan Lifecycle Modeling, Periodic Snapshot vs Accumulating Snapshot Facts  
 **Question:** Design a Data Model for a Lending Book.
 
@@ -570,7 +570,7 @@ CREATE TABLE fact_daily_loan_snapshot (
 
 ---
 
-### Q5. Slowly Changing Dimensions (SCD Types 1, 2, 3) in Spark & Delta Lake
+### Q11. Slowly Changing Dimensions (SCD Types 1, 2, 3) in Spark & Delta Lake
 *(Grouped together: SCD Types 1, 2, 3 concepts, use cases, and high-scale pipeline design)*  
 **Topic Covered:** Temporal History Preservation, High-Scale SCD Pipelines & Delta Lake MERGE  
 **Questions Covered:**
@@ -657,7 +657,7 @@ def merge_scd_type2_delta(spark, delta_table_path: str, staging_df, merge_key: s
 
 ---
 
-### Q8. Handling Inferred Members & Late-Arriving Dimensions
+### Q12. Handling Inferred Members & Late-Arriving Dimensions
 **Topic Covered:** Referential Integrity Enforcement & Surrogate Placeholder Resolution  
 **Question:** How do you handle a fact that arrives with an unknown dimension key (inferred / late-arriving member)?
 
@@ -669,15 +669,24 @@ If the fact load enforces strict foreign key constraints or relies on inner join
 #### Production Solution: Inferred Member Pattern
 ```mermaid
 flowchart TD
-    subgraph InferredPipeline ["Late-Arriving Dimension & Inferred Member Resolution Pipeline"]
-        A["Order Arrives with customer_id = 999"] --> B{"Lookup customer_id<br/>in dim_customer"}
-        B -->|Found| C["Assign existing customer_sk"]
-        B -->|Not Found| D["1. Create Placeholder Inferred Member in dim_customer<br/>customer_sk = Hash(999)<br/>is_inferred = TRUE<br/>customer_name = 'UNKNOWN'"]
-        D --> E["2. Attach Inferred customer_sk to Fact Order"]
-        E --> F["Later: Customer Registration Arrives (11:30 AM)<br/>3. SCD Type 1 Update overwrites 'UNKNOWN' with real customer data<br/>Sets is_inferred = FALSE"]
+    subgraph FactIngestion ["Fact Ingestion & Dimension Lookup"]
+        A["<b>Order Ingested</b><br/>customer_id = 999"] --> B{"Lookup customer_id<br/>in dim_customer"}
+        C["<b>Assign Existing Key</b><br/>Attach customer_sk"]
+        B -- "Found" --> C
     end
 
-    style InferredPipeline fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
+    subgraph InferredResolution ["Inferred Member Creation & Reconciliation"]
+        D["<b>Create Inferred Placeholder</b><br/>customer_sk = Hash(999), is_inferred = TRUE, name = 'UNKNOWN'"]
+        E["<b>Attach Inferred Key</b><br/>Fact row written with inferred customer_sk"]
+        F["<b>Late Registration Arrival (11:30 AM)</b><br/>SCD 1 overwrites 'UNKNOWN' with real customer data, is_inferred = FALSE"]
+
+        B -- "Not Found" --> D
+        D --> E
+        E --> F
+    end
+
+    style FactIngestion fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style InferredResolution fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style A fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style B fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style C fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
@@ -715,7 +724,7 @@ WHERE dim.customer_id IS NULL;
 
 ---
 
-### Q10. Multi-Currency Sales Fact Modeling & Daily Exchange Rate Joins
+### Q13. Multi-Currency Sales Fact Modeling & Daily Exchange Rate Joins
 **Topic Covered:** FX Triangulation, Daily Exchange Rates & Weekend Interval Filling  
 **Question:** How do you handle currency conversion in a global sales model with daily rates?
 
@@ -774,14 +783,13 @@ JOIN daily_fx_with_forward_fill fx
    AND s.currency_code = fx.currency_code;
 ```
 
-
 ---
 
 # 10. Large-Scale User Watch-History & Telemetry Data Modeling
 
 ---
 
-### Q13. Global User Watch-History Data Model at Scale
+### Q14. Global User Watch-History Data Model at Scale
 **Topic Covered:** Global Scale Event Sizing, User Sharding, Fact-Dimension Normalization  
 **Question:** Design a data model for storing user watch-history at scale for global users, and explain your choice of schema design.
 
@@ -859,7 +867,7 @@ CLUSTER BY (user_id, content_id);
 
 ---
 
-### Q14. High-Throughput Log Data Modeling: Fast Writes vs Fast Reads
+### Q15. High-Throughput Log Data Modeling: Fast Writes vs Fast Reads
 **Topic Covered:** LSM Trees vs B-Trees, Columnar Append-Only Topologies  
 **Question:** How would you design a data model for storing large-scale logs that need fast write speed and moderately fast reads?
 
@@ -910,7 +918,7 @@ PARTITIONED BY (date, hour);
 
 ---
 
-### Q15. Managing Schema Evolution & Versioning Across Multiple Analytics Teams
+### Q16. Managing Schema Evolution & Versioning Across Multiple Analytics Teams
 *(Grouped together: Handling schema evolution, backward incompatibility, and downstream dependency protection)*  
 **Topic Covered:** Schema Evolution Governance, Semantic Layer Versioning, Expand/Contract  
 **Questions Covered:**
@@ -928,22 +936,33 @@ To guarantee zero-downtime evolution:
 #### Visual Flow
 ```mermaid
 flowchart TD
-    Producer["Producer Pushes Breaking Schema Change"] --> Gate{"Schema Registry Check"}
-    Gate -->|Incompatible| Block["Reject Producer Deployment"]
-    Gate -->|Approved Breaking Evolution| Dual["Dual-Version Lakehouse Pattern"]
-    
-    Dual --> BaseTable[("Base Physical Table<br/>(Contains All Columns Unioned)")]
-    BaseTable --> ViewV1["View v1.orders<br/>(Legacy contract: user_id mapped)"]
-    BaseTable --> ViewV2["View v2.orders<br/>(New contract: account_uuid mapped)"]
-    
-    ViewV1 --> TeamA["Analytics Team A (Legacy Dashboards)"]
-    ViewV2 --> TeamB["Analytics Team B (Modern Pipelines)"]
+    subgraph SchemaGovernance ["Schema Registry Governance"]
+        Producer["Producer Pushes Breaking Schema Change"] --> Gate{"Schema Registry Check"}
+        Block["Reject Producer Deployment"]
+        Dual["Dual-Version Lakehouse Pattern"]
+        Gate -->|Incompatible| Block
+        Gate -->|Approved Breaking Evolution| Dual
+    end
 
+    subgraph DecoupledViews ["Decoupled Analytical Serving Views"]
+        Dual --> BaseTable[("<b>Base Physical Table</b><br/>Contains unioned super-schema columns")]
+        BaseTable --> ViewV1["<b>View v1.orders</b><br/>Legacy contract: user_id mapped"]
+        BaseTable --> ViewV2["<b>View v2.orders</b><br/>New contract: account_uuid mapped"]
+        ViewV1 --> TeamA["Analytics Team A (Legacy Dashboards)"]
+        ViewV2 --> TeamB["Analytics Team B (Modern Pipelines)"]
+    end
+
+    style SchemaGovernance fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style DecoupledViews fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Producer fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style Gate fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style Block fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fecaca
+    style Dual fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
     style BaseTable fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style ViewV1 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
     style ViewV2 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
+    style TeamA fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#fff
+    style TeamB fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#fff
 ```
 
 #### Production Implementation / Code Solution
@@ -983,7 +1002,7 @@ FROM core.orders;
 
 ---
 
-### Q16. Enterprise Data Governance, Lineage & Consistency Guarantees
+### Q17. Enterprise Data Governance, Lineage & Consistency Guarantees
 *(Grouped together: Audit frameworks, data consistency, ACID properties, and warehouse taxonomy)*  
 **Topic Covered:** Audit Lineage Graphs, CDC Two-Phase Reconciliation, ACID Properties  
 **Questions Covered:**
@@ -1065,7 +1084,7 @@ USING DELTA;
 
 ---
 
-### Q19. Securing Sensitive Customer Data, PII & Enforcing Row-Level Access Controls
+### Q18. Securing Sensitive Customer Data, PII & Enforcing Row-Level Access Controls
 *(Grouped together: Securing sensitive customer data, lakehouse PII architecture, dynamic masking, and row-level security)*  
 **Topic Covered:** Lakehouse Security, Unity Catalog Governance, Dynamic Data Masking, Row-Level Filters & Cryptographic Tokenization  
 **Questions Covered:**
@@ -1144,7 +1163,7 @@ FROM gold.customers;
 
 ---
 
-### Q20. Dimensional Data Modeling for Multi-Level Sales (Product, Vendor, Location)
+### Q19. Dimensional Data Modeling for Multi-Level Sales (Product, Vendor, Location)
 **Topic Covered:** Star Schema Design, Periodic Snapshots, Hierarchy Flattening & Kimball Principles  
 **Question:** Design a dimensional data model to support analytical reporting for yearly and monthly sales by product, vendor, and geographic location.
 
@@ -1211,7 +1230,7 @@ GROUP BY d.year, d.month_name, v.vendor_name, p.category_name, l.country, l.stat
 
 ---
 
-### Q21. Managing and Querying Billion-Row Tables in Analytical Warehouses
+### Q20. Managing and Querying Billion-Row Tables in Analytical Warehouses
 **Topic Covered:** Extreme Scale Table Management, Partition Pruning, Z-Ordering & Compaction  
 **Question:** How would you work with a table containing 1 billion rows in a cloud data warehouse/lakehouse?
 
@@ -1238,7 +1257,7 @@ flowchart TD
 
 ---
 
-### Q22. Enterprise Cloud Storage Cost Optimization in Data Lakes & Warehouses
+### Q21. Enterprise Cloud Storage Cost Optimization in Data Lakes & Warehouses
 **Topic Covered:** FinOps, Lifecycle Management, Delta VACUUM & Compression Codecs  
 **Question:** How do you save storage costs in a petabyte-scale cloud data lakehouse?
 
@@ -1255,7 +1274,7 @@ flowchart TD
 
 ---
 
-### Q23. Microsoft Fabric Lakehouse vs Fabric Warehouse: Architectural Comparison
+### Q22. Microsoft Fabric Lakehouse vs Fabric Warehouse: Architectural Comparison
 **Topic Covered:** SaaS Data Platforms, OneLake, Direct Lake Mode, T-SQL vs Spark  
 **Question:** What is the difference between a Fabric Lakehouse and a Fabric Warehouse? When would you choose each?
 
@@ -1276,7 +1295,7 @@ flowchart TD
 
 ---
 
-### Q24. End-to-End Database Design: Movie Ticket Booking Platform
+### Q23. End-to-End Database Design: Movie Ticket Booking Platform
 **Topic Covered:** Relational Modeling, High-Concurrency Race Conditions, Seat Locking  
 **Question:** Design a database schema for an online movie ticket booking platform (e.g. BookMyShow). Explain table relationships, assumptions, and how you prevent double-booking.
 
@@ -1327,7 +1346,7 @@ WHERE show_seat_id = :seat_id
 
 ---
 
-### Q25. Schema Evolution & Safe Data Model Migration in Active Pipelines
+### Q24. Schema Evolution & Safe Data Model Migration in Active Pipelines
 **Topic Covered:** Non-Destructive Migrations, Expand/Contract Pattern, View Virtualization  
 **Question:** You are tasked with implementing a significant change to an existing data model in an active production pipeline. How do you approach this safely without breaking downstream analytics?
 
@@ -1359,16 +1378,13 @@ sequenceDiagram
 3. **Dual-Writing & Backfilling:** Run parallel backfill jobs to populate historical data for the new schema before promoting downstream reports.
 4. **Automated Schema Evolution Guards:** In Spark/Delta pipelines, use `.option("mergeSchema", "true")` for additive changes, but enforce strict data contracts via Great Expectations or Delta Expectations to prevent silent corruptions.
 
-
-
-
 ---
 
 # 16. Physical Table Life Cycles, Payment Schemas & Data Discrepancy Diagnostics
 
 ---
 
-### Q26. Transient Tables vs Temporary Tables in Enterprise Warehouses
+### Q25. Transient Tables vs Temporary Tables in Enterprise Warehouses
 **Topic Covered:** Physical Table Lifecycles, Session Scoping, Fail-Safe & Storage Costs  
 **Question:** Describe the differences between transient tables and temporary tables in modern cloud data warehouses (e.g., Snowflake, BigQuery, Databricks). When would you choose one over the other in production ETL pipelines?
 
@@ -1452,11 +1468,11 @@ WHEN NOT MATCHED THEN
 2. **Session Disconnection in Microservice Orchestration:** If using ADF, Airflow, or dbt where each task opens an independent connection or executes across separate worker nodes, a `TEMPORARY TABLE` created in Task 1 will **not exist in Task 2**. For multi-activity DAGs, always use `TRANSIENT` tables scoped with a unique pipeline execution run ID.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Storage Formats & Physical Design](../06_data_architecture_and_modeling.md#2-dimensional-modeling-deep-dive-kimball-vs-inmon-vs-data-vault-20)*
+*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Storage Formats & Physical Design](../03_data_modeling_and_warehousing.md#110-architecture-showdown-inmon-vs-kimball-vs-data-vault-20)*
 
 ---
 
-### Q27. Swipe Payment API Relational Schema & Idempotent Ledger Design
+### Q26. Swipe Payment API Relational Schema & Idempotent Ledger Design
 **Topic Covered:** Financial Ledger Modeling, Idempotency Keys, Double-Entry Bookkeeping & POS States  
 **Question:** Explain how you would model a card-present “swipe payment” API in a relational database. Detail the tables, constraints, transaction lifecycle, and double-entry ledger design.
 
@@ -1560,11 +1576,11 @@ $$ LANGUAGE plpgsql;
 2. **Distributed Transaction Contention:** High-volume merchants process hundreds of swipes per second. Updating an account balance column directly (`UPDATE accounts SET balance = balance + amount`) creates massive row-level write lock contention (`RowExclusiveLock`). Always record ledger postings as immutable append-only events, computing balance on-the-fly or via periodic asynchronous snapshotting.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Relational Normalization & Event Ledgers](../06_data_architecture_and_modeling.md#1-foundations-of-data-modeling-relational-vs-dimensional)*
+*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Relational Normalization & Event Ledgers](../03_data_modeling_and_warehousing.md#03-data-architecture-dimensional-modeling--storage-formats-master-production-guide)*
 
 ---
 
-### Q28. University Relational Database Schema Design (Colleges, Students, Professors)
+### Q27. University Relational Database Schema Design (Colleges, Students, Professors)
 **Topic Covered:** 3NF Normalization, Composite Primary Keys, Foreign Keys & Cardinality Constraints  
 **Question:** Design an optimal, normalized relational database schema for a university system encompassing colleges, departments, students, professors, and course enrollments.
 
@@ -1708,11 +1724,11 @@ CREATE TABLE enrollments (
 2. **Surrogate Keys vs Composite Keys:** While `(student_id, section_id)` uniquely identifies an enrollment, using a surrogate `enrollment_id UUID PRIMARY KEY` with a `UNIQUE (student_id, section_id)` constraint simplifies downstream foreign key relationships (e.g. `assignment_submissions` linking to `enrollment_id`).
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Relational Foundations & Normal Forms](../06_data_architecture_and_modeling.md#1-foundations-of-data-modeling-relational-vs-dimensional)*
+*Deep-dive theoretical reference: See [06. Data Architecture & Modeling: Relational Foundations & Normal Forms](../03_data_modeling_and_warehousing.md#03-data-architecture-dimensional-modeling--storage-formats-master-production-guide)*
 
 ---
 
-### Q29. High-Velocity Web Traffic Event Log Schema (Clicks/Swipes)
+### Q28. High-Velocity Web Traffic Event Log Schema (Clicks/Swipes)
 **Topic Covered:** Telemetry Schemas, Partitioning Strategies, Columnar Encoding & Write Scalability  
 **Question:** Design an optimal schema to store high-velocity event logs (such as clicks, swipes, and impressions) for a web platform generating 50,000 events per second.
 
@@ -1793,11 +1809,11 @@ GROUP BY event_name, device_os;
 2. **Schema Drift in JSON Payloads:** Mobile app updates frequently add or rename payload fields. Storing dynamic attributes in a typed `VARIANT` column allows schema evolution without requiring `ALTER TABLE ADD COLUMN` operations that risk breaking downstream analytical ingestion.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [07. File Formats and Storage: Parquet, ORC, Delta & Columnar Compression](../07_file_formats_and_storage.md#1-columnar-storage-mechanics-parquet--orc)*
+*Deep-dive theoretical reference: See [07. File Formats and Storage: Parquet, ORC, Delta & Columnar Compression](../03_data_modeling_and_warehousing.md#4-first-principles-serialization-deserialization--storage-mechanics)*
 
 ---
 
-### Q30. Data Integrity Discrepancy Between Data Warehouse and Source Post-Incremental Load
+### Q29. Data Integrity Discrepancy Between Data Warehouse and Source Post-Incremental Load
 **Topic Covered:** Data Reconciliation, Watermarking Skew, Soft Deletes & Uncommitted Transaction Anomalies  
 **Question:** After completing an incremental ETL load, the Data Warehouse and the source transactional system report different aggregate values (e.g., total daily revenue or active order counts). How could this discrepancy occur, and how do you systematically diagnose and fix it?
 
@@ -1815,15 +1831,29 @@ Data reconciliation discrepancies between source OLTP databases and target OLAP 
 #### Visual Flow
 ```mermaid
 flowchart TD
-    Alert["🚨 Metric Discrepancy: Source Total = $1,050,000 vs DW Total = $1,020,000 (-$30k)"] --> Step1["1. Quantify Discrepancy Granularity<br/>Is difference isolated to a specific hour, status, or tenant?"]
-    Step1 --> Step2{"2. Check for Hard Deletes"}
-    Step2 -- "Source Count < DW Count" --> HardDelete["Root Cause: Source hard-deleted rows without tombstone<br/>Solution: Enable CDC (Debezium/Goldengate) or Anti-Join audit"]
-    Step2 -- "Source Count > DW Count" --> Step3{"3. Audit In-Flight Transactions & Watermarks"}
-    Step3 -- "Timestamp Gap Found" --> WatermarkLag["Root Cause: Long-running transaction committed after watermark extracted<br/>Solution: High-watermark lookback window (buffer overlap)"]
-    Step3 -- "Counts Match, Revenue Differs" --> Step4["4. Precision / Multi-Currency Skew<br/>Float precision loss or stale exchange rate join"]
+    subgraph DiscrepancyAlert ["Alert & Initial Triage"]
+        Alert["🚨 <b>Metric Discrepancy Alert</b><br/>Source Total = $1,050,000 vs DW Total = $1,020,000 (-$30k)"] --> Step1["<b>1. Quantify Granularity</b><br/>Isolate discrepancy to specific hour, tenant, or status"]
+    end
 
+    subgraph InvestigationChecks ["Root Cause Analysis Paths"]
+        Step1 --> Step2{"2. Check Hard Deletes"}
+        HardDelete["<b>Root Cause: Unrecorded Hard Deletes</b><br/>Source deleted rows without tombstone &rarr; Enable CDC"]
+        Step2 -- "Source Count < DW Count" --> HardDelete
+
+        Step2 -- "Source Count > DW Count" --> Step3{"3. Audit In-Flight Transactions"}
+        WatermarkLag["<b>Root Cause: Watermark Lag</b><br/>Long transaction committed post-watermark &rarr; Add lookback buffer"]
+        Step3 -- "Timestamp Gap Found" --> WatermarkLag
+
+        Step4["<b>4. Precision / Multi-Currency Skew</b><br/>Floating-point drift or stale FX rate join"]
+        Step3 -- "Counts Match, Revenue Differs" --> Step4
+    end
+
+    style DiscrepancyAlert fill:#0f172a,stroke:#ef4444,stroke-width:1.5px,color:#fca5a5
+    style InvestigationChecks fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Alert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
     style Step1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Step2 fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
+    style Step3 fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fff
     style HardDelete fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
     style WatermarkLag fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7
     style Step4 fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#fff
@@ -1883,4 +1913,28 @@ WHERE updated_at >= (CAST(:last_watermark AS TIMESTAMP) - INTERVAL '15 minutes')
 2. **Log-Based CDC as the Definitive Solution:** Incremental loads based on query timestamps (`updated_at`) are inherently fragile because they cannot track hard deletes or schema drops. Mission-critical platforms must deploy log-based Change Data Capture (Debezium, Fivetran, Qlik) that parses the database WAL / transaction log directly.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [14. Data Governance, Security, and Observability: Data Quality & Anomaly Detection](../14_data_governance_security_and_observability.md#2-data-observability-the-5-pillars)*
+*Deep-dive theoretical reference: See [14. Data Governance, Security, and Observability: Data Quality & Anomaly Detection](../07_unity_catalog_and_governance.md#5-the-5-pillars-of-data-observability)*
+
+---
+
+## Summary Comparison & Production Reference Matrix
+
+| Scenario Domain | Critical Runtime Pathology | Diagnostic & Triage Method | Canonical Production Resolution |
+| :--- | :--- | :--- | :--- |
+| **OLTP vs OLAP Architecture & Normalization vs Denormalization** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Data Lake vs Data Warehouse vs Data Lakehouse** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Dimensional Modeling Foundations: Star vs Snowflake Schemas** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Row-Oriented vs Columnar Storage & Physical Optimization** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Domain Data Model Design: Vendor Payment System** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Domain Data Model Design: Lending Book Architecture** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+
+---
+
+## References & Further Reading
+
+- [The Data Warehouse Toolkit: The Definitive Guide to Dimensional Modeling (Ralph Kimball, Margy Ross)](https://www.kimballgroup.com/data-warehouse-toolkit/) — The seminal authority on star schema, snowflake schema, and slowly changing dimensions.
+- [Building the Data Warehouse (W. H. Inmon)](https://www.wiley.com/en-us/Building+the+Data+Warehouse%2C+4th+Edition-p-9780764599446) — The foundational text on enterprise normalized data warehouse architecture.
+- [Building a Scalable Data Warehouse with Data Vault 2.0 (Dan Linstedt, Michael Olschimke)](https://www.sciencedirect.com/book/9780128025109/building-a-scalable-data-warehouse-with-data-vault-20) — The authoritative guide to Hubs, Links, Satellites, and hash key architectures.
+- [Designing Data-Intensive Applications (Martin Kleppmann)](https://dataintensive.net/) — Data models, query languages, storage engine architectures, and distributed transactions.
+- [Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores (Armbrust et al., VLDB 2020)](https://www.vldb.org/pvldb/vol13/p3411-armbrust.pdf) — Architectural principles behind transactional lakehouses.
+- [Databricks Documentation: Liquid Clustering & Data Modeling Guidance](https://docs.databricks.com/en/delta/clustering.html) — Modern multi-dimensional clustering in production lakehouses.

@@ -6,7 +6,7 @@ This guide defines the authoritative repository architecture, curriculum structu
 
 ## 1. Directory Tree & Architecture
 
-Each engineering track must reside in a dedicated root directory containing exactly **15 numbered core curriculum modules**, a **master study guide & index**, and a **`frequently_asked_questions/`** directory containing **10 to 12 scenario-based interview guides**:
+Each engineering track must reside in a dedicated root directory containing **strictly 10 numbered core curriculum modules (`01_` through `10_`)**, a **master study guide & index**, and—where interview questions exist—a **`frequently_asked_questions/`** directory containing **scenario-based interview guides** (strictly matching core topics 1:1):
 
 ```mermaid
 flowchart TD
@@ -14,22 +14,21 @@ flowchart TD
         direction TB
         MasterIndex["📄 00_&lt;track&gt;_study_guide_and_index.md<br/>(Master syllabus, 5-tier roadmap & 50-problem matrix)"]
         
-        subgraph CoreModules ["📁 Core Curriculum (Strict Linear Chronological Progression)"]
+        subgraph CoreModules ["📁 Core Curriculum (Strictly 10 Modules, Linear Progression)"]
             direction TB
             M01["📄 01_&lt;topic_slug&gt;.md (Tier 1 Foundational)"]
             M02["📄 02_&lt;topic_slug&gt;.md (Foundations)"]
-            MDots["📄 ... (03 through 14)"]
-            M15["📄 15_&lt;topic_slug&gt;.md (Tier 5 Systems Design / Capstone)"]
-            M01 --> M02 --> MDots --> M15
+            MDots["📄 ... (03 through 09/11)"]
+            M10["📄 10_&lt;topic_slug&gt;.md (Tier 5 Systems Design / Capstone)"]
+            M01 --> M02 --> MDots --> M10
         end
 
-        subgraph FAQDir ["📁 frequently_asked_questions/ (Scenario Interview Tracks)"]
+        subgraph FAQDir ["📁 frequently_asked_questions/ (1:1 Paired Tracks Where Questions Exist)"]
             direction TB
-            FAQIndex["📄 00_&lt;track&gt;_faq_study_guide_and_index.md (Question Roadmap)"]
-            RawQuestions["📄 &lt;track&gt;_interview_questions.md (Raw Question Backlog)"]
-            FAQ01["📄 01_&lt;topic_slug&gt;_faq.md (Topic FAQ)"]
-            FAQDots["📄 ... (02 through 10/12)"]
-            FAQIndex --- RawQuestions --- FAQ01 --- FAQDots
+            FAQIndex["📄 00_&lt;track&gt;_faq_study_guide_and_index.md<br/>(Question Roadmap, Coverage Matrix & Question Bank)"]
+            FAQ01["📄 01_&lt;topic_slug&gt;_faq.md (Topic 01 FAQ)"]
+            FAQDots["📄 ... (02 through 10)"]
+            FAQIndex --- FAQ01 --- FAQDots
         end
     end
 
@@ -42,25 +41,27 @@ flowchart TD
     style M01 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#ffffff
     style M02 fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#ffffff
     style MDots fill:#1f2937,stroke:#64748b,stroke-width:1.5px,color:#ffffff
-    style M15 fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#ffffff
+    style M10 fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#ffffff
     style FAQDir fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style FAQIndex fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#ffffff
-    style RawQuestions fill:#1f2937,stroke:#64748b,stroke-width:1.5px,color:#ffffff
     style FAQ01 fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#ffffff
     style FAQDots fill:#1f2937,stroke:#64748b,stroke-width:1.5px,color:#ffffff
 ```
 
-### 1.1 Standard File Naming Rules
-1. **Core Curriculum Modules:** Two-digit zero-padded numbers `01_` through `15_` followed by a snake_case topic slug (e.g., `01_core_java_and_oop.md`).
+### 1.1 Standard File Naming & Organization Rules
+1. **Core Curriculum Modules:** Two-digit zero-padded numbers `01_` through `10_` followed by a snake_case topic slug (e.g., `01_core_java_and_oop.md`). All engineering tracks consolidate domain knowledge into strictly 10 comprehensive modules.
 2. **Master Track Index:** `00_<track_slug>_study_guide_and_index.md` (e.g., `00_de_study_guide_and_index.md`, `00_java_study_guide_and_index.md`).
-3. **FAQ Directory:** Exactly `frequently_asked_questions/` (all lowercase snake_case).
-4. **FAQ Master Index:** `00_<track_slug>_faq_study_guide_and_index.md`.
-5. **Raw Question Source File:** `<track_slug>_interview_questions.md` (e.g., `data_engineering_interview_questions.md`, `java_backend_interview_questions.md` — never use spaces).
-6. **FAQ Scenario Modules:** Numbered `01_` through `10_` (or `12_`) using concise snake_case topic slugs followed by the mandatory `_faq.md` suffix (e.g., `01_core_java_oop_and_algorithms_faq.md`, `02_collections_framework_faq.md`, `01_sql_faq.md`). Do **not** append redundant `_interview_questions_and_answers.md` suffixes.
+3. **1:1 Topic-to-FAQ Pairing & Consistent Numeric Prefixes:**
+   - Every scenario question file in `frequently_asked_questions/` must directly correspond 1:1 to its base curriculum topic and share the exact same numeric prefix (e.g. `01_sql_and_advanced_querying.md` pairs with `frequently_asked_questions/01_sql_and_advanced_querying_faq.md`).
+   - Suffix for FAQ scenario files is strictly `_faq.md` (e.g., `01_sql_and_advanced_querying_faq.md`, `02_java_collections_and_generics_faq.md`).
+4. **No Placeholders Mandate:**
+   - Never create empty, stub, or placeholder FAQ files or directories where questions do not exist or are insufficient.
+   - If a track or topic has no questions, omit the FAQ directory or file entirely. For instance, tracks without question dumps retain 0 FAQ files, and tracks with partial questions only feature FAQ files for topics with real questions.
+5. **FAQ Master Study Guide & Question Bank:** `00_<track_slug>_faq_study_guide_and_index.md` (Unifies syllabus roadmap, Topic Guides & Coverage Overview matrix, and the complete master bank of interview questions organized by module and difficulty tier. Standalone `*_interview_questions.md` files are not created; questions are cataloged directly within the FAQ study guide).
 
 ---
 
-## 2. Core Curriculum Module Specification (`01_*.md` to `15_*.md`)
+## 2. Core Curriculum Module Specification (`01_*.md` to `10_*.md`)
 
 Every core module must follow a uniform, sequential structure:
 
@@ -103,10 +104,10 @@ Strictly numbered with verified GitHub markdown anchors:
 
 ```markdown
 ## Table of Contents
-1. [<Major Section 1>](#1-major-section-1)
-   - [1.1 <Subsection 1>](#11-standard-file-naming-rules)
-   - [1.2 <Subsection 2>](#12-subsection-2)
-2. [<Major Section 2>](#2-major-section-2)
+1. [<Major Section 1>](#2-mandatory-content-pillars-for-every-section)
+   - [1.1 <Subsection 1>](#11-standard-file-naming-organization-rules)
+   - [1.2 <Subsection 2>](#26-subsections-blueprint-1-through-8)
+2. [<Major Section 2>](#2-mandatory-content-pillars-for-every-section)
 ...
 9. [Summary Comparison & Engineering Reference Matrix](#9-summary-comparison--engineering-reference-matrix)
 10. [References & Further Reading](#10-references--further-reading)
@@ -145,16 +146,16 @@ Every numbered major section and subsection must systematically deliver:
 
 > [!WARNING]
 > **Eliminating "Agent Fatigue" and Context Degradation:**
-> When authoring multi-module curricula, AI agents often demonstrate "verbosity decay"—providing extensive, 2,000-word explanations with rich diagrams for Modules 01–03, but degrading into brief, superficial summaries and bullet points by Modules 10–15. This degradation is strictly forbidden.
+> When authoring multi-module curricula, AI agents often demonstrate "verbosity decay"—providing extensive, 2,000-word explanations with rich diagrams for Modules 01–03, but degrading into brief, superficial summaries and bullet points by Modules 08–10. This degradation is strictly forbidden.
 
 1. **The File-Independence Principle:**
-   - Every file (from `01_*.md` to `15_*.md` in core modules, and `01_*.md` to `12_*.md` in FAQ tracks) must be approached as a completely independent, fresh, standalone guide.
+   - Every file (from `01_*.md` to `10_*.md` in core modules, and `01_*.md` to `10_*.md` in FAQ tracks) must be approached as a completely independent, fresh, standalone guide.
    - Never assume that because a concept appears in a later module, it can be treated casually or summarized tersely.
 2. **Equal Depth Across the Entire Curriculum:**
-   - Modules 10 through 15 (which cover advanced distributed architectures, cloud platforms, streaming engines, and enterprise system designs) must receive the exact same or even greater depth, prose length, code complexity, and diagram density as Modules 01 through 03.
-   - Treat each file equally as a fresh, high-value resource. The reader may access Module 14 directly via search without ever reading Module 01.
+   - Modules 08 through 10 (which cover advanced distributed architectures, cloud platforms, streaming engines, and enterprise system designs) must receive the exact same or even greater depth, prose length, code complexity, and diagram density as Modules 01 through 03.
+   - Treat each file equally as a fresh, high-value resource. The reader may access Module 10 directly via search without ever reading Module 01.
 3. **Uniform Section Coverage:**
-   - Every core module must completely execute sections `# 1.` through `# 8.`, followed by `# 9. Summary Comparison & Engineering Reference Matrix` and `# 10. References & Further Reading`. No section may be omitted or collapsed into a single cursory paragraph.
+   - Every core module must completely execute sections `# 1.` through `# 8.`, followed by `# 9. Summary Comparison & Engineering Reference Matrix`, and mandatory final `# 10. References & Further Reading`. Topic-level FAQ links are embedded directly after each corresponding topic within the module rather than grouping all question links at the end of the file. No section may be omitted or collapsed into a single cursory paragraph.
 
 ---
 
@@ -171,15 +172,50 @@ Every numbered major section (`# 1.`) and subsection (`### 1.1`) must contain:
      - `> [!CAUTION]` for data corruption, memory leaks, or concurrency bugs.
      - `> [!IMPORTANT]` for architectural invariants or contracts.
      - `> [!TIP]` for performance optimizations.
-5. **Cross-References:** Explicit Markdown links to companion modules (e.g., `see [04. Database Internals](04_database_internals_and_performance.md#anchor)`).
+5. **Cross-References:** Explicit Markdown links to companion modules (e.g., `see [04. Database Internals](04_database_internals_and_distributed_systems.md#anchor)`).
+6. **Topic-Level FAQ Links (When Companion FAQ Exists):**
+   - Immediately after each corresponding topic section or subsection, embed links to relevant scenario-based interview questions using a dedicated GitHub alert block:
+     ```markdown
+     > [!TIP]
+     > **Deep-Dive Interview Scenario(s):**
+     > - [Q<N>. <Question Title>](frequently_asked_questions/NN_<slug>_faq.md#q<n>-<anchor>)
+     ```
+   - This provides immediate context for real-world interview scenarios directly adjacent to the foundational theory, rather than deferring all questions to a grouped section at the end of the file.
 
-### 2.7 Closing Sections (Mandatory)
+### 2.7 Code Block Integrity & Anti-Corruption Mandate
 
 > [!CAUTION]
-> **Strict Prohibition of End-of-File Checklists:**
-> Never add a checklist (e.g. `- [ ]` checkboxes, "Self-Assessment Checklist", or "Verification Checklist" sections) at the end of files. Instead, synthesize the core principles into an authoritative **Summary in Points** or **Structured Paragraph** (e.g., `Summary & Production Engineering Takeaways` or `Summary Comparison & Engineering Reference Matrix`), immediately followed by a mandatory **References & Further Reading** section.
+> **The Zero Code Block Corruption Mandate:**
+> Under no circumstances should Markdown structural formatting—such as horizontal rules (`---`), Markdown heading markers (`#`, `##`, `###`), alert blockquotes (`> [!TIP]`, `> [!IMPORTANT]`), or HTML tags—be injected inside programming code blocks (```` ```python ````, ```` ```bash ````, ```` ```yaml ````, ```` ```sql ````, ```` ```java ````).
+>
+> 1. **Code Comment Purity:** Comments inside code blocks must remain native language comments (e.g., `# Step 1:` in Python/Bash/YAML, `// Step 1:` in Java/Go/C++, `-- Step 1:` in SQL). Never prepend `\n---\n\n#` to code comments. Doing so causes fatal `SyntaxError` breaks, invalidates YAML multi-document parsing, crashes execution, and causes Markdown parsers to treat inline comments as H1/H2 document headings.
+> 2. **Alert Block Placement:** Interview scenario alert blocks (`> [!TIP]`) must always reside in the prose flow directly before or after a code snippet, never nested within code blocks.
+> 3. **Syntax Verifiability:** All code examples must be syntactically valid and runnable in their respective languages without requiring manual sanitization.
 
-Every core guide must conclude with:
+---
+
+### 2.8 Heading Sequencing & Table of Contents Anchor Conventions
+
+1. **Deterministic Linear Progression:**
+   - Section numbers in core modules must advance sequentially from `# 1.` through `# 8.` (or `# N.`), followed by `# N+1. Summary Comparison & Engineering Reference Matrix` (or `Summary & Production Engineering Takeaways`) and mandatory final `# N+2. References & Further Reading`.
+   - Never introduce artificial heading leaps or phantom sections caused by unescaped code comments.
+2. **GitHub-Flavored Markdown Anchor Normalization:**
+   - Table of Contents entries must strictly resolve to valid headings.
+   - When generating anchors:
+     - Backtick characters (`` `code` ``) are stripped, but enclosed underscores (e.g. `__slots__`, `row_number`) are preserved.
+     - Punctuation characters (`.`, `,`, `(`, `)`, `&`, `|`, etc.) are stripped, and whitespace sequences collapse to single hyphens.
+     - Punctuation-only tokens inside parentheses (e.g. `(`&&`, `||`)`) produce trailing double hyphens (`--`) after whitespace collapsing and punctuation stripping.
+     - Always verify TOC anchors against document headings using automated link verification.
+
+---
+
+### 2.9 Closing Sections (Mandatory)
+
+> [!CAUTION]
+> **Strict Prohibition of End-of-File Checklists & Duplicate Dividers:**
+> Never add a checklist (e.g. `- [ ]` checkboxes, "Self-Assessment Checklist", or "Verification Checklist" sections) at the end of files. Instead, synthesize the core principles into an authoritative **Summary Comparison & Engineering Reference Matrix** or **Summary & Production Engineering Takeaways**, immediately followed by the mandatory **References & Further Reading** section. Duplicate horizontal dividers (`---\n\n---`) or trailing dividers at the end of files are strictly prohibited.
+
+Every guide across the repository must conclude with the following sequence:
 1. **Summary Section (`# N. Summary Comparison & Engineering Reference Matrix` or `# N. Summary & Production Engineering Takeaways`):**
    - Provide a comprehensive, senior-level synthesis of key concepts, production invariants, and architectural trade-offs using structured bullet points or narrative paragraphs (whatever best suits the domain).
    - For comparative modules, include a multi-dimensional comparison table of key features, complexity, latency percentiles, and operational rules.
@@ -187,6 +223,7 @@ Every core guide must conclude with:
 2. **References & Further Reading Section (`# N+1. References & Further Reading`):**
    - Mandatory in every module without exception.
    - Curated Markdown links to authoritative sources: official engine/framework documentation, RFCs, ISO/ANSI standards, academic research papers, and seminal engineering books (e.g., Martin Kleppmann, Ralph Kimball).
+
 ---
 
 ## 3. Master Study Guide & Index Specification (`00_*_study_guide_and_index.md`)
@@ -194,12 +231,12 @@ Every core guide must conclude with:
 Each track root must contain a master curriculum guide containing:
 
 ### 3.1 5-Tier Chronological Mermaid Roadmap
-Modules must strictly follow linear numbering across tiers:
-* **Tier 1 (Modules 01–03):** Core Languages & Low-Level Foundations
-* **Tier 2 (Modules 04–06):** Storage Engines, Architecture & Data Modeling
-* **Tier 3 (Modules 07–09):** Core Frameworks, Runtimes & Execution Engines
-* **Tier 4 (Modules 10–12):** Ingestion, Caching, Streaming & Persistence
-* **Tier 5 (Modules 13–15):** Distributed Systems, Cloud, Ops & System Design
+Modules strictly follow linear numbering across 5 tiers (strictly 10 modules total, 2 modules per tier):
+* **Tier 1 (Modules 01–02):** Core Languages & Low-Level Foundations
+* **Tier 2 (Modules 03–04):** Storage Engines, Architecture & Data Modeling
+* **Tier 3 (Modules 05–06):** Core Frameworks, Runtimes & Execution Engines
+* **Tier 4 (Modules 07–08):** Ingestion, Caching, Streaming & Persistence
+* **Tier 5 (Modules 09–10):** Distributed Systems, Cloud, Ops & System Design
 
 ```mermaid
 flowchart TD
@@ -228,9 +265,28 @@ Summary links to all scenario files within `frequently_asked_questions/`.
 
 ---
 
-## 4. Interview FAQ Guide Specification (`frequently_asked_questions/NN_*_faq.md`)
+## 4. Interview FAQ Track & Question Bank Specification
 
-### 4.1 Header & Clustered TOC
+The `frequently_asked_questions/` directory combines scenario deep-dives with a unified master study guide and question bank. Separate raw question files (e.g. `*_interview_questions.md`) must not be created; all questions are cataloged directly within the track's master FAQ guide.
+
+### 4.1 FAQ Master Study Guide & Question Bank (`00_<track>_faq_study_guide_and_index.md`)
+
+Each FAQ track root must contain a master syllabus and unified question bank containing:
+1. **Header & Context:** Scope summary connecting scenarios to real-world production engineering.
+2. **Recommended Chronological Study Order:** Multi-tier Mermaid flowchart (`flowchart TD` or `flowchart LR`) illustrating the linear progression across foundational, framework, and distributed architecture tracks.
+3. **Topic Guides & Coverage Overview Table (Proportional Legibility & Formatting Mandate):**
+   - **Balanced Row Height & Width:** Every row must maintain balanced proportions (~3–4 lines tall across all columns) to prevent distorted rows where some columns are stretched out horizontally while others form excessively tall vertical towers.
+   - **Balanced File Link Wrapping:** Long filenames in `Guide File` and `Corresponding Base Concepts` must be wrapped into **at most 2 balanced lines** at natural word boundaries/underscores (e.g., ``[`01_machine_learning_`<br/>`and_deep_learning_faq.md`](...)``). Short filenames (e.g. `01_sql_and_advanced_querying_faq.md`) must remain on a single line.
+   - **Base Concepts Compaction:** Multiple base concepts must be separated by a single `<br/>` without blank lines or excessive multi-line splitting.
+   - **Structured Thematic Bullets for Scenarios:** The `Key Topics & Grouped Scenarios` column must **never** contain an unformatted, 1,000-character run-on paragraph. It must be organized into 2–3 structured thematic bullet points (e.g., `• **Foundations:** ...<br/>• **Architecture:** ...<br/>• **Production Triage:** ...`), keeping each bullet line concise and readable.
+4. **Master Topic Directory & Difficulty Matrix:** Summary breakdown of questions per module across difficulty tiers (`Easy`, `Medium`, `Hard`, `Expert`), with wrapped companion guide links.
+5. **Master Question Bank Sections (`## 01 – ...` to `## NN – ...`):**
+   - Complete, permanent collection of questions partitioned by topic module.
+   - Every question entry includes its difficulty rating badge (e.g. `**[Easy]**`, `**[Medium]**`, `**[Hard]**`, `**[Expert]**`) and a verified direct anchor link to its deep-dive solution in the companion scenario module (`→ [Solution](NN_*_faq.md#anchor)`).
+
+### 4.2 Scenario FAQ Module Specification (`frequently_asked_questions/NN_*_faq.md`)
+
+### 4.2.1 Header & Clustered TOC
 ```markdown
 # NN. <Topic Title>: Interview Questions & Deep-Dive Solutions
 
@@ -241,13 +297,13 @@ A comprehensive, production-grade guide answering real-world <Topic> interview s
 ## Table of Contents & Question Mapping
 
 1. **<Thematic Cluster 1>**
-   - [Q1. <Question Title>](#q1-question-title)
-   - [Q2 & Q3. <Grouped Question Title>](#q2--q3-grouped-question-title)
+   - [Q1. <Question Title>](#nn-topic-title-interview-questions-deep-dive-solutions)
+   - [Q2 & Q3. <Grouped Question Title>](#nn-topic-title-interview-questions-deep-dive-solutions)
 ...
 ---
 ```
 
-### 4.2 Standard Question Entry Blueprint
+### 4.2.2 Standard Question Entry Blueprint
 ```markdown
 ### Q<N>. <Question Title>
 *(If questions are grouped: Grouped together: <Reason for grouping>)*  
@@ -272,7 +328,7 @@ A comprehensive, production-grade guide answering real-world <Topic> interview s
 2. **<Interview Talking Point>:** <Key trade-off or nuance that demonstrates senior expertise.>
 ```
 
-### 4.3 FAQ Pedagogical Depth & Cross-Question Consistency Mandate
+### 4.2.3 FAQ Pedagogical Depth & Cross-Question Consistency Mandate
 
 1. **Comprehensive Deep-Dive Solutions vs. Brief Interview Tips:**
    - FAQ solutions must never be summarized into two-sentence soundbites, generic definitions, or high-level bullet lists.
@@ -284,7 +340,7 @@ A comprehensive, production-grade guide answering real-world <Topic> interview s
      - Explicit $O(...)$ time and space complexity annotations.
      - Deep engineering implications, production anti-patterns, and nuanced interview talking points.
 2. **Strict Non-Degrading Verbosity Across All Questions:**
-   - Maintain uniform depth, prose density, and code completeness from Question 1 through to the final question in the file (e.g., Q10 or Q12).
+   - Maintain uniform depth, prose density, and code completeness from Question 1 through to the final question in the file.
    - Never taper off in depth or omit visual diagrams and code blocks for later questions in the file.
 
 ---
@@ -834,15 +890,18 @@ timeline
 ## 6. Pre-Commit Verification Checklist for Future Agents
 
 Before marking any new topic or track complete, verify:
-- [ ] Exactly 15 core curriculum files (`01_` to `15_`) in the track root, numbered in strict reading order.
+- [ ] Strictly 10 core curriculum files (`01_` to `10_`) in the track root, numbered in strict reading order.
 - [ ] `00_<track>_study_guide_and_index.md` contains the 5-tier roadmap, curriculum table, and 50-problem matrix.
+- [ ] **1:1 Topic-to-FAQ Parity:** Where interview questions exist, scenario FAQ files match core topics 1:1 with identical numeric prefixes (`NN_*.md` ↔ `frequently_asked_questions/NN_*_faq.md`).
+- [ ] **No Placeholders Mandate:** No empty or stub FAQ directories/files exist where questions are absent or insufficient. Tracks without questions retain 0 FAQ files.
+- [ ] **Topic-to-FAQ Links:** Each core topic concluding section contains `# N+1. Interview Questions & Deep-Dive FAQ References` linking to corresponding FAQ questions (only when companion FAQ exists), without modifying or duplicating FAQ content.
 - [ ] Subdirectory is named `frequently_asked_questions/` (lowercase snake_case).
-- [ ] `frequently_asked_questions/00_<track>_faq_study_guide_and_index.md` exists with an interview study roadmap.
-- [ ] Raw question backlog is named `<track>_interview_questions.md` without spaces.
-- [ ] FAQ files use concise slugs followed by the mandatory `_faq.md` suffix (e.g., `01_core_java_oop_and_algorithms_faq.md`, `01_sql_faq.md`).
+- [ ] `frequently_asked_questions/00_<track>_faq_study_guide_and_index.md` exists with an interview study roadmap, legible wrapped tables, and complete question bank (no standalone `*_interview_questions.md` files).
+- [ ] Topic Guides & Coverage Overview table in the FAQ study guide uses `<br/>` soft wraps on long file links so other columns retain adequate horizontal space.
+- [ ] FAQ files use concise slugs followed by the mandatory `_faq.md` suffix (e.g., `01_core_java_and_oop_faq.md`, `01_sql_and_advanced_querying_faq.md`).
 - [ ] Hero architecture diagram appears **before** the Table of Contents in each core guide.
 - [ ] **Pedagogical Depth (Fresh Learning Resource Standard):** Written as an authoritative, first-principles textbook/resource rather than terse revision notes. Fully elaborated for beginners (clear definitions, explaining the "why", progressive disclosure) with rigorous low-level internals, failure modes, and hardware/OS mechanics for experienced engineers.
-- [ ] **Non-Degrading Cross-File Consistency:** Every module is treated as completely fresh and standalone. Later modules (Modules 08–15) and questions maintain the exact same (or greater) depth, word count, code detail, and diagram density as early modules. No verbosity decay or agent fatigue across files.
+- [ ] **Non-Degrading Cross-File Consistency:** Every module is treated as completely fresh and standalone. Later modules (Modules 08–10) and questions maintain the exact same (or greater) depth, word count, code detail, and diagram density as early modules. No verbosity decay or agent fatigue across files.
 - [ ] **Universal Zero-ASCII Rule:** Zero ASCII directory trees (`├──`, `└──`), zero ASCII tables (`+---+`), zero ASCII box architecture diagrams, and zero ASCII memory maps throughout the entire file.
 - [ ] **Pragmatic Modality Selection:** Markdown tables are used for multi-attribute comparisons, trade-off matrices, and reference parameters; Mermaid diagrams are purposefully used for structural, sequential, and relational flows (no blind Mermaid overuse).
 - [ ] **TreeView Enforcement:** All directory and folder structures use Mermaid TreeView (`flowchart TD` with `📁` and `📄` badges).
@@ -857,6 +916,9 @@ Before marking any new topic or track complete, verify:
 - [ ] Diagrams avoid monolithic vertical towers (5+ nodes in linear `flowchart TD`) and squished single-line horizontal streams (5+ nodes in `flowchart LR`); multi-step workflows adhere to the Hybrid Multi-Stage pattern (`flowchart TD` with `direction LR` subgraphs).
 - [ ] Code blocks contain step-by-step inline comments; complexities use KaTeX ($O(1)$, $O(N)$).
 - [ ] All intra-repository links (`[text](file.md#anchor)`) resolve without broken anchors.
+- [ ] **Zero Code Block Corruption:** No Markdown dividers (`---`), Markdown headings (`#`, `##`), or alert blocks (`> [!TIP]`) appear inside programming code blocks. Code blocks contain valid syntax and compile/parse cleanly.
+- [ ] **TOC Anchor Integrity:** Every link in the Table of Contents resolves without broken anchors, following GitHub anchor normalization rules (backtick removal, underscore preservation, trailing hyphens).
+- [ ] **Cross-File Link Integrity:** All cross-file links in study guides and curriculum modules resolve to existing files and valid anchors.
 - [ ] **No End-of-File Checklists (Summary & References Enforcement):** Ensure the file does NOT conclude with a checklist or `- [ ]` checkboxes. The guide must conclude with an authoritative summary in points or structured paragraphs (`Summary & Production Engineering Takeaways` or `Summary Comparison & Engineering Reference Matrix`) followed by a comprehensive, link-verified `References & Further Reading` section.
 
 

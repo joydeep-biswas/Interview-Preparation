@@ -59,7 +59,7 @@ flowchart TD
 3. [Method Dispatch: Overloading vs Overriding](#3-method-dispatch-overloading-vs-overriding)
    - [3.1 Method Overloading (Compile-Time Static Resolution)](#31-method-overloading-compile-time-static-resolution)
    - [3.2 Method Overriding (Runtime Dynamic Dispatch via `vtable`)](#32-method-overriding-runtime-dynamic-dispatch-via-vtable)
-   - [3.3 Covariant Return Types & Exception Narrowing Rules](#33-covariant-return-types-exception-narrowing-rules)
+   - [3.3 Covariant Return Types & Exception Narrowing Rules](#33-covariant-return-types--exception-narrowing-rules)
    - [3.4 Method Hiding (`static`) vs Overriding](#34-method-hiding-static-vs-overriding)
 4. [Java Keywords & Language Guarantees](#4-java-keywords--language-guarantees)
    - [4.1 `this` and `super` In Detail](#41-this-and-super-in-detail)
@@ -72,7 +72,7 @@ flowchart TD
 6. [Java Value Semantics, Primitives & Wrappers](#6-java-value-semantics-primitives--wrappers)
    - [6.1 Strictly Pass-by-Value Mechanics (Stack & Heap Memory Tracing)](#61-strictly-pass-by-value-mechanics-stack--heap-memory-tracing)
    - [6.2 The 8 Primitives vs Wrapper Classes & Autoboxing Hazards](#62-the-8-primitives-vs-wrapper-classes--autoboxing-hazards)
-   - [6.3 The Integer Cache (`-128` to `127`) & Equality Pitfalls (`==` vs `equals()`)](#63-the-integer-cache--128-to-127--equality-pitfalls-vs-equals)
+   - [6.3 The Integer Cache (`-128` to `127`) & Equality Pitfalls (`==` vs `equals()`)](#63-the-integer-cache--128-to-127--equality-pitfalls--vs-equals)
 7. [Nested, Inner & Anonymous Classes](#7-nested-inner--anonymous-classes)
    - [7.1 Static Nested Classes vs Inner Classes](#71-static-nested-classes-vs-inner-classes)
    - [7.2 Anonymous Classes vs Modern Lambdas](#72-anonymous-classes-vs-modern-lambdas)
@@ -88,9 +88,8 @@ flowchart TD
    - [9.4 Object Cleanup: Deprecated `finalize()` vs `Cleaner` & `AutoCloseable`](#94-object-cleanup-deprecated-finalize-vs-cleaner--autocloseable)
 10. [Advanced Production Case Study: Object Graph Cycle Detection](#10-advanced-production-case-study-object-graph-cycle-detection)
 11. [Production Troubleshooting Playbook](#11-production-troubleshooting-playbook)
-12. [Summary Comparison & Engineering Reference Matrix](#12-summary-comparison--engineering-reference-matrix)
+12. [Summary Comparison & Production Engineering Reference Matrix](#12-summary-comparison--production-engineering-reference-matrix)
 13. [References & Further Reading](#13-references--further-reading)
-
 ---
 
 # 1. Foundations: Classes, Objects & Java Program Execution
@@ -258,7 +257,6 @@ public class UserProfile {
 
 Java defines three distinct categories of variables based on where they are declared, how long they live, and where they reside in physical JVM memory:
 
-
 | Characteristic | Local Variable | Instance Variable (Field) | Static Variable (Class Field) |
 | :--- | :--- | :--- | :--- |
 | **Where Declared** | Inside a method, constructor, or `{}` block | Inside class, outside any method (without `static`) | Inside class, marked with `static` |
@@ -291,6 +289,17 @@ public class VariableScopingDemo {
     }
 }
 ```
+
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q1. Reverse a String Without Built-ins](frequently_asked_questions/01_core_java_and_oop_faq.md#q1-reverse-a-string-without-built-ins)
+> - [Q2. Convert First Half to Lowercase & Second Half to Uppercase](frequently_asked_questions/01_core_java_and_oop_faq.md#q2-convert-first-half-to-lowercase--second-half-to-uppercase)
+> - [Q3. First Non-Repeating Character in a String](frequently_asked_questions/01_core_java_and_oop_faq.md#q3-first-non-repeating-character-in-a-string)
+> - [Q4. Longest Substring Without Repeating Characters](frequently_asked_questions/01_core_java_and_oop_faq.md#q4-longest-substring-without-repeating-characters)
+> - [Q5. Longest Common Prefix in an Array of Strings](frequently_asked_questions/01_core_java_and_oop_faq.md#q5-longest-common-prefix-in-an-array-of-strings)
+> - [Q8. Print Prime Numbers Between 1 and 200 (Minimal Complexity)](frequently_asked_questions/01_core_java_and_oop_faq.md#q8-print-prime-numbers-between-1-and-200-minimal-complexity)
+> - [Q10. Path Sum Verification in a Binary Tree (Root to Leaf)](frequently_asked_questions/01_core_java_and_oop_faq.md#q10-path-sum-verification-in-a-binary-tree-root-to-leaf)
+> - [Q31. Records, Standard Classes & Sealed Classes in Production](frequently_asked_questions/01_core_java_and_oop_faq.md#q31-records-standard-classes--sealed-classes-in-production)
 
 ---
 
@@ -556,6 +565,13 @@ public abstract class AbstractDatabaseService {
 }
 ```
 
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q6. Remove Duplicates from an Array in a Single Iteration](frequently_asked_questions/01_core_java_and_oop_faq.md#q6-remove-duplicates-from-an-array-in-a-single-iteration)
+> - [Q7. Rearrange Integer Array: Even Before Odd](frequently_asked_questions/01_core_java_and_oop_faq.md#q7-rearrange-integer-array-even-before-odd)
+> - [Q9. Reverse a Singly Linked List (Iterative & Recursive)](frequently_asked_questions/01_core_java_and_oop_faq.md#q9-reverse-a-singly-linked-list-iterative--recursive)
+> - [Q16. Composition Over Inheritance](frequently_asked_questions/01_core_java_and_oop_faq.md#q16-composition-over-inheritance)
+
 ---
 
 # 3. Method Dispatch: Overloading vs Overriding
@@ -582,19 +598,48 @@ When the compiler encounters an overloaded method call, it evaluates candidates 
 4. **Varargs**: `int...` (lowest priority, considered only if no other match exists).
 
 ```mermaid
-flowchart LR
-    Call["Overloaded Call: process(42)"] --> Step1{"1. Exact primitive match?<br/>process(int)"}
-    Step1 -- No --> Step2{"2. Primitive Widening?<br/>process(long) / process(double)"}
-    Step2 -- No --> Step3{"3. Autoboxing?<br/>process(Integer)"}
-    Step3 -- No --> Step4{"4. Varargs?<br/>process(int...)"}
-    Step4 -- No --> Error["Compilation Error: No suitable method found"]
+flowchart TD
+    Call["<b>Overloaded Call</b><br/>process(42) - int literal"]
 
-    style Call fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style Step1 fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#fff
-    style Step2 fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#fff
-    style Step3 fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fff
-    style Step4 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
-    style Error fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+    subgraph Phase1 ["Phase 1: Primitive & Exact Matching"]
+        direction LR
+        Step1{"1. Exact Type Match?"}
+        ExactMatch["<b>Invoke Exact</b><br/>process(int)"]
+        Step2{"2. Primitive Widening?"}
+        WidenMatch["<b>Invoke Widened</b><br/>process(long/double)"]
+        Step1 -- "Yes" --> ExactMatch
+        Step1 -- "No" --> Step2
+        Step2 -- "Yes" --> WidenMatch
+    end
+
+    subgraph Phase2 ["Phase 2: Reference Boxing & Varargs Fallback"]
+        direction LR
+        Step3{"3. Autoboxing?"}
+        BoxMatch["<b>Invoke Boxed</b><br/>process(Integer)"]
+        Step4{"4. Varargs Fallback?"}
+        VarargsMatch["<b>Invoke Varargs</b><br/>process(int... / Object...)"]
+        Ambiguity["<b>Compiler Error</b><br/>Ambiguous method call"]
+        Step3 -- "Yes" --> BoxMatch
+        Step3 -- "No" --> Step4
+        Step4 -- "Yes" --> VarargsMatch
+        Step4 -- "No" --> Ambiguity
+    end
+
+    Call --> Phase1
+    Step2 -- "No" --> Phase2
+
+    style Call fill:#0f172a,stroke:#64748b,stroke-width:2px,color:#f8fafc
+    style Phase1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Phase2 fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
+    style Step1 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style ExactMatch fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style Step2 fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style WidenMatch fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style Step3 fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
+    style BoxMatch fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style Step4 fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#c4b5fd
+    style VarargsMatch fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
+    style Ambiguity fill:#1e1e2e,stroke:#ef4444,stroke-width:2px,color:#fca5a5
 ```
 
 #### The Classic Ambiguity Trap with `null`:
@@ -690,6 +735,12 @@ public class DispatchDemo {
     }
 }
 ```
+
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q19. Overriding Static Methods & Method Hiding](frequently_asked_questions/01_core_java_and_oop_faq.md#q19-overriding-static-methods--method-hiding)
+> - [Q34. Static Method Hiding vs Dynamic Method Overriding in Java Inheritance](frequently_asked_questions/01_core_java_and_oop_faq.md#q34-static-method-hiding-vs-dynamic-method-overriding-in-java-inheritance)
+> - [Q37. Checked vs Unchecked Exceptions, Performance Overhead & `@ControllerAdvice` Exception Handling](frequently_asked_questions/01_core_java_and_oop_faq.md#q37-checked-vs-unchecked-exceptions-performance-overhead--controlleradvice-exception-handling)
 
 ---
 
@@ -787,6 +838,17 @@ public void processMessageModern(Object message) {
     }
 }
 ```
+
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q11. `==` vs `equals()` and the String Pool Mechanism](frequently_asked_questions/01_core_java_and_oop_faq.md#q11--vs-equals-and-the-string-pool-mechanism)
+> - [Q12. Short-Circuiting with Logical Operators (`&&`, `||`)](frequently_asked_questions/01_core_java_and_oop_faq.md#q12-short-circuiting-with-logical-operators)
+> - [Q13. Constructors and Invoking Static Methods Inside Constructors](frequently_asked_questions/01_core_java_and_oop_faq.md#q13-constructors-and-invoking-static-methods-inside-constructors)
+> - [Q14. `final`, `finally`, and `finalize()`](frequently_asked_questions/01_core_java_and_oop_faq.md#q14-final-finally-and-finalize)
+> - [Q15. `ClassCastException`: Root Causes and Prevention](frequently_asked_questions/01_core_java_and_oop_faq.md#q15-classcastexception-root-causes-and-prevention)
+> - [Q29. Text Blocks and Multiline Strings](frequently_asked_questions/01_core_java_and_oop_faq.md#q29-text-blocks-and-multiline-strings)
+> - [Q30. Pattern Matching for `switch`](frequently_asked_questions/01_core_java_and_oop_faq.md#q30-pattern-matching-for-switch)
+> - [Q32. Virtual Threads (Project Loom) vs Platform Threads](frequently_asked_questions/01_core_java_and_oop_faq.md#q32-virtual-threads-project-loom-vs-platform-threads)
 
 ---
 
@@ -1058,6 +1120,10 @@ public class HeavyReportService {
 }
 ```
 
+> [!TIP]
+> **Deep-Dive Interview Scenario:**
+> - [Q20. Anonymous Inner Classes & Scoping](frequently_asked_questions/01_core_java_and_oop_faq.md#q20-anonymous-inner-classes--scoping)
+
 ---
 
 # 8. The HotSpot JVM Object Model & Memory Layout
@@ -1097,7 +1163,6 @@ flowchart TD
 | **Instance Data** | Variable | Variable | Primitive variables and compressed 32-bit reference pointers to other heap instances. |
 | **Alignment Padding** | $0\text{--}56$ bits | $0\text{--}7$ Bytes | Round-up padding ensuring 8-byte CPU cache boundary alignment. |
 
-
 1. **Mark Word (64 bits / 8 bytes)**: Stores runtime metadata dynamically updated by the JVM:
    * **Identity Hash Code** (31 bits): Computed on first invocation of `System.identityHashCode(obj)`.
    * **GC Age** (4 bits): Tracks survival cycles across young generation survivor spaces (range: $0$ to $15$).
@@ -1125,6 +1190,15 @@ The JVM exploits this by shifting addresses right by 3 bits, compressing 64-bit 
 To prevent thread contention when hundreds of threads allocate objects simultaneously:
 * **TLAB (Thread-Local Allocation Buffer)**: HotSpot assigns each thread an exclusive slice of Eden space. Inside its TLAB, allocating an object is a simple, lock-free **bump-the-pointer** operation ($O(1)$).
 * **Escape Analysis & Scalar Replacement**: The C2 JIT compiler analyzes whether an object escapes the method allocating it. If an object is strictly local and never passed to external methods, heap allocation is omitted entirely: the object is decomposed into primitive variables mapped directly into **CPU registers or stack slots**.
+
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q23. `StringBuffer` vs `StringBuilder`](frequently_asked_questions/01_core_java_and_oop_faq.md#q23-stringbuffer-vs-stringbuilder)
+> - [Q24. JVM Memory Architecture & Handling `OutOfMemoryError`](frequently_asked_questions/01_core_java_and_oop_faq.md#q24-jvm-memory-architecture--handling-outofmemoryerror)
+> - [Q25. ClassLoader Architecture and Delegation Model](frequently_asked_questions/01_core_java_and_oop_faq.md#q25-classloader-architecture-and-delegation-model)
+> - [Q26. Java Reflection API & Dynamic Proxies](frequently_asked_questions/01_core_java_and_oop_faq.md#q26-java-reflection-api--dynamic-proxies)
+> - [Q27. Java NIO `Path` vs Classic IO `File`](frequently_asked_questions/01_core_java_and_oop_faq.md#q27-java-nio-path-vs-classic-io-file)
+> - [Q28. Tail Call Optimization in Java](frequently_asked_questions/01_core_java_and_oop_faq.md#q28-tail-call-optimization-in-java)
 
 ---
 
@@ -1231,6 +1305,13 @@ System.out.println(map.get(id2)); // Returns null! Even though id1.equals(id2) i
 * **`finalize()` (Deprecated in Java 9, removed in modern specs)**: Unpredictable, delays GC cycles, can resurrect dead objects, and causes severe performance bottlenecks.
 * **Modern Standard**: Use `AutoCloseable` with `try-with-resources` for deterministic resource reclamation, or `java.lang.ref.Cleaner` for asynchronous safety-net cleanup.
 
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q17. Interface vs Abstract Class & Static vs Default Methods](frequently_asked_questions/01_core_java_and_oop_faq.md#q17-interface-vs-abstract-class--static-vs-default-methods)
+> - [Q18. Marker Interfaces and Modern Alternatives](frequently_asked_questions/01_core_java_and_oop_faq.md#q18-marker-interfaces-and-modern-alternatives)
+> - [Q21. Designing Completely Immutable Classes](frequently_asked_questions/01_core_java_and_oop_faq.md#q21-designing-completely-immutable-classes)
+> - [Q22. Shallow Copy vs Deep Copy](frequently_asked_questions/01_core_java_and_oop_faq.md#q22-shallow-copy-vs-deep-copy)
+
 ---
 
 # 10. Advanced Production Case Study: Object Graph Cycle Detection
@@ -1324,6 +1405,13 @@ public final class CycleDetector {
     }
 }
 ```
+
+> [!TIP]
+> **Deep-Dive Interview Scenarios:**
+> - [Q33. Detect a Cycle in a Singly Linked List Without Using Extra Space](frequently_asked_questions/01_core_java_and_oop_faq.md#q33-detect-a-cycle-in-a-singly-linked-list-without-using-extra-space)
+> - [Q35. Character Parity / Zero vs One Frequency Comparison Without Using a Third Variable](frequently_asked_questions/01_core_java_and_oop_faq.md#q35-character-parity--zero-vs-one-frequency-comparison-without-using-a-third-variable)
+> - [Q36. Highest Average Student Score (Rounded Down) from Tabular Data](frequently_asked_questions/01_core_java_and_oop_faq.md#q36-highest-average-student-score-rounded-down-from-tabular-data)
+> - [Q38. Validating Balanced Parentheses / Brackets: Stack-Based vs Recursive Stackless Approaches](frequently_asked_questions/01_core_java_and_oop_faq.md#q38-validating-balanced-parentheses--brackets-stack-based-vs-recursive-stackless-approaches)
 
 ---
 
@@ -1459,7 +1547,7 @@ public final class CycleDetector {
 
 ---
 
-# 12. Summary Comparison & Engineering Reference Matrix
+# 12. Summary Comparison & Production Engineering Reference Matrix
 
 | Feature / Concept | Low-Level JVM / Language Mechanism | Production Engineering Rule |
 | :--- | :--- | :--- |
@@ -1477,6 +1565,8 @@ public final class CycleDetector {
 ---
 
 # 13. References & Further Reading
+
+---
 
 - [Oracle Java Language Specification - Classes & Objects](https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html)
 - [Oracle HotSpot Virtual Machine Garbage Collection Tuning Guide](https://docs.oracle.com/en/java/javase/21/gctuning/)

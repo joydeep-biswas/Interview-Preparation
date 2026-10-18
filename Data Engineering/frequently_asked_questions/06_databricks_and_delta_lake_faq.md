@@ -7,39 +7,39 @@ A comprehensive, production-grade guide answering Databricks and Delta Lake inte
 ## Table of Contents & Question Mapping
 
 1. **Delta Lake Architecture & ACID Transaction Internals**
-   - [Q22. Delta Lake Architecture & ACID Transaction Internals](#q22-delta-lake-architecture--acid-transaction-internals)
+   - [Q1. Delta Lake Architecture & ACID Transaction Internals](#q1-delta-lake-architecture--acid-transaction-internals)
 2. **Incremental Loading, MERGE Semantics & Multiple-Match Trap**
-   - [Q3. When to Use MERGE vs INSERT](#q3-when-to-use-merge-vs-insert)
-   - [Q1 & Q2. Incremental Loading Architecture & CDC Ingestion](#q1--q2-incremental-loading-architecture--cdc-ingestion)
-   - [Q5. The Multiple-Match MERGE Trap & Resolution](#q5-the-multiple-match-merge-trap--resolution)
+   - [Q2. When to Use MERGE vs INSERT](#q2-when-to-use-merge-vs-insert)
+   - [Q3. Incremental Loading Architecture & CDC Ingestion](#q3-incremental-loading-architecture--cdc-ingestion)
+   - [Q4. The Multiple-Match MERGE Trap & Resolution](#q4-the-multiple-match-merge-trap--resolution)
 3. **Slowly Changing Dimensions (SCD 1 & 2) in Delta Lake**
-   - [Q4. Slowly Changing Dimensions (SCD Types 1 & 2) in Delta Lake](#q4-slowly-changing-dimensions-scd-types-1--2-in-delta-lake)
+   - [Q5. Slowly Changing Dimensions (SCD Types 1 & 2) in Delta Lake](#q5-slowly-changing-dimensions-scd-types-1--2-in-delta-lake)
 4. **Physical Table Maintenance: OPTIMIZE, Z-ORDER & VACUUM**
-   - [Q7. Physical Table Maintenance: OPTIMIZE, Z-ORDER & VACUUM](#q7-physical-table-maintenance-optimize-z-order--vacuum)
-   - [Q13, Q15 & Q19. Optimizing Multi-TB Tables with Frequent Mutations & Small Files](#q13-q15--q19-optimizing-multi-tb-tables-with-frequent-mutations--small-files)
-   - [Q23. Millions of Small Files in ADLS: Root Causes & Resolution in Databricks](#q23-millions-of-small-files-in-adls-root-causes--resolution-in-databricks)
-   - [Q24. Partitioning Strategy & Liquid Clustering in Azure Databricks](#q24-partitioning-strategy--liquid-clustering-in-azure-databricks)
+   - [Q6. Physical Table Maintenance: OPTIMIZE, Z-ORDER & VACUUM](#q6-physical-table-maintenance-optimize-z-order--vacuum)
+   - [Q7. Optimizing Multi-TB Tables with Frequent Mutations & Small Files](#q7-optimizing-multi-tb-tables-with-frequent-mutations--small-files)
+   - [Q8. Millions of Small Files in ADLS: Root Causes & Resolution in Databricks](#q8-millions-of-small-files-in-adls-root-causes--resolution-in-databricks)
+   - [Q9. Partitioning Strategy & Liquid Clustering in Azure Databricks](#q9-partitioning-strategy--liquid-clustering-in-azure-databricks)
 5. **Time Travel, Disaster Recovery & Deployment Rollbacks**
-   - [Q6. Recovering Deleted or Overwritten Delta Data via Time Travel](#q6-recovering-deleted-or-overwritten-delta-data-via-time-travel)
-   - [Q16. Automated Rollback Strategy for Failed Deployments](#q16-automated-rollback-strategy-for-failed-deployments)
+   - [Q10. Recovering Deleted or Overwritten Delta Data via Time Travel](#q10-recovering-deleted-or-overwritten-delta-data-via-time-travel)
+   - [Q11. Automated Rollback Strategy for Failed Deployments](#q11-automated-rollback-strategy-for-failed-deployments)
 6. **Databricks Cluster Architecture & 3x Slowdown Diagnostics**
    - [Q12. Job Clusters vs All-Purpose Clusters](#q12-job-clusters-vs-all-purpose-clusters)
-   - [Q8 & Q9. Root-Cause Analysis for 3x Production Job Slowdowns](#q8--q9-root-cause-analysis-for-3x-production-job-slowdowns)
+   - [Q13. Root-Cause Analysis for 3x Production Job Slowdowns](#q13-root-cause-analysis-for-3x-production-job-slowdowns)
 7. **Partial Failure Restartability & Billion-Record Architecture**
-   - [Q10. Restarting Failed Jobs Without Reprocessing from Scratch](#q10-restarting-failed-jobs-without-reprocessing-from-scratch)
-   - [Q11. Designing Databricks Solutions for Billions of Records](#q11-designing-databricks-solutions-for-billions-of-records)
+   - [Q14. Restarting Failed Jobs Without Reprocessing from Scratch](#q14-restarting-failed-jobs-without-reprocessing-from-scratch)
+   - [Q15. Designing Databricks Solutions for Billions of Records](#q15-designing-databricks-solutions-for-billions-of-records)
 8. **Data Quality Constraints, Schema Governance & Concurrency**
-   - [Q14. Enforcing Data Quality Constraints in Delta Lake](#q14-enforcing-data-quality-constraints-in-delta-lake)
-   - [Q21. Schema Enforcement vs Schema Evolution](#q21-schema-enforcement-vs-schema-evolution)
-   - [Q20. Delta Lake Change Data Feed (CDF) Implementation](#q20-delta-lake-change-data-feed-cdf-implementation)
-   - [Q17. Concurrent Writes & Optimistic Concurrency Control (OCC)](#q17-concurrent-writes--optimistic-concurrency-control-occ)
+   - [Q16. Enforcing Data Quality Constraints in Delta Lake](#q16-enforcing-data-quality-constraints-in-delta-lake)
+   - [Q17. Schema Enforcement vs Schema Evolution](#q17-schema-enforcement-vs-schema-evolution)
+   - [Q18. Delta Lake Change Data Feed (CDF) Implementation](#q18-delta-lake-change-data-feed-cdf-implementation)
+   - [Q19. Concurrent Writes & Optimistic Concurrency Control (OCC)](#q19-concurrent-writes--optimistic-concurrency-control-occ)
 9. **Production Table Health Monitoring & Governance**
-   - [Q18. Monitoring and Maintaining Delta Tables in Production](#q18-monitoring-and-maintaining-delta-tables-in-production)
+   - [Q20. Monitoring and Maintaining Delta Tables in Production](#q20-monitoring-and-maintaining-delta-tables-in-production)
 10. **Enterprise Platform Engineering: Multi-Tenancy, CI/CD & Secret Security**
-    - [Designing a Multi-Tenant Lakehouse Platform on Databricks](#designing-a-multi-tenant-lakehouse-platform-on-databricks)
-    - [Enterprise CI/CD for Databricks Asset Bundles (DABs) & Repos](#enterprise-cicd-for-databricks-asset-bundles-dabs--repos)
-    - [Databricks Secret Scopes & Azure Key Vault Integration](#databricks-secret-scopes--azure-key-vault-integration)
-    - [Multi-Terabyte Table Performance Optimization Strategy](#multi-terabyte-table-performance-optimization-strategy)
+    - [Q21. Designing a Multi-Tenant Lakehouse Platform on Databricks](#q21-designing-a-multi-tenant-lakehouse-platform-on-databricks)
+    - [Q22. Enterprise CI/CD for Databricks Asset Bundles (DABs) & Repos](#q22-enterprise-cicd-for-databricks-asset-bundles-dabs--repos)
+    - [Q23. Databricks Secret Scopes & Azure Key Vault Integration](#q23-databricks-secret-scopes--azure-key-vault-integration)
+    - [Q24. Multi-Terabyte Table Performance Optimization Strategy](#q24-multi-terabyte-table-performance-optimization-strategy)
 11. **Modern Lakehouse Ingestion & Infrastructure as Code**
     - [Q25. Databricks Lakeflow Architecture & Databricks Asset Bundles (DABs)](#q25-databricks-lakeflow-architecture--databricks-asset-bundles-dabs)
     - [Q26. Catalog Table Referencing vs Direct File Path Ingestion in Delta Lake](#q26-catalog-table-referencing-vs-direct-file-path-ingestion-in-delta-lake)
@@ -48,15 +48,15 @@ A comprehensive, production-grade guide answering Databricks and Delta Lake inte
     - [Q28. Diagnosing and Tuning Gold-Layer Delta Table Dashboard Performance](#q28-diagnosing-and-tuning-gold-layer-delta-table-dashboard-performance)
     - [Q29. Manual Versioning & Snapshots in Parquet vs Delta ACID Transaction Logs](#q29-manual-versioning--snapshots-in-parquet-vs-delta-acid-transaction-logs)
 13. **Medallion Data Reconciliation & Programmatic Notebook Orchestration**
-    - [Q33. Tracing Record Discrepancies Across Bronze, Silver, and Gold Tables](#q33-tracing-record-discrepancies-across-bronze-silver-and-gold-tables)
-    - [Q34. Executing Databricks Notebooks Programmatically: dbutils.notebook.run vs Databricks Workflows](#q34-executing-databricks-notebooks-programmatically-dbutilsnotebookrun-vs-databricks-workflows)
+    - [Q30. Tracing Record Discrepancies Across Bronze, Silver, and Gold Tables](#q30-tracing-record-discrepancies-across-bronze-silver-and-gold-tables)
+    - [Q31. Executing Databricks Notebooks Programmatically: dbutils.notebook.run vs Databricks Workflows](#q31-executing-databricks-notebooks-programmatically-dbutilsnotebookrun-vs-databricks-workflows)
 ---
 
 # 1. Delta Lake Architecture & ACID Transaction Internals
 
 ---
 
-### Q22. Delta Lake Architecture & ACID Transaction Internals
+### Q1. Delta Lake Architecture & ACID Transaction Internals
 *(Grouped together: Delta Lake core architecture, Parquet/transaction log underpinnings, reliability advantages, and lakehouse problem solving)*  
 **Topic Covered:** Open-Source Storage Layer, Parquet Formats & JSON Transaction Logs  
 **Questions Covered:**
@@ -123,7 +123,7 @@ Delta Lake stores raw data as standard compressed Apache Parquet files, but wrap
 
 ---
 
-### Q3. When to Use MERGE vs INSERT
+### Q2. When to Use MERGE vs INSERT
 **Topic Covered:** Conditional Mutation Semantics vs Append-Only Ingestion  
 **Question:** When would you use MERGE instead of INSERT?
 
@@ -133,7 +133,7 @@ Delta Lake stores raw data as standard compressed Apache Parquet files, but wrap
 
 ---
 
-### Q1 & Q2. Incremental Loading Architecture & CDC Ingestion
+### Q3. Incremental Loading Architecture & CDC Ingestion
 **Topic Covered:** Daily High-Watermark Offsets, Change Data Feed & Target Upserts  
 **Questions Covered:**
 - **Q1**: How would you implement an incremental load using Delta Lake?
@@ -169,7 +169,7 @@ flowchart TD
 
 ---
 
-### Q5. The Multiple-Match MERGE Trap & Resolution
+### Q4. The Multiple-Match MERGE Trap & Resolution
 **Topic Covered:** Non-Deterministic Mutations & Source Pre-Deduplication  
 **Question:** What happens when multiple records match the same MERGE condition?
 
@@ -219,7 +219,7 @@ target_table.alias("target").merge(
 
 ---
 
-### Q4. Slowly Changing Dimensions (SCD Types 1 & 2) in Delta Lake
+### Q5. Slowly Changing Dimensions (SCD Types 1 & 2) in Delta Lake
 *(Grouped together: Dimension mutation patterns, in-place overwrites, and historical audit tracking)*  
 **Topic Covered:** Historical Record Tracking & 2-Stage Staging MERGE Architecture  
 **Questions Covered:**
@@ -249,7 +249,7 @@ In Delta Lake, SCD Type 2 is implemented via a **two-pass merge**:
 
 ---
 
-### Q7. Physical Table Maintenance: OPTIMIZE, Z-ORDER & VACUUM
+### Q6. Physical Table Maintenance: OPTIMIZE, Z-ORDER & VACUUM
 *(Grouped together: Delta Lake file compaction, multidimensional clustering, and tombstone purging)*  
 **Topic Covered:** File Compaction, Multidimensional Clustering & Tombstone Purging  
 **Questions Covered:**
@@ -297,7 +297,7 @@ flowchart TD
 
 ---
 
-### Q13, Q15 & Q19. Optimizing Multi-TB Tables with Frequent Mutations & Small Files
+### Q7. Optimizing Multi-TB Tables with Frequent Mutations & Small Files
 **Topic Covered:** Deletion Vectors, Target File Sizing & Automated Maintenance  
 **Questions Covered:**
 - **Q13**: A Delta table has grown to several TB and queries are becoming slow. How would you optimize it?
@@ -320,7 +320,7 @@ ANALYZE TABLE silver.orders COMPUTE STATISTICS FOR ALL COLUMNS;
 
 ---
 
-### Q23. Millions of Small Files in ADLS: Root Causes & Resolution in Databricks
+### Q8. Millions of Small Files in ADLS: Root Causes & Resolution in Databricks
 **Topic Covered:** ADLS Gen2 Metadata Bottlenecks, Rate Throttling, Auto Loader, CONVERT TO DELTA & Compaction  
 **Question:** Your ADLS folder contains millions of small files. What problems can this cause in Databricks, and how would you solve them?
 
@@ -405,7 +405,7 @@ spark.conf.set("spark.databricks.delta.autoCompact.enabled", "true")
 
 ---
 
-### Q24. Partitioning Strategy & Liquid Clustering in Azure Databricks
+### Q9. Partitioning Strategy & Liquid Clustering in Azure Databricks
 **Topic Covered:** Partition Column Selection, High vs Low Cardinality, Liquid Clustering vs Hive Partitioning  
 **Question:** Explain partitioning in Azure Databricks. How do you decide the appropriate partition column?
 
@@ -428,17 +428,32 @@ Partitioning physically separates a table's data into separate directories based
 #### Visual Flow
 ```mermaid
 flowchart TD
-    Start["New Delta Table Design"] --> SizeCheck{"Total Table Volume?"}
-    SizeCheck -->|< 500 GB| NoPartition["Do NOT Partition<br/>Rely on standard Delta file sizing + Min/Max Data Skipping"]
-    SizeCheck -->|>= 500 GB - Multi-TB| WorkloadCheck{"Databricks Runtime Version?"}
-    
-    WorkloadCheck -->|DBR >= 13.3| Liquid["Use Liquid Clustering:<br/>CREATE TABLE ... CLUSTER BY (date, customer_id)<br/>Flexible, supports high-cardinality, no directory skew"]
-    WorkloadCheck -->|Legacy DBR / Hive Engine| CardCheck{"Candidate Column Cardinality?"}
-    
-    CardCheck -->|High: >1,000 values (e.g. user_id)| Reject["REJECT: Will create millions of directories<br/>Use Z-ORDER instead"]
-    CardCheck -->|Tiny: 2-5 values (e.g. status)| RejectSkew["REJECT: Causes massive partition skew"]
-    CardCheck -->|Moderate: 10 - 1,000 values<br/>(e.g. year_month, region)| AcceptHive["Accept Hive Partition:<br/>PARTITIONED BY (order_date)<br/>Verify >= 1 GB per partition"]
+    subgraph SizingGate ["Table Sizing & Modern Runtime Assessment"]
+        Start(["New Delta Table Design"]) --> SizeCheck{"Total Table Volume?"}
+        NoPartition["<b>Do NOT Partition</b><br/>Rely on standard Delta file sizing + Min/Max Data Skipping"]
+        SizeCheck -->|< 500 GB| NoPartition
 
+        WorkloadCheck{"Databricks Runtime Version?"}
+        SizeCheck -->|>= 500 GB - Multi-TB| WorkloadCheck
+        Liquid["<b>Use Liquid Clustering</b><br/>CREATE TABLE ... CLUSTER BY (date, customer_id)<br/>Flexible, handles high cardinality, no directory skew"]
+        WorkloadCheck -->|DBR >= 13.3| Liquid
+    end
+
+    subgraph CardinalityAssessment ["Legacy Hive Partitioning Cardinality Gate"]
+        CardCheck{"Candidate Column Cardinality?"}
+        WorkloadCheck -->|Legacy DBR / Hive Engine| CardCheck
+
+        Reject["<b>REJECT: High Cardinality (>1,000)</b><br/>Creates millions of directories &rarr; Use Z-ORDER"]
+        RejectSkew["<b>REJECT: Low Cardinality (<5)</b><br/>Causes massive partition skew"]
+        AcceptHive["<b>Accept Hive Partition</b><br/>PARTITIONED BY (order_date) where partition &ge; 1 GB"]
+
+        CardCheck -->|High: >1,000 values| Reject
+        CardCheck -->|Tiny: 2-5 values| RejectSkew
+        CardCheck -->|Moderate: 10 - 1,000 values| AcceptHive
+    end
+
+    style SizingGate fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style CardinalityAssessment fill:#0f172a,stroke:#8b5cf6,stroke-width:1.5px,color:#c084fc
     style Start fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style NoPartition fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
     style Liquid fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0
@@ -493,7 +508,7 @@ OPTIMIZE silver.modern_retail_orders;
 
 ---
 
-### Q6. Recovering Deleted or Overwritten Delta Data via Time Travel
+### Q10. Recovering Deleted or Overwritten Delta Data via Time Travel
 *(Grouped together: Delta Lake time travel, table versioning, and disaster recovery rollback)*  
 **Topic Covered:** Timestamp & Version Time Travel Restoration  
 **Questions Covered:**
@@ -518,7 +533,7 @@ RESTORE TABLE silver.customers TO TIMESTAMP AS OF '2024-10-02 12:00:00';
 
 ---
 
-### Q16. Automated Rollback Strategy for Failed Deployments
+### Q11. Automated Rollback Strategy for Failed Deployments
 **Topic Covered:** Atomic Commit Rollbacks & Production Table Restoration  
 **Question:** How would you implement a rollback strategy for a failed Delta Lake deployment?
 
@@ -558,7 +573,7 @@ RESTORE TABLE silver.customers TO TIMESTAMP AS OF '2024-10-02 12:00:00';
 
 ---
 
-### Q8 & Q9. Root-Cause Analysis for 3x Production Job Slowdowns
+### Q13. Root-Cause Analysis for 3x Production Job Slowdowns
 **Topic Covered:** Production Cluster Contention, Spark UI Bottleneck Isolation & Data Drift  
 **Questions Covered:**
 - **Q8**: A Databricks job suddenly starts taking 3× longer than usual. What would you investigate?
@@ -590,7 +605,7 @@ flowchart TD
 
 ---
 
-### Q10. Restarting Failed Jobs Without Reprocessing from Scratch
+### Q14. Restarting Failed Jobs Without Reprocessing from Scratch
 **Topic Covered:** Checkpoint Directories, Idempotent Partitions & Atomic Batch Tracking  
 **Question:** A production job fails after processing 80% of the data. How would you restart it without processing everything again?
 
@@ -601,7 +616,7 @@ flowchart TD
 
 ---
 
-### Q11. Designing Databricks Solutions for Billions of Records
+### Q15. Designing Databricks Solutions for Billions of Records
 **Topic Covered:** High-Scale Data Modeling, Auto Loader, Liquid Clustering & Photon Engine  
 **Question:** How would you design a Databricks solution for billions of records?
 
@@ -636,7 +651,7 @@ flowchart LR
 
 ---
 
-### Q14. Enforcing Data Quality Constraints in Delta Lake
+### Q16. Enforcing Data Quality Constraints in Delta Lake
 **Topic Covered:** CHECK Constraints, NOT NULL Enforcement & Quarantine Logic  
 **Question:** How would you implement data quality checks before writing data into a Delta table?
 
@@ -650,7 +665,7 @@ ALTER TABLE silver.orders ADD CONSTRAINT check_valid_date CHECK (order_date >= '
 
 ---
 
-### Q21. Schema Enforcement vs Schema Evolution
+### Q17. Schema Enforcement vs Schema Evolution
 **Topic Covered:** AnalysisException Protection vs mergeSchema Options  
 **Question:** A source schema changes unexpectedly during a Delta load. How would you handle schema enforcement versus schema evolution?
 
@@ -666,7 +681,7 @@ df_with_new_col.write.format("delta") \
 
 ---
 
-### Q20. Delta Lake Change Data Feed (CDF) Implementation
+### Q18. Delta Lake Change Data Feed (CDF) Implementation
 **Topic Covered:** Row-Level Change Auditing, _change_type & Downstream Propagation  
 **Question:** How would you use Delta Lake Change Data Feed (CDF) to capture INSERT, UPDATE, and DELETE changes?
 
@@ -684,7 +699,7 @@ FROM table_changes('silver.customers', 2, 5);
 
 ---
 
-### Q17. Concurrent Writes & Optimistic Concurrency Control (OCC)
+### Q19. Concurrent Writes & Optimistic Concurrency Control (OCC)
 **Topic Covered:** ConcurrentAppendException, Mutually Exclusive Partition Predicates  
 **Question:** How would you handle concurrent writes to the same Delta table?
 
@@ -701,7 +716,7 @@ Delta Lake uses **Optimistic Concurrency Control (OCC)**:
 
 ---
 
-### Q18. Monitoring and Maintaining Delta Tables in Production
+### Q20. Monitoring and Maintaining Delta Tables in Production
 **Topic Covered:** DESCRIBE DETAIL/HISTORY, Automated Databricks Workflows & Telemetry  
 **Question:** How would you monitor and maintain Delta tables in a production environment?
 
@@ -717,14 +732,13 @@ Delta Lake uses **Optimistic Concurrency Control (OCC)**:
    - Query `system.billing.usage` to audit cluster costs.
    - Query `system.access.audit` to detect unauthorized data access.
 
-
 ---
 
 # 10. Enterprise Platform Engineering: Multi-Tenancy, CI/CD & Secret Security
 
 ---
 
-### Designing a Multi-Tenant Lakehouse Platform on Databricks
+### Q21. Designing a Multi-Tenant Lakehouse Platform on Databricks
 **Topic Covered:** Multi-Tenant Isolation, Unity Catalog Catalogs, Cluster Policies & Cost Allocation  
 **Question:** How would you design a multi-tenant data platform using Databricks?
 
@@ -774,7 +788,7 @@ flowchart TD
 
 ---
 
-### Enterprise CI/CD for Databricks Asset Bundles (DABs) & Repos
+### Q22. Enterprise CI/CD for Databricks Asset Bundles (DABs) & Repos
 **Topic Covered:** Databricks Asset Bundles (DABs), Git Workflows, Multi-Environment Deployment  
 **Question:** How would you implement CI/CD for Databricks notebooks, workflows, and data pipelines?
 
@@ -841,7 +855,7 @@ resources:
 
 ---
 
-### Databricks Secret Scopes & Azure Key Vault Integration
+### Q23. Databricks Secret Scopes & Azure Key Vault Integration
 **Topic Covered:** Credential Isolation, Azure Key Vault Backed Scopes & Secrets API  
 **Question:** How do you secure secrets and credentials in Azure Databricks without exposing them in code?
 
@@ -876,7 +890,7 @@ print(db_password) # Prints: [REDACTED]
 
 ---
 
-### Multi-Terabyte Table Performance Optimization Strategy
+### Q24. Multi-Terabyte Table Performance Optimization Strategy
 **Topic Covered:** Liquid Clustering vs Z-Order, Predictive I/O & File Size Tuning  
 **Question:** A Delta table has grown to several terabytes, and query performance has degraded significantly. How would you optimize it?
 
@@ -1084,15 +1098,13 @@ df.write.parquet(output_path)
    SELECT * FROM gold.orders VERSION AS OF 42;
    ```
 
-
-
 ---
 
 # 13. Medallion Data Reconciliation & Programmatic Notebook Orchestration
 
 ---
 
-### Q33. Tracing Record Discrepancies Across Bronze, Silver, and Gold Tables
+### Q30. Tracing Record Discrepancies Across Bronze, Silver, and Gold Tables
 **Topic Covered:** Medallion Audit Lineage, Row Attrition Tracking, Quarantine Tables & Delta Time Travel  
 **Question:** A downstream Gold reporting table contains fewer records than expected. How would you systematically trace the discrepancy and locate missing records across Bronze, Silver, and Gold layers in Databricks Delta Lake?
 
@@ -1107,17 +1119,26 @@ Delta Lake provides native audit primitives to trace this pipeline deterministic
 #### Visual Flow
 ```mermaid
 flowchart TD
-    GoldAlert["🚨 Gold Table Missing 50,000 Records: Expected 1,000,000 -> Found 950,000"] --> Trace1["1. Audit Bronze Raw Table<br/>Run count(*) & inspect Auto Loader _rescued_data column"]
-    Trace1 --> CheckBronze{"Did Bronze receive all 1,000,000?"}
-    CheckBronze -- "No" --> BronzeLoss["Root Cause: Source file ingestion failure or Auto Loader glob mismatch"]
-    CheckBronze -- "Yes" --> Trace2["2. Audit Silver Quality Quarantine<br/>Inspect silver.quarantine_orders"]
+    subgraph BronzeAudit ["1. Bronze Raw Ingestion Audit"]
+        GoldAlert["🚨 <b>Gold Missing 50k Records</b><br/>Expected 1,000,000 &rarr; Found 950,000"] --> Trace1["<b>1. Audit Bronze Raw Table</b><br/>Run count(*) & inspect Auto Loader _rescued_data"]
+        Trace1 --> CheckBronze{"Did Bronze receive all 1,000,000?"}
+        BronzeLoss["<b>Root Cause: Source Ingestion Failure</b><br/>Source file drop missed or Auto Loader glob mismatch"]
+        CheckBronze -- "No" --> BronzeLoss
+    end
 
-    Trace2 --> CheckQuarantine{"Were records quarantined?"}
-    CheckQuarantine -- "Yes: 30,000 in DLQ" --> QualityLoss["Root Cause: Strict validation gate caught schema/null violations"]
-    CheckQuarantine -- "No / Unaccounted" --> Trace3["3. Check Inner Join Attrition<br/>Anti-join Silver Fact against Dimensions"]
+    subgraph SilverAndJoinAudit ["2. Quality Gate & Join Loss Audit"]
+        CheckBronze -- "Yes" --> Trace2["<b>2. Audit Silver Quality Quarantine</b><br/>Inspect silver.quarantine_orders"]
+        Trace2 --> CheckQuarantine{"Were records quarantined?"}
+        QualityLoss["<b>Root Cause: Quality Gate Caught Errors</b><br/>Strict validation caught schema/null violations"]
+        CheckQuarantine -- "Yes (30,000 in DLQ)" --> QualityLoss
 
-    Trace3 --> DimensionLoss["Root Cause: 20,000 Fact rows dropped by INNER JOIN on missing dim_store keys!"]
+        CheckQuarantine -- "No / Unaccounted" --> Trace3["<b>3. Check Inner Join Attrition</b><br/>Anti-join Silver Fact against Dimensions"]
+        DimensionLoss["<b>Root Cause: Missing Dimension Key</b><br/>20,000 Fact rows dropped by INNER JOIN on missing dim_store keys"]
+        Trace3 --> DimensionLoss
+    end
 
+    style BronzeAudit fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style SilverAndJoinAudit fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style GoldAlert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
     style Trace1 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Trace2 fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
@@ -1163,11 +1184,11 @@ FROM gold.daily_sales_summary VERSION AS OF 42;
 2. **Delta History Retention:** By default, Delta Lake preserves transaction log history for 30 days (`delta.logRetentionDuration = 'interval 30 days'`). Never run `VACUUM RETAIN 0 HOURS` in production, as it destroys historical Parquet files and eliminates the ability to Time Travel and trace discrepancy regressions.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [09. Databricks & Delta Lake: Transaction Logs & Time Travel](../09_databricks_and_delta_lake.md#2-delta-transaction-log--acid-internals)*
+*Deep-dive theoretical reference: See [09. Databricks & Delta Lake: Transaction Logs & Time Travel](../06_databricks_and_delta_lake.md#12-delta-lake-fundamentals--log-internals)*
 
 ---
 
-### Q34. Executing Databricks Notebooks Programmatically: dbutils.notebook.run vs Databricks Workflows
+### Q31. Executing Databricks Notebooks Programmatically: dbutils.notebook.run vs Databricks Workflows
 **Topic Covered:** Notebook Orchestration, Parameter Passing, Multi-Task Workflows & Concurrency Limits  
 **Question:** How would you execute one notebook from another in Databricks? Compare `dbutils.notebook.run()` versus Databricks Multi-Task Workflows for production ETL orchestration.
 
@@ -1242,4 +1263,28 @@ print("Execution Results:", results)
 2. **Production Mandate:** In enterprise environments, never use `dbutils.notebook.run()` as your primary scheduler. Use Databricks Asset Bundles (DABs) to define declarative Databricks Workflows in YAML and version them in Git.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [09. Databricks & Delta Lake: Databricks Asset Bundles & Workflows](../09_databricks_and_delta_lake.md#7-databricks-asset-bundles-dabs--cicd)*
+*Deep-dive theoretical reference: See [09. Databricks & Delta Lake: Databricks Asset Bundles & Workflows](../06_databricks_and_delta_lake.md#63-databricks-asset-bundles-dabs)*
+
+---
+
+## Summary Comparison & Production Reference Matrix
+
+| Scenario Domain | Critical Runtime Pathology | Diagnostic & Triage Method | Canonical Production Resolution |
+| :--- | :--- | :--- | :--- |
+| **Delta Lake Architecture & ACID Transaction Internals** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Incremental Loading, MERGE Semantics & Multiple-Match Trap** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Slowly Changing Dimensions (SCD 1 & 2) in Delta Lake** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Physical Table Maintenance: OPTIMIZE, Z-ORDER & VACUUM** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Time Travel, Disaster Recovery & Deployment Rollbacks** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Databricks Cluster Architecture & 3x Slowdown Diagnostics** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+
+---
+
+## References & Further Reading
+
+- [Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores (Armbrust et al., VLDB 2020)](https://www.vldb.org/pvldb/vol13/p3411-armbrust.pdf) — Architectural principles behind the Delta transaction log and ACID guarantees.
+- [Databricks Documentation: Liquid Clustering Architecture & Guidance](https://docs.databricks.com/en/delta/clustering.html) — Next-generation multi-dimensional layout and incremental clustering.
+- [Databricks Documentation: Deletion Vectors Optimization](https://docs.databricks.com/en/delta/deletion-vectors.html) — Mechanics of soft-delete bitmaps and write amplification mitigation.
+- [Unity Catalog Architectural Guide (Databricks)](https://docs.databricks.com/en/data-governance/unity-catalog/index.html) — Unified governance, fine-grained access control, and data lineage across clouds.
+- [UniForm (Universal Format): Read Delta Lake with Iceberg and Hudi Clients](https://docs.databricks.com/en/delta/uniform.html) — Multi-format metadata translation and lakehouse interoperability.
+- [Delta Sharing: An Open Protocol for Secure Data Sharing](https://delta.io/sharing/) — Zero-copy, cross-cloud, cross-platform enterprise data exchange specification.

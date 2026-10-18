@@ -7,64 +7,64 @@ A comprehensive, production-grade guide answering Apache Spark and PySpark archi
 ## Table of Contents & Question Mapping
 
 1. **Spark Engine Architecture & Execution Lifecycle**
-   - [Q30. Spark Physical Cluster Architecture](#q30-spark-physical-cluster-architecture)
-   - [Q43. Spark Execution Flow from spark-submit to Completion](#q43-spark-execution-flow-from-spark-submit-to-completion)
-   - [Q40. Narrow vs Wide Transformations & Stage Boundaries](#q40-narrow-vs-wide-transformations--stage-boundaries)
-   - [Q41. RDD Immutability & Lineage-Based Fault Tolerance](#q41-rdd-immutability--lineage-based-fault-tolerance)
-   - [Q42. reduceByKey() vs groupByKey() Efficiency](#q42-reducebykey-vs-groupbykey-efficiency)
-   - [Q44. map() vs flatMap() Mechanics](#q44-map-vs-flatmap-mechanics)
+   - [Q1. Spark Physical Cluster Architecture](#q1-spark-physical-cluster-architecture)
+   - [Q2. Spark Execution Flow from spark-submit to Completion](#q2-spark-execution-flow-from-spark-submit-to-completion)
+   - [Q3. Narrow vs Wide Transformations & Stage Boundaries](#q3-narrow-vs-wide-transformations--stage-boundaries)
+   - [Q4. RDD Immutability & Lineage-Based Fault Tolerance](#q4-rdd-immutability--lineage-based-fault-tolerance)
+   - [Q5. reduceByKey() vs groupByKey() Efficiency](#q5-reducebykey-vs-groupbykey-efficiency)
+   - [Q6. map() vs flatMap() Mechanics](#q6-map-vs-flatmap-mechanics)
 2. **Distributed Join Strategies & Accidental Multipliers**
-   - [Q4, Q5 & Q6. Spark Join Strategies & Optimizer Selection Matrix](#q4-q5--q6-spark-join-strategies--optimizer-selection-matrix)
-   - [Q23. Joining 500 GB DataFrame with 50 MB Lookup DataFrame](#q23-joining-500-gb-dataframe-with-50-mb-lookup-dataframe)
-   - [Q28. Diagnosing Join Record Multipliers & Cartesian Explodes](#q28-diagnosing-join-record-multipliers--cartesian-explodes)
-   - [Q34. Joining Two DataFrames with Different Schemas via Row Number](#q34-joining-two-dataframes-with-different-schemas-via-row-number)
+   - [Q7. Spark Join Strategies & Optimizer Selection Matrix](#q7-spark-join-strategies--optimizer-selection-matrix)
+   - [Q8. Joining 500 GB DataFrame with 50 MB Lookup DataFrame](#q8-joining-500-gb-dataframe-with-50-mb-lookup-dataframe)
+   - [Q9. Diagnosing Join Record Multipliers & Cartesian Explodes](#q9-diagnosing-join-record-multipliers--cartesian-explodes)
+   - [Q10. Joining Two DataFrames with Different Schemas via Row Number](#q10-joining-two-dataframes-with-different-schemas-via-row-number)
 3. **Data Skew Detection, Stragglers & Mitigation**
-   - [Q1. Root Causes of the 1-Task Straggler](#q1-root-causes-of-the-1-task-straggler)
-   - [Q2. Identifying Data Skew in the Spark Web UI](#q2-identifying-data-skew-in-the-spark-web-ui)
-   - [Q3 & Q25. Mitigating Data Skew via Key Salting & AQE Skew Join](#q3--q25-mitigating-data-skew-via-key-salting--aqe-skew-join)
+   - [Q11. Root Causes of the 1-Task Straggler](#q11-root-causes-of-the-1-task-straggler)
+   - [Q12. Identifying Data Skew in the Spark Web UI](#q12-identifying-data-skew-in-the-spark-web-ui)
+   - [Q13. Mitigating Data Skew via Key Salting & AQE Skew Join](#q13-mitigating-data-skew-via-key-salting--aqe-skew-join)
 4. **Partition Management: Repartition vs Coalesce & Small Files**
-   - [Q7 & Q8. repartition() vs coalesce() Architectural Comparison](#q7--q8-repartition-vs-coalesce-architectural-comparison)
-   - [Q18. Partition Sizing Heuristics (Increasing vs Decreasing)](#q18-partition-sizing-heuristics-increasing-vs-decreasing)
-   - [Q20 & Q21. The Small File Problem & Resolution in Spark](#q20--q21-the-small-file-problem--resolution-in-spark)
-   - [Q45. Partition Pruning Mechanics](#q45-partition-pruning-mechanics)
+   - [Q14. repartition() vs coalesce() Architectural Comparison](#q14-repartition-vs-coalesce-architectural-comparison)
+   - [Q15. Partition Sizing Heuristics (Increasing vs Decreasing)](#q15-partition-sizing-heuristics-increasing-vs-decreasing)
+   - [Q16. The Small File Problem & Resolution in Spark](#q16-the-small-file-problem--resolution-in-spark)
+   - [Q17. Partition Pruning Mechanics](#q17-partition-pruning-mechanics)
 5. **Shuffle Mechanics, Intermediate DataFrames & AQE**
-   - [Q14 & Q15. Identifying & Reducing Excessive Shuffling](#q14--q15-identifying--reducing-excessive-shuffling)
-   - [Q16. Adaptive Query Execution (AQE) 3-Pillar Architecture](#q16-adaptive-query-execution-aqe-3-pillar-architecture)
-   - [Q22 & Q26. Optimizing Large Intermediate DataFrames & Multiple groupBy Operations](#q22--q26-optimizing-large-intermediate-dataframes--multiple-groupby-operations)
+   - [Q18. Identifying & Reducing Excessive Shuffling](#q18-identifying--reducing-excessive-shuffling)
+   - [Q19. Adaptive Query Execution (AQE) 3-Pillar Architecture](#q19-adaptive-query-execution-aqe-3-pillar-architecture)
+   - [Q20. Optimizing Large Intermediate DataFrames & Multiple groupBy Operations](#q20-optimizing-large-intermediate-dataframes--multiple-groupby-operations)
 6. **Spark Memory Architecture, Caching, GC & OOM Debugging**
-   - [Q36. Spark Unified Memory Architecture Breakdown](#q36-spark-unified-memory-architecture-breakdown)
-   - [Q13. cache() vs persist() Storage Levels](#q13-cache-vs-persist-storage-levels)
-   - [Q17. OutOfMemoryError (OOM) Diagnostic Playbook](#q17-outofmemoryerror-oom-diagnostic-playbook)
+   - [Q21. Spark Unified Memory Architecture Breakdown](#q21-spark-unified-memory-architecture-breakdown)
+   - [Q22. cache() vs persist() Storage Levels](#q22-cache-vs-persist-storage-levels)
+   - [Q23. OutOfMemoryError (OOM) Diagnostic Playbook](#q23-outofmemoryerror-oom-diagnostic-playbook)
    - [Q24. Garbage Collection (GC) Optimization & Executor Sizing](#q24-garbage-collection-gc-optimization--executor-sizing)
 7. **Production Troubleshooting Playbook & Scaling to 10 TB**
-   - [Q9, Q11 & Q12. Production Troubleshooting Playbook for 2hr vs 20min Slowdowns](#q9-q11--q12-production-troubleshooting-playbook-for-2hr-vs-20min-slowdowns)
-   - [Q10. Why Spark Jobs Run Fine in Dev but Crash in Production](#q10-why-spark-jobs-run-fine-in-dev-but-crash-in-production)
-   - [Q19. Scaling Playbook for Processing 10 TB Datasets](#q19-scaling-playbook-for-processing-10-tb-datasets)
+   - [Q25. Production Troubleshooting Playbook for 2hr vs 20min Slowdowns](#q25-production-troubleshooting-playbook-for-2hr-vs-20min-slowdowns)
+   - [Q26. Why Spark Jobs Run Fine in Dev but Crash in Production](#q26-why-spark-jobs-run-fine-in-dev-but-crash-in-production)
+   - [Q27. Scaling Playbook for Processing 10 TB Datasets](#q27-scaling-playbook-for-processing-10-tb-datasets)
 8. **Transformations: Built-in Functions vs UDFs, Schemas & JSON**
-   - [Q27 & Q38. Built-in transform() vs Python UDF vs Pandas UDF](#q27--q38-built-in-transform-vs-python-udf-vs-pandas-udf)
-   - [Q29 & Q31. Handling Inconsistent Schemas, Null Values & Incorrect Casing](#q29--q31-handling-inconsistent-schemas-null-values--incorrect-casing)
-   - [Q39. Parsing & Flattening Nested JSON in PySpark](#q39-parsing--flattening-nested-json-in-pyspark)
+   - [Q28. Built-in transform() vs Python UDF vs Pandas UDF](#q28-built-in-transform-vs-python-udf-vs-pandas-udf)
+   - [Q29. Handling Inconsistent Schemas, Null Values & Incorrect Casing](#q29-handling-inconsistent-schemas-null-values--incorrect-casing)
+   - [Q30. Parsing & Flattening Nested JSON in PySpark](#q30-parsing--flattening-nested-json-in-pyspark)
 9. **Production PySpark Live Coding Scenarios**
-   - [Q32. PySpark Live Coding: Days Between Status Changes per User](#q32-pyspark-live-coding-days-between-status-changes-per-user)
-   - [Q33. PySpark Live Coding: Upserting New Files into Delta Tables](#q33-pyspark-live-coding-upserting-new-files-into-delta-tables)
-   - [Q35. PySpark Live Coding: Store Spending > ₹1000 in the Last Month](#q35-pyspark-live-coding-store-spending--1000-in-the-last-month)
-   - [Q37. PySpark Live Coding: Department-wise Employee Ranking](#q37-pyspark-live-coding-department-wise-employee-ranking)
+   - [Q31. PySpark Live Coding: Days Between Status Changes per User](#q31-pyspark-live-coding-days-between-status-changes-per-user)
+   - [Q32. PySpark Live Coding: Upserting New Files into Delta Tables](#q32-pyspark-live-coding-upserting-new-files-into-delta-tables)
+   - [Q33. PySpark Live Coding: Store Spending > ₹1000 in the Last Month](#q33-pyspark-live-coding-store-spending--1000-in-the-last-month)
+   - [Q34. PySpark Live Coding: Department-wise Employee Ranking](#q34-pyspark-live-coding-department-wise-employee-ranking)
 10. **Severe Data Skew Mechanics & The 40% Partition Nightmare**
-    - [The 40% Skew Partition Breakdown: Stages, Tasks, and Execution Dynamics](#the-40-skew-partition-breakdown-stages-tasks-and-execution-dynamics)
-    - [Petabyte-Scale Strategic Partitioning Heuristics](#petabyte-scale-strategic-partitioning-heuristics)
+    - [Q35. The 40% Skew Partition Breakdown: Stages, Tasks, and Execution Dynamics](#q35-the-40-skew-partition-breakdown-stages-tasks-and-execution-dynamics)
+    - [Q36. Petabyte-Scale Strategic Partitioning Heuristics](#q36-petabyte-scale-strategic-partitioning-heuristics)
 11. **External Source Bottlenecks & JDBC Ingestion Tuning**
-    - [Spark Executor JDBC Read Stalls: The 4-Step Diagnosis](#spark-executor-jdbc-read-stalls-the-4-step-diagnosis)
+    - [Q37. Spark Executor JDBC Read Stalls: The 4-Step Diagnosis](#q37-spark-executor-jdbc-read-stalls-the-4-step-diagnosis)
 12. **Driver & Executor Memory Leaks in Iterative / Streaming Pipelines**
-    - [Progressive Memory Creep & Py4J Object Retention Debugging](#progressive-memory-creep--py4j-object-retention-debugging)
+    - [Q38. Progressive Memory Creep & Py4J Object Retention Debugging](#q38-progressive-memory-creep--py4j-object-retention-debugging)
 13. **Engine Abstractions: RDDs vs DataFrames vs Datasets & Context vs Session**
-    - [RDDs vs DataFrames vs Datasets: Catalyst & Tungsten Internals](#rdds-vs-dataframes-vs-datasets-catalyst--tungsten-internals)
-    - [SparkContext vs SparkSession from a Modern Data Architecture Perspective](#sparkcontext-vs-sparksession-from-a-modern-data-architecture-perspective)
-    - [Broadcast Variables Internals & Torrent Protocol](#broadcast-variables-internals--torrent-protocol)
-    - [Bloom Filters in Spark & Delta Lake for Runtime File Skipping](#bloom-filters-in-spark--delta-lake-for-runtime-file-skipping)
+    - [Q39. RDDs vs DataFrames vs Datasets: Catalyst & Tungsten Internals](#q39-rdds-vs-dataframes-vs-datasets-catalyst--tungsten-internals)
+    - [Q40. SparkContext vs SparkSession from a Modern Data Architecture Perspective](#q40-sparkcontext-vs-sparksession-from-a-modern-data-architecture-perspective)
+    - [Q41. Broadcast Variables Internals & Torrent Protocol](#q41-broadcast-variables-internals--torrent-protocol)
+    - [Q42. Bloom Filters in Spark & Delta Lake for Runtime File Skipping](#q42-bloom-filters-in-spark--delta-lake-for-runtime-file-skipping)
 14. **Distributed Massive Joins & Snowflake Lakehouse Integration**
-    - [Joining Two Massive Multi-Terabyte Datasets Beyond Memory Spills](#joining-two-massive-multi-terabyte-datasets-beyond-memory-spills)
-    - [Best Practices for Analysing Snowflake Data Using Python & Snowpark](#best-practices-for-analysing-snowflake-data-using-python--snowpark)
-    - [PySpark Live Coding: DataFrame Deduplication & Department Sales Aggregations](#pyspark-live-coding-dataframe-deduplication--department-sales-aggregations)
+    - [Q43. Joining Two Massive Multi-Terabyte Datasets Beyond Memory Spills](#q43-joining-two-massive-multi-terabyte-datasets-beyond-memory-spills)
+    - [Q44. Best Practices for Analysing Snowflake Data Using Python & Snowpark](#q44-best-practices-for-analysing-snowflake-data-using-python--snowpark)
+    - [Q45. PySpark Live Coding: DataFrame Deduplication & Department Sales Aggregations](#q45-pyspark-live-coding-dataframe-deduplication--department-sales-aggregations)
 15. **Senior Whiteboarding & Production Join Scenarios (Without an IDE)**
     - [Q46. Solving Data Transformations Without an IDE (Whiteboarding Best Practices)](#q46-solving-data-transformations-without-an-ide-whiteboarding-best-practices)
     - [Q47. Joining 2 TB Fact Table with 200 MB Dimension Table](#q47-joining-2-tb-fact-table-with-200-mb-dimension-table)
@@ -77,19 +77,19 @@ A comprehensive, production-grade guide answering Apache Spark and PySpark archi
     - [Q52. Production Data Cleansing: Filtering Null Identifiers & Dead-Letter Routing](#q52-production-data-cleansing-filtering-null-identifiers--dead-letter-routing)
     - [Q53. Diagnosing Spark Job Slowdown: Scaling from 1M to 100M Records](#q53-diagnosing-spark-job-slowdown-scaling-from-1m-to-100m-records)
 18. **Broadcast Memory Limits, Distributed Locks & Kubernetes Diagnostics**
-    - [Q66. Spark Broadcast Join Exceeding Executor Memory: Failure Modes & Safeguards](#q66-spark-broadcast-join-exceeding-executor-memory-failure-modes--safeguards)
-    - [Q67. Distributed Lock Expiration & Split-Brain Hazard During Long Spark GC Pauses](#q67-distributed-lock-expiration--split-brain-hazard-during-long-spark-gc-pauses)
-    - [Q68. Kubernetes OOMKilled Executor Pod with Low JVM Heap Usage](#q68-kubernetes-oomkilled-executor-pod-with-low-jvm-heap-usage)
-    - [Q69. Spark Repartition vs Coalesce vs RepartitionByRange Execution Mechanics](#q69-spark-repartition-vs-coalesce-vs-repartitionbyrange-execution-mechanics)
-    - [Q70. Multi-Source Customer Record Deduplication Across CRM and ERP in PySpark](#q70-multi-source-customer-record-deduplication-across-crm-and-erp-in-pyspark)
-    - [Q71. PySpark Regional Top 3 Products Sold (Window Ranking Live Coding)](#q71-pyspark-regional-top-3-products-sold-window-ranking-live-coding)
+    - [Q54. Spark Broadcast Join Exceeding Executor Memory: Failure Modes & Safeguards](#q54-spark-broadcast-join-exceeding-executor-memory-failure-modes--safeguards)
+    - [Q55. Distributed Lock Expiration & Split-Brain Hazard During Long Spark GC Pauses](#q55-distributed-lock-expiration--split-brain-hazard-during-long-spark-gc-pauses)
+    - [Q56. Kubernetes OOMKilled Executor Pod with Low JVM Heap Usage](#q56-kubernetes-oomkilled-executor-pod-with-low-jvm-heap-usage)
+    - [Q57. Spark Repartition vs Coalesce vs RepartitionByRange Execution Mechanics](#q57-spark-repartition-vs-coalesce-vs-repartitionbyrange-execution-mechanics)
+    - [Q58. Multi-Source Customer Record Deduplication Across CRM and ERP in PySpark](#q58-multi-source-customer-record-deduplication-across-crm-and-erp-in-pyspark)
+    - [Q59. PySpark Regional Top 3 Products Sold (Window Ranking Live Coding)](#q59-pyspark-regional-top-3-products-sold-window-ranking-live-coding)
 ---
 
 # 1. Spark Engine Architecture & Execution Lifecycle
 
 ---
 
-### Q30. Spark Physical Cluster Architecture
+### Q1. Spark Physical Cluster Architecture
 **Topic Covered:** Driver, Executors, Cluster Manager & Task Scheduling  
 **Question:** Spark Architecture (Driver, Executors, Cluster Manager, DAG Scheduler, and Task Scheduler).
 
@@ -144,7 +144,7 @@ flowchart TD
 
 ---
 
-### Q43. Spark Execution Flow from spark-submit to Completion
+### Q2. Spark Execution Flow from spark-submit to Completion
 **Topic Covered:** Complete Lifecycle from Client Submit to Action Evaluation  
 **Questions Covered:**
 - How do Spark’s lazy evaluation and the DAG (Directed Acyclic Graph) execution model work?
@@ -162,7 +162,7 @@ flowchart TD
 
 ---
 
-### Q40. Narrow vs Wide Transformations & Stage Boundaries
+### Q3. Narrow vs Wide Transformations & Stage Boundaries
 **Topic Covered:** Transformation Lineage, Shuffles & Stage Pipelining  
 **Questions Covered:**
 - What is the difference between transformations and actions in Spark?
@@ -177,7 +177,7 @@ flowchart TD
 
 ---
 
-### Q41. RDD Immutability & Lineage-Based Fault Tolerance
+### Q4. RDD Immutability & Lineage-Based Fault Tolerance
 **Topic Covered:** Resilient Distributed Datasets, Deterministic Recomputation  
 **Question:** What is an RDD and why is it immutable?
 
@@ -188,7 +188,7 @@ An **RDD (Resilient Distributed Dataset)** is an immutable, distributed collecti
 
 ---
 
-### Q42. reduceByKey() vs groupByKey() Efficiency
+### Q5. reduceByKey() vs groupByKey() Efficiency
 **Topic Covered:** Map-Side Combine, Shuffle Spills & Memory Thrashing  
 **Question:** reduceByKey() vs groupByKey() — why is one generally more efficient?
 
@@ -221,7 +221,7 @@ flowchart TD
 
 ---
 
-### Q44. map() vs flatMap() Mechanics
+### Q6. map() vs flatMap() Mechanics
 **Topic Covered:** One-to-One vs One-to-Many Iterator Transformation  
 **Question:** map() vs flatMap().
 
@@ -235,7 +235,7 @@ flowchart TD
 
 ---
 
-### Q4, Q5 & Q6. Spark Join Strategies & Optimizer Selection Matrix
+### Q7. Spark Join Strategies & Optimizer Selection Matrix
 **Topic Covered:** Distributed Join Topologies (BHJ, SMJ, SHJ, Cartesian)  
 **Questions Covered:**
 - How do you optimize joins in Spark for large datasets?
@@ -256,7 +256,7 @@ flowchart TD
 
 ---
 
-### Q23. Joining 500 GB DataFrame with 50 MB Lookup DataFrame
+### Q8. Joining 500 GB DataFrame with 50 MB Lookup DataFrame
 **Topic Covered:** Broadcast Hash Join Optimization & Auto-Broadcast Thresholds  
 **Questions Covered:**
 - You join a 500 GB fact table with a 200 MB dimension table. Would you use a Broadcast Join? Why?
@@ -280,7 +280,7 @@ If executed with standard Sort-Merge Join, Spark will shuffle and sort all 500 G
 
 ---
 
-### Q28. Diagnosing Join Record Multipliers & Cartesian Explodes
+### Q9. Diagnosing Join Record Multipliers & Cartesian Explodes
 **Topic Covered:** Non-Unique Keys, Composite Key Omissions & Row Explosion Diagnostics  
 **Question:** A Spark join produces a huge increase in the number of records. How would you determine whether the join is creating duplicate/multiple matches?
 
@@ -299,7 +299,7 @@ print(f"Right duplicate keys: {dup_keys_right.count()}")
 
 ---
 
-### Q34. Joining Two DataFrames with Different Schemas via Row Number
+### Q10. Joining Two DataFrames with Different Schemas via Row Number
 **Topic Covered:** Window Row Number Generation & Positional Schema Merging  
 **Question:** PySpark scenario: Join two DataFrames with different schemas using row numbers / Window functions.
 
@@ -322,7 +322,7 @@ aligned_df = df1_indexed.join(df2_indexed, on="row_id", how="inner").drop("row_i
 
 ---
 
-### Q1. Root Causes of the 1-Task Straggler
+### Q11. Root Causes of the 1-Task Straggler
 **Topic Covered:** Distributed Partition Asymmetry & Single-Key Hotspots  
 **Questions Covered:**
 - One Spark task takes 2 hours while 199 tasks finish in 10 minutes. How would you diagnose the bottleneck?
@@ -338,7 +338,7 @@ When 199 tasks finish in 10 seconds but Task 200 runs for 45 minutes or 2 hours:
 
 ---
 
-### Q2. Identifying Data Skew in the Spark Web UI
+### Q12. Identifying Data Skew in the Spark Web UI
 **Topic Covered:** Task Duration Quantiles, Shuffle Read Spikes & Executor Memory  
 **Question:** How would you identify and handle data skew in a Spark join?
 
@@ -351,7 +351,7 @@ When 199 tasks finish in 10 seconds but Task 200 runs for 45 minutes or 2 hours:
 
 ---
 
-### Q3 & Q25. Mitigating Data Skew via Key Salting & AQE Skew Join
+### Q13. Mitigating Data Skew via Key Salting & AQE Skew Join
 **Topic Covered:** Synthetic Key Salting, DataFrame Key Replication & Partition Balancing  
 **Questions Covered:**
 - How would you optimize a Spark job that is suffering from data skew and excessive shuffle?
@@ -429,7 +429,7 @@ When AQE detects a partition larger than the threshold, it automatically splits 
 
 ---
 
-### Q7 & Q8. repartition() vs coalesce() Architectural Comparison
+### Q14. repartition() vs coalesce() Architectural Comparison
 **Topic Covered:** Full Hash Shuffle vs Narrow Partition Merging  
 **Questions Covered:**
 - Explain the difference between repartition() and coalesce() in PySpark. When would you use each?
@@ -479,7 +479,7 @@ flowchart LR
 
 ---
 
-### Q18. Partition Sizing Heuristics (Increasing vs Decreasing)
+### Q15. Partition Sizing Heuristics (Increasing vs Decreasing)
 **Topic Covered:** Cluster Core Multiples & Target 128MB Partition Rule  
 **Questions Covered:**
 - Your Spark cluster has available compute, but the job still runs slowly. How would you optimize partitions, shuffles, executor memory, and parallelism?
@@ -495,7 +495,7 @@ $$\text{Ideal Partitions} = \frac{\text{Total Uncompressed Dataset Size}}{128\te
 
 ---
 
-### Q20 & Q21. The Small File Problem & Resolution in Spark
+### Q16. The Small File Problem & Resolution in Spark
 **Topic Covered:** NameNode Metadata Overhead, I/O IOPS Bottlenecks & Post-Processing Compaction  
 **Questions Covered:**
 - **Q20**: A Spark job generates thousands of small files. How would you identify and fix the issue?
@@ -512,7 +512,7 @@ $$\text{Ideal Partitions} = \frac{\text{Total Uncompressed Dataset Size}}{128\te
 
 ---
 
-### Q45. Partition Pruning Mechanics
+### Q17. Partition Pruning Mechanics
 **Topic Covered:** File Index Skipping & Directory Scanning Elimination  
 **Question:** What is partition pruning?
 
@@ -526,7 +526,7 @@ $$\text{Ideal Partitions} = \frac{\text{Total Uncompressed Dataset Size}}{128\te
 
 ---
 
-### Q14 & Q15. Identifying & Reducing Excessive Shuffling
+### Q18. Identifying & Reducing Excessive Shuffling
 **Topic Covered:** Shuffle File I/O, Disk Spill Mitigation & Shuffle Pruning  
 **Questions Covered:**
 - **Q14**: How would you reduce unnecessary shuffle operations?
@@ -542,7 +542,7 @@ $$\text{Ideal Partitions} = \frac{\text{Total Uncompressed Dataset Size}}{128\te
 
 ---
 
-### Q16. Adaptive Query Execution (AQE) 3-Pillar Architecture
+### Q19. Adaptive Query Execution (AQE) 3-Pillar Architecture
 **Topic Covered:** Dynamic Coalescing, Runtime Join Switching & Dynamic Skew Handling  
 **Question:** How does AQE (Adaptive Query Execution) improve Spark performance?
 
@@ -567,7 +567,7 @@ flowchart TD
 
 ---
 
-### Q22 & Q26. Optimizing Large Intermediate DataFrames & Multiple groupBy Operations
+### Q20. Optimizing Large Intermediate DataFrames & Multiple groupBy Operations
 **Topic Covered:** Projection Pushing, Checkpointing Lineage Truncation & Multi-Aggregation Optimization  
 **Questions Covered:**
 - **Q22**: A PySpark transformation creates a very large intermediate DataFrame and causes performance issues. How would you optimize it?
@@ -584,7 +584,7 @@ When an intermediate DataFrame becomes massive and degrades downstream stages:
 
 ---
 
-### Q36. Spark Unified Memory Architecture Breakdown
+### Q21. Spark Unified Memory Architecture Breakdown
 **Topic Covered:** JVM Heap Division: Storage Memory, Execution Memory, User Memory & Overhead  
 **Question:** How does Spark memory management work? Explain caching, persistence, garbage collection, and executor memory tuning.
 
@@ -638,7 +638,7 @@ flowchart TD
 
 ---
 
-### Q13. cache() vs persist() Storage Levels
+### Q22. cache() vs persist() Storage Levels
 **Topic Covered:** Default MEMORY_AND_DISK Storage Level vs Custom Deserialization Policies  
 **Questions Covered:**
 - Your pipeline repeatedly performs expensive transformations on the same DataFrame. Would you use cache() or persist()?
@@ -654,7 +654,7 @@ flowchart TD
 
 ---
 
-### Q17. OutOfMemoryError (OOM) Diagnostic Playbook
+### Q23. OutOfMemoryError (OOM) Diagnostic Playbook
 **Topic Covered:** Driver OOM vs Executor OOM & Disk Spill Diagnostics  
 **Question:** A PySpark job is running out of memory (OutOfMemoryError). What would you check first?
 
@@ -699,7 +699,7 @@ flowchart TD
 
 ---
 
-### Q9, Q11 & Q12. Production Troubleshooting Playbook for 2hr vs 20min Slowdowns
+### Q25. Production Troubleshooting Playbook for 2hr vs 20min Slowdowns
 **Topic Covered:** Systematic Pipeline Performance Diagnostics & Intermittent Failure Resolution  
 **Questions Covered:**
 - **Q9**: A Spark job is taking 2 hours instead of 20 minutes. How would you troubleshoot it?
@@ -708,7 +708,7 @@ flowchart TD
 
 ---
 
-### Q10. Why Spark Jobs Run Fine in Dev but Crash in Production
+### Q26. Why Spark Jobs Run Fine in Dev but Crash in Production
 **Topic Covered:** Data Volume Multipliers, Unseen Data Skew & Cluster Contention  
 **Questions Covered:**
 - How would you systematically debug a Spark job that is running significantly slower in production than in testing?
@@ -722,7 +722,7 @@ flowchart TD
 
 ---
 
-### Q19. Scaling Playbook for Processing 10 TB Datasets
+### Q27. Scaling Playbook for Processing 10 TB Datasets
 **Topic Covered:** Petabyte-Scale Architecture, Executor Cluster Sizing & Storage Compaction  
 **Question:** How would you process a 10 TB dataset efficiently using PySpark?
 
@@ -741,7 +741,7 @@ flowchart TD
 
 ---
 
-### Q27 & Q38. Built-in transform() vs Python UDF vs Pandas UDF
+### Q28. Built-in transform() vs Python UDF vs Pandas UDF
 **Topic Covered:** JVM Py4J Serialization Overhead vs Vectorized Arrow Batches  
 **Questions Covered:**
 - Can you walk me through how to implement a PySpark transformation using a custom UDF?
@@ -766,7 +766,7 @@ fast_df = df.withColumn("name_upper", F.upper(F.col("name")))
 
 ---
 
-### Q29 & Q31. Handling Inconsistent Schemas, Null Values & Incorrect Casing
+### Q29. Handling Inconsistent Schemas, Null Values & Incorrect Casing
 **Topic Covered:** Schema Merging, Defensive Casting & Null Sanitization  
 **Questions Covered:**
 - **Q29**: A Spark job reads a large number of files with different schemas. How would you handle schema inconsistencies efficiently?
@@ -786,7 +786,7 @@ df_json = spark.read.option("mode", "PERMISSIVE") \
 
 ---
 
-### Q39. Parsing & Flattening Nested JSON in PySpark
+### Q30. Parsing & Flattening Nested JSON in PySpark
 **Topic Covered:** Recursive Schema Traversal, StructType Unpacking & Array Explodes  
 **Question:** Given a nested JSON file, how would you parse and flatten it in PySpark?
 
@@ -814,7 +814,7 @@ flat_df = (
 
 ---
 
-### Q32. PySpark Live Coding: Days Between Status Changes per User
+### Q31. PySpark Live Coding: Days Between Status Changes per User
 **Topic Covered:** Window Lead/Lag Offset & Date Difference Calculation  
 **Question:** Write a PySpark logic to compute the difference in days between two status changes for each user.
 
@@ -838,7 +838,7 @@ status_diff_df = (
 
 ---
 
-### Q33. PySpark Live Coding: Upserting New Files into Delta Tables
+### Q32. PySpark Live Coding: Upserting New Files into Delta Tables
 **Topic Covered:** DeltaTable MERGE Python API & Match Predicates  
 **Question:** How would you write a PySpark job to merge (upsert) data from a new file into an existing Delta table?
 
@@ -864,7 +864,7 @@ delta_table.alias("target").merge(
 
 ---
 
-### Q35. PySpark Live Coding: Store Spending > ₹1000 in the Last Month
+### Q33. PySpark Live Coding: Store Spending > ₹1000 in the Last Month
 **Topic Covered:** Multi-Table Broadcast Joins, Rolling Date Filtering & Aggregations  
 **Question:** PySpark live coding: Write code to find customers who spent more than ₹1000 from store S1 in the last month using Customer, Store, and Sales datasets (joins, add_months(), aggregation).
 
@@ -895,7 +895,7 @@ high_spenders_df = (
 
 ---
 
-### Q37. PySpark Live Coding: Department-wise Employee Ranking
+### Q34. PySpark Live Coding: Department-wise Employee Ranking
 **Topic Covered:** Window Partitioning & Dense Ranking  
 **Question:** Write a PySpark query to rank employees department-wise using Window Functions.
 
@@ -912,14 +912,13 @@ ranked_employees = (
 )
 ```
 
-
 ---
 
 # 10. Severe Data Skew Mechanics & The 40% Partition Nightmare
 
 ---
 
-### The 40% Skew Partition Breakdown: Stages, Tasks, and Execution Dynamics
+### Q35. The 40% Skew Partition Breakdown: Stages, Tasks, and Execution Dynamics
 **Topic Covered:** Extreme Skew Impact, Straggler Tasks, Shuffle Spills & Cluster Idle Overhead  
 **Question:** One partition contains 40% of the entire dataset. What happens to stages, tasks, and overall job execution?
 
@@ -933,6 +932,7 @@ When 1 partition out of 200 holds 40% of the data in a 1 TB dataset:
 
 #### Visualizing the Stage Execution Timeline
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontFamily': 'ui-sans-serif, system-ui, sans-serif', 'primaryColor': '#1e293b', 'primaryTextColor': '#f8fafc', 'primaryBorderColor': '#3b82f6', 'lineColor': '#64748b', 'secondaryColor': '#0f172a', 'tertiaryColor': '#1e293b' }}}%%
 gantt
     title Spark Stage Execution with 40% Skew Straggler
     dateFormat  X
@@ -960,7 +960,7 @@ gantt
 
 ---
 
-### Petabyte-Scale Strategic Partitioning Heuristics
+### Q36. Petabyte-Scale Strategic Partitioning Heuristics
 **Topic Covered:** Partition Column Selection, Cardinality Traps & Directory Tree Limits  
 **Question:** How do you strategically manage data partitioning in a petabyte-scale dataset to avoid data skew and optimize query performance?
 
@@ -983,7 +983,7 @@ At petabyte scale, bad partitioning destroys both cloud storage performance and 
 
 ---
 
-### Spark Executor JDBC Read Stalls: The 4-Step Diagnosis
+### Q37. Spark Executor JDBC Read Stalls: The 4-Step Diagnosis
 **Topic Covered:** Parallel JDBC Reads, Connection Pool Saturation, Bounds Partitioning  
 **Questions Covered:**
 - Every Spark executor is waiting while reading from the database. What would you check first: connection limits, partitioning, query performance, or source-system bottlenecks?
@@ -1000,13 +1000,22 @@ Spark launches **only 1 single task on 1 single executor core**! All other 99 ex
 #### The 4-Step Systematic Diagnostic Checklist
 ```mermaid
 flowchart TD
-    S1["1. Inspect Spark UI Tasks Tab<br/>Is there only 1 task running for the JDBC read?"] -->|Yes: Only 1 Task| F1["Fix: Add partitionColumn, lowerBound, upperBound, numPartitions"]
-    S1 -->|No: Multiple Tasks| S2["2. Check Source DB Active Sessions<br/>Are connections stuck in lock waits or queue limits?"]
-    S2 -->|DB CPU 100% or Locks| F2["Fix: Reduce numPartitions, index query predicates, read from read-replica"]
-    S2 -->|DB Idle, Network Slow| S3["3. Inspect FetchSize<br/>Is fetchsize defaulting to 10 rows?"]
-    S3 -->|Default FetchSize| F3["Fix: Set fetchsize=50000 to buffer network roundtrips"]
-    S3 -->|FetchSize OK| S4["4. Source Table Query Execution Plan<br/>Is DB performing a full table scan without index?"]
+    subgraph ExtractionTriage ["Spark JDBC Extraction Triage"]
+        Issue["🚨 <b>Slow JDBC Read</b><br/>Single core saturated, cluster idling"] --> S1["<b>1. Partitioning Strategy Check</b><br/>Are numPartitions and partitionColumn specified?"]
+        S1 -->|Missing Partitioning| F1["<b>Fix: Add Partitioning</b><br/>Set numPartitions=20 with lower/upper bounds"]
+        S1 -->|Partitioned| S2["<b>2. Partition Column Distribution</b><br/>Is column integer/date with uniform distribution?"]
+    end
 
+    subgraph NetworkRemediation ["Network & Database Tuning"]
+        S2 -->|Skewed Column| F2["<b>Fix: Address Skew</b><br/>Select balanced integer/date column or salted hash"]
+        S2 -->|Evenly Distributed| S3["<b>3. FetchSize Parameter Check</b><br/>Default fetchsize=10 causes millions of roundtrips"]
+        S3 -->|Default FetchSize| F3["<b>Fix: Set FetchSize</b><br/>Set fetchsize=50000 to buffer network roundtrips"]
+        S3 -->|FetchSize OK| S4["<b>4. Source Query Execution Plan</b><br/>Check if database is performing unindexed sequential scan"]
+    end
+
+    style ExtractionTriage fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style NetworkRemediation fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
+    style Issue fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
     style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style S2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
     style S3 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
@@ -1038,7 +1047,7 @@ df = (
 
 ---
 
-### Progressive Memory Creep & Py4J Object Retention Debugging
+### Q38. Progressive Memory Creep & Py4J Object Retention Debugging
 **Topic Covered:** Py4J Gateway Leak, Unbounded RDD Lineage Trees, Driver Heap Growth  
 **Questions Covered:**
 - Your PySpark job memory usage keeps increasing after every batch. What do you suspect, and which metrics or Spark UI details would you inspect?
@@ -1066,7 +1075,7 @@ df = (
 
 ---
 
-### RDDs vs DataFrames vs Datasets: Catalyst & Tungsten Internals
+### Q39. RDDs vs DataFrames vs Datasets: Catalyst & Tungsten Internals
 **Topic Covered:** Resilient Distributed Datasets, Schema Optimization, Tungsten Binary Encoders  
 **Questions Covered:**
 - What are the differences between RDDs, DataFrames, and Datasets in PySpark?
@@ -1098,7 +1107,7 @@ flowchart LR
 
 ---
 
-### SparkContext vs SparkSession from a Modern Data Architecture Perspective
+### Q40. SparkContext vs SparkSession from a Modern Data Architecture Perspective
 **Topic Covered:** Legacy Contexts (`SQLContext`, `HiveContext`) vs Unified `SparkSession`  
 **Questions Covered:**
 - Explain SparkContext vs SparkSession from a data analysis perspective.
@@ -1115,7 +1124,7 @@ flowchart LR
 
 ---
 
-### Broadcast Variables Internals & Torrent Protocol
+### Q41. Broadcast Variables Internals & Torrent Protocol
 **Topic Covered:** Read-Only Distributed Cache, P2P Torrent Protocol, Deserialization Efficiency  
 **Questions Covered:**
 - Explain broadcast variables - what are they and when would you use them?
@@ -1146,7 +1155,7 @@ df_transformed = df.withColumn("feature_weight", apply_lookup(F.col("key")))
 
 ---
 
-### Bloom Filters in Spark & Delta Lake for Runtime File Skipping
+### Q42. Bloom Filters in Spark & Delta Lake for Runtime File Skipping
 **Topic Covered:** Probabilistic Data Structures, False Positives, Dynamic File Pruning  
 **Question:** How can Bloom Filters help reduce unnecessary data scans in distributed queries?
 
@@ -1165,7 +1174,7 @@ A **Bloom Filter** is a space-efficient probabilistic data structure that tests 
 
 ---
 
-### Joining Two Massive Multi-Terabyte Datasets Beyond Memory Spills
+### Q43. Joining Two Massive Multi-Terabyte Datasets Beyond Memory Spills
 **Topic Covered:** Sort-Merge Join Tuning, Bucketing / Pre-shuffling & Key Salting  
 **Questions Covered:**
 - How would you join two massive datasets that are too large to fit into memory efficiently in a distributed environment?
@@ -1187,7 +1196,7 @@ A **Bloom Filter** is a space-efficient probabilistic data structure that tests 
 
 ---
 
-### Best Practices for Analysing Snowflake Data Using Python & Snowpark
+### Q44. Best Practices for Analysing Snowflake Data Using Python & Snowpark
 **Topic Covered:** Snowflake Connector, Snowpark DataFrames, Pushdown Predicates & Storage Staging  
 **Question:** What are the best practices for analysing Snowflake data using Python?
 
@@ -1200,7 +1209,7 @@ A **Bloom Filter** is a space-efficient probabilistic data structure that tests 
 
 ---
 
-### PySpark Live Coding: DataFrame Deduplication & Department Sales Aggregations
+### Q45. PySpark Live Coding: DataFrame Deduplication & Department Sales Aggregations
 **Topic Covered:** `dropDuplicates()` vs Window Dedup, Multi-Column GroupBy Aggregation  
 **Questions Covered:**
 - You've discovered duplicate records in a critical production dataset. What is your immediate plan to handle them, and what long-term strategy would you implement to prevent recurrence?
@@ -1380,13 +1389,20 @@ joined_df = fact_2tb_df.join(
 #### Systematic 4-Stage Diagnostic Framework
 ```mermaid
 flowchart TD
-    Issue["High Memory Usage / Slow Processing"] --> S1["1. Spark UI: Executors Tab<br/>Inspect GC Time vs Task Time (Is GC > 15%?)"]
-    S1 -->|High GC| F1["Fix: Sizing Java Heap, reduce executor cores from 8 to 4-5"]
-    S1 -->|Low GC| S2["2. Stages Tab: Task Time & Aggregation Spills<br/>Check Spill (Memory) and Spill (Disk)"]
-    S2 -->|High Disk Spill| F2["Fix: Increase spark.sql.shuffle.partitions & spark.memory.fraction"]
-    S2 -->|Zero Spill| S3["3. Check Off-Heap & Native Memory<br/>Are Python UDFs or Netty buffers exceeding cgroups?"]
-    S3 --> F3["Fix: Increase spark.executor.memoryOverhead (default 10% to 25%)"]
+    subgraph DiagnosticTriage ["Spark UI Diagnostic Inspection"]
+        Issue["🚨 <b>High Memory Usage / Slow Processing</b>"] --> S1["<b>1. Executors Tab: GC Time vs Task Time</b><br/>Inspect GC pause ratio (Is GC > 15%?)"]
+        S1 -->|High GC| F1["<b>Fix: GC Tuning</b><br/>Size Java Heap, reduce executor cores from 8 to 4-5"]
+        S1 -->|Low GC| S2["<b>2. Stages Tab: Spills & Task Skew</b><br/>Check Spill (Memory) and Spill (Disk)"]
+    end
 
+    subgraph MemoryRemediation ["Memory & Disk Spill Remediation"]
+        S2 -->|High Disk Spill| F2["<b>Fix: Shuffle Spilling</b><br/>Increase spark.sql.shuffle.partitions & spark.memory.fraction"]
+        S2 -->|Zero Spill| S3["<b>3. Off-Heap & Native Memory</b><br/>Check Python UDFs & Netty buffers exceeding cgroups"]
+        S3 --> F3["<b>Fix: Overhead Sizing</b><br/>Increase spark.executor.memoryOverhead (default 10% to 25%)"]
+    end
+
+    style DiagnosticTriage fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style MemoryRemediation fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
     style Issue fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fca5a5
     style S1 fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
     style S2 fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff
@@ -1589,16 +1605,13 @@ def process_and_quarantine_events(raw_events_df: DataFrame, silver_path: str, de
    - Calling `.collect()` or reading large broadcast lookup tables triggers Driver OutOfMemory when data volume scales 100x.
    - **Resolution:** Replace `.collect()` with batch partitioned writes or increase `spark.driver.memory`.
 
-
-
-
 ---
 
 # 18. Broadcast Memory Limits, Distributed Locks & Kubernetes Diagnostics
 
 ---
 
-### Q66. Spark Broadcast Join Exceeding Executor Memory: Failure Modes & Safeguards
+### Q54. Spark Broadcast Join Exceeding Executor Memory: Failure Modes & Safeguards
 **Topic Covered:** Broadcast Hash Join (BHJ) Internals, Driver OOM, Torrent Broadcast & Auto-Broadcast Threshold  
 **Question:** What happens under the hood when a Spark Broadcast Join exceeds available executor or driver memory? How do you diagnose and prevent this in high-scale production pipelines?
 
@@ -1671,11 +1684,11 @@ joined_df.write.format("delta").mode("append").saveAsTable("sales_enriched")
 2. **Multi-Core Amplification:** An executor configured with `spark.executor.cores = 5` runs 5 tasks concurrently. If each task performs a join with a 200MB broadcast table, all 5 tasks share the cached broadcast reference, but intermediate hash probe states can thrash executor memory.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Distributed Join Strategies](../08_apache_spark_pyspark.md#4-distributed-join-strategies--performance-optimization)*
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Distributed Join Strategies](../05_apache_spark_and_pyspark.md#11-distributed-spark-join-strategies)*
 
 ---
 
-### Q67. Distributed Lock Expiration & Split-Brain Hazard During Long Spark GC Pauses
+### Q55. Distributed Lock Expiration & Split-Brain Hazard During Long Spark GC Pauses
 **Topic Covered:** Distributed Locks, Lease Expiration, GC Stop-The-World Pauses & Fencing Tokens  
 **Question:** Your distributed ETL lock has a 30-second TTL. A Spark job experiences a 40-second Stop-The-World (STW) Garbage Collection pause. What happens when another worker acquires the lock, and how do you prevent catastrophic data corruption?
 
@@ -1743,11 +1756,11 @@ class FencedStorageWriter:
 2. **GC Tuning Mitigation:** While fencing tokens protect storage integrity, tuning the JVM to prevent 40-second pauses is essential. Switching from standard ParallelGC to **Shenandoah GC or ZGC** (`-XX:+UseZGC` or `-XX:+UseG1GC -XX:MaxGCPauseMillis=200`) eliminates multi-second STW pauses.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [05. Distributed Systems and APIs: Distributed Locks & Consensus](../05_distributed_systems_and_apis.md#3-distributed-consensus--state-machines)*
+*Deep-dive theoretical reference: See [05. Distributed Systems and APIs: Distributed Locks & Consensus](../04_database_internals_and_distributed_systems.md)*
 
 ---
 
-### Q68. Kubernetes OOMKilled Executor Pod with Low JVM Heap Usage
+### Q56. Kubernetes OOMKilled Executor Pod with Low JVM Heap Usage
 **Topic Covered:** Container Cgroups, JVM Heap vs Off-Heap, MemoryOverhead & Native Netty Buffers  
 **Question:** In a Spark-on-Kubernetes (or Databricks) cluster, an executor pod is abruptly OOMKilled by the OS kernel, but the Spark Web UI shows JVM heap usage never exceeded 60%. Where is the memory being consumed, and how do you resolve it?
 
@@ -1810,11 +1823,11 @@ spark-submit   --master k8s://https://k8s-apiserver:443   --conf spark.executor.
 2. **The `spark.executor.pyspark.memory` Guard:** By default, Spark sets no ceiling on how much memory a Python worker process can allocate. Setting `spark.executor.pyspark.memory` forces Python workers to spill or throw memory errors within Python rather than allowing the kernel to kill the entire executor pod.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Memory Architecture & OOM Debugging](../08_apache_spark_pyspark.md#5-memory-management-and-garbage-collection-internals)*
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Memory Architecture & OOM Debugging](../05_apache_spark_and_pyspark.md)*
 
 ---
 
-### Q69. Spark Repartition vs Coalesce vs RepartitionByRange Execution Mechanics
+### Q57. Spark Repartition vs Coalesce vs RepartitionByRange Execution Mechanics
 **Topic Covered:** Hash Partitioning, Shuffle Elimination, Range Partitioning & Data Slicing  
 **Question:** Compare `repartition()`, `coalesce()`, and `repartitionByRange()` in Apache Spark. Explain the internal execution mechanics, shuffle implications, and when to use each in production ETL.
 
@@ -1890,11 +1903,11 @@ range_sorted_df.write.format("parquet").save("time_series_curated/")
 2. **Skew Hazard in Coalesce:** Coalesce merges partitions greedily based on node locality. If Node 1 had 500MB and Node 2 had 10MB, `coalesce(2)` can produce 1 massive 500MB partition and 1 tiny 10MB partition. Use `repartition()` if uniform partition sizing is essential.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Partition Management](../08_apache_spark_pyspark.md#3-core-transformations-actions-and-rdddataframe-mechanics)*
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Partition Management](../05_apache_spark_and_pyspark.md)*
 
 ---
 
-### Q70. Multi-Source Customer Record Deduplication Across CRM and ERP in PySpark
+### Q58. Multi-Source Customer Record Deduplication Across CRM and ERP in PySpark
 **Topic Covered:** Record Linkage, Source Precedence Rules, Window Deduplication & PySpark Live Coding  
 **Question:** How would you deduplicate customer records arriving from two distinct sources (CRM and ERP) with conflicting addresses and timestamps using PySpark, giving precedence to ERP updates?
 
@@ -1981,11 +1994,11 @@ golden_customers_df.write.format("delta").mode("overwrite").saveAsTable("silver.
 2. **Data Skew on Generic IDs:** If corrupted upstream records populate dummy IDs (e.g. `customer_id = '00000000'` or `NULL`), millions of rows hash to a single partition, triggering severe task stragglers. Filter null/dummy keys into a quarantine table before executing the window deduplication.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Production PySpark Engineering](../08_apache_spark_pyspark.md#7-production-pyspark-job-design-and-maintenance)*
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: Production PySpark Engineering](../05_apache_spark_and_pyspark.md)*
 
 ---
 
-### Q71. PySpark Regional Top 3 Products Sold (Window Ranking Live Coding)
+### Q59. PySpark Regional Top 3 Products Sold (Window Ranking Live Coding)
 **Topic Covered:** PySpark Window Functions, Dense Ranking & Aggregation Pipelines  
 **Question:** Write a PySpark job to calculate the top 3 best-selling products by quantity sold in each geographical region from a fact sales DataFrame.
 
@@ -2051,4 +2064,28 @@ top_3_regional_products.show(truncate=False)
 2. **Handling Regional Data Skew:** If one region (e.g. `US-EAST`) accounts for 70% of total global sales, that single window partition will become a straggler task. Enable Spark 3.x Adaptive Query Execution (`spark.sql.adaptive.skewJoin.enabled = true`) to dynamically split skewed partitions.
 
 #### Core Curriculum Cross-Reference
-*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: PySpark Transformations & Windowing](../08_apache_spark_pyspark.md#3-core-transformations-actions-and-rdddataframe-mechanics)*
+*Deep-dive theoretical reference: See [08. Apache Spark & PySpark: PySpark Transformations & Windowing](../05_apache_spark_and_pyspark.md)*
+
+---
+
+## Summary Comparison & Production Reference Matrix
+
+| Scenario Domain | Critical Runtime Pathology | Diagnostic & Triage Method | Canonical Production Resolution |
+| :--- | :--- | :--- | :--- |
+| **Spark Engine Architecture & Execution Lifecycle** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Distributed Join Strategies & Accidental Multipliers** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Data Skew Detection, Stragglers & Mitigation** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Partition Management: Repartition vs Coalesce & Small Files** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Shuffle Mechanics, Intermediate DataFrames & AQE** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+| **Spark Memory Architecture, Caching, GC & OOM Debugging** | High-throughput invariants & concurrency boundaries | Metric instrumentation & trace profiling | Defensive validation & graceful degradation |
+
+---
+
+## References & Further Reading
+
+- [Apache Spark Official Documentation: Tuning Spark](https://spark.apache.org/docs/latest/tuning.html) — Authoritative guidance on memory tuning, serialization, and shuffle optimization.
+- [Adaptive Query Execution (AQE) Architectural Overview (Databricks)](https://www.databricks.com/blog/2020/05/29/adaptive-query-execution-speeding-up-spark-sql-at-runtime.html) — Dynamic partition coalescing, runtime join switching, and skew handling.
+- [Deep Dive into Project Tungsten: Bringing Spark Closer to Bare Metal (Databricks)](https://www.databricks.com/blog/2015/04/28/project-tungsten-bringing-spark-closer-to-bare-metal.html) — Off-heap binary memory management and whole-stage code generation.
+- [Learning Spark: Lightning-Fast Data Analytics, 2nd Edition (Jules S. Damji, Brooke Wenig, Tathagata Das, Denny Lee)](https://www.oreilly.com/library/view/learning-spark-2nd/9781492050032/) — Comprehensive enterprise reference on Spark internals and PySpark.
+- [High Performance Spark: Best Practices for Scaling and Optimizing Apache Spark (Holden Karau, Rachel Warren)](https://www.oreilly.com/library/view/high-performance-spark/9781491943199/) — Low-level join strategies, memory spills, and distributed data structures.
+- [Spark: Cluster Computing with Working Sets (Zaharia et al., HotCloud 2010)](https://www.usenix.org/legacy/event/hotcloud10/tech/full_papers/Zaharia.pdf) — The seminal research paper introducing the RDD architecture.

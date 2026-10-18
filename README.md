@@ -1,32 +1,34 @@
 # Interview Preparation & Engineering Knowledge Base
 
-A structured collection of production-grade study guides, architectural deep dives, and real-world interview solutions across four core engineering disciplines: **AI Engineering**, **Cloud Engineering**, **Data Engineering**, and **Java Backend Engineering**.
+A structured collection of production-grade study guides, architectural deep dives, and real-world interview solutions across five core engineering disciplines: **AI Engineering**, **Cloud Engineering**, **Data Engineering**, **Java Backend Engineering**, and **Python Backend Engineering**.
+
+Each track provides a strict 10-module linear curriculum, accompanied by scenario-based interview question deep dives in 1:1 mapped companion guides.
 
 ---
 
 ## Tracks Overview
 
 ### 1. [AI Engineering](AI%20Engineering/00_ai_study_guide_and_index.md)
-Comprehensive guides covering applied machine learning, generative AI, vector retrieval, autonomous agent architectures, and LLM serving infrastructure.
+Comprehensive guides covering applied machine learning, neural architectures, generative AI, vector retrieval, autonomous agent architectures, and LLM serving infrastructure.
 
 - **Core Curriculum ([Study Guide & Index](AI%20Engineering/00_ai_study_guide_and_index.md))**:
-  - Foundations & Neural Architectures: [ML & Deep Learning Fundamentals](AI%20Engineering/01_machine_learning_and_deep_learning_fundamentals.md) | [LLM Foundations & Architecture](AI%20Engineering/02_llm_foundations_and_model_architecture.md) | [Prompt Engineering & Orchestration](AI%20Engineering/03_prompt_engineering_and_api_orchestration.md)
-  - Application & Retrieval Engineering: [Embeddings & Vector Databases](AI%20Engineering/04_embeddings_vector_databases_and_search.md) | [Advanced RAG & Knowledge Systems](AI%20Engineering/05_advanced_rag_and_knowledge_systems.md) | [Context Engineering & Agent Harness](AI%20Engineering/06_context_engineering_and_agent_harness_design.md)
-  - Cognitive Agents & Evaluation: [AI Agents & Workflows](AI%20Engineering/07_ai_agents_and_workflow_orchestration.md) | [Multi-Agent Systems](AI%20Engineering/08_multi_agent_systems_and_collaboration.md) | [LLM Evaluation & Benchmarking](AI%20Engineering/09_llm_evaluation_testing_and_benchmarking.md)
-  - Security, LLMOps & Infrastructure: [AI Security & Governance](AI%20Engineering/10_ai_security_guardrails_and_governance.md) | [LLMOps & Gateways](AI%20Engineering/11_llmops_gateways_and_production_operations.md) | [AI Infrastructure & Serving](AI%20Engineering/12_ai_infrastructure_cloud_platforms_and_inference_serving.md)
-  - Multimodal, Adaptation & System Design: [Multimodal AI & Real-Time](AI%20Engineering/13_multimodal_ai_vision_audio_and_realtime_systems.md) | [Model Adaptation & Fine-Tuning](AI%20Engineering/14_model_adaptation_finetuning_and_distillation.md) | [Enterprise AI System Design](AI%20Engineering/15_enterprise_ai_system_design_and_production_scenarios.md)
+  - Foundations & Neural Architectures: [`01. ML & Deep Learning Fundamentals`](AI%20Engineering/01_machine_learning_and_deep_learning.md) | [`02. LLM & Transformer Architecture`](AI%20Engineering/02_llm_and_transformer_architecture.md)
+  - Orchestration & Knowledge Systems: [`03. Prompt Engineering & Orchestration`](AI%20Engineering/03_prompt_engineering_and_context_design.md) | [`04. Embeddings, Vector DBs & RAG`](AI%20Engineering/04_embeddings_vector_databases_and_rag.md)
+  - Cognitive Agents & Security: [`05. AI Agents & Multi-Agent Systems`](AI%20Engineering/05_ai_agents_and_multi_agent_systems.md) | [`06. LLM Evaluation & Security`](AI%20Engineering/06_llm_evaluation_and_security.md)
+  - Operations & Serving Platforms: [`07. LLMOps & Production Gateways`](AI%20Engineering/07_llmops_and_model_gateways.md) | [`08. AI Cloud Infrastructure & Serving`](AI%20Engineering/08_ai_infrastructure_and_serving.md)
+  - Real-Time & Systems Design: [`09. Multimodal AI & Real-Time Systems`](AI%20Engineering/09_multimodal_and_realtime_ai.md) | [`10. Model Adaptation & Enterprise AI Design`](AI%20Engineering/10_model_adaptation_and_system_design.md)
+- **[Interview FAQs & Scenarios](AI%20Engineering/frequently_asked_questions/00_ai_faq_study_guide_and_index.md)**: Deep-dive interview scenarios covering transformer mechanics, LLM architecture, prompt engineering, and context design.
 
 ---
 
 ### 2. [Cloud Engineering](Cloud%20Engineering/00_cloud_study_guide_and_index.md)
-Concept-first, production-grade curriculum spanning Linux OS internals, software-defined networking, core cloud infrastructure paradigms (grounded in Microsoft Azure with equivalent AWS counterparts), Infrastructure as Code (Terraform & Bicep), release engineering, Kubernetes & GitOps, DevSecOps, observability, Site Reliability Engineering, distributed databases, serverless architectures, and FinOps.
+Concept-first, production-grade curriculum spanning Linux OS internals, software-defined networking, core cloud infrastructure paradigms (Azure & AWS), Infrastructure as Code (Terraform), release engineering, Kubernetes & GitOps, DevSecOps, observability, Site Reliability Engineering, distributed databases, serverless architectures, and FinOps.
 
 - **Core Curriculum ([Study Guide & Index](Cloud%20Engineering/00_cloud_study_guide_and_index.md))**:
-  - Foundations & Networking: [Linux & OS](Cloud%20Engineering/01_linux_operating_systems_and_scripting.md) | [Networking Fundamentals](Cloud%20Engineering/02_networking_fundamentals.md) | [Cloud Fundamentals](Cloud%20Engineering/03_cloud_fundamentals_and_architecture.md)
-  - Core Infrastructure, Networks & IaC: [Cloud Infrastructure Concepts](Cloud%20Engineering/04_azure_core_services_and_aws_equivalents.md) | [Cloud Networking Design](Cloud%20Engineering/05_cloud_networking_and_infrastructure_design.md) | [IaC & Config Management](Cloud%20Engineering/06_infrastructure_as_code_and_configuration_management.md)
-  - Release, Kubernetes & Security: [CI/CD & Release](Cloud%20Engineering/07_cicd_and_release_engineering.md) | [Containers, K8s & GitOps](Cloud%20Engineering/08_containers_kubernetes_and_gitops.md) | [Cloud Security & IAM](Cloud%20Engineering/09_cloud_security_iam_and_devsecops.md)
-  - Observability, SRE & Data: [Observability & Monitoring](Cloud%20Engineering/10_observability_monitoring_and_logging.md) | [Reliability & Resilience](Cloud%20Engineering/11_reliability_resilience_and_incident_management.md) | [Databases & Distributed Systems](Cloud%20Engineering/12_databases_storage_and_distributed_systems.md)
-  - Cloud-Native, Platforms & FinOps: [Serverless Architecture](Cloud%20Engineering/13_serverless_and_cloud_native_architecture.md) | [Platform Engineering & IDP](Cloud%20Engineering/14_platform_engineering_and_developer_experience.md) | [FinOps & Governance](Cloud%20Engineering/15_finops_governance_and_enterprise_operations.md)
+  - Foundations & Networking: [`01. Linux OS & Shell Scripting`](Cloud%20Engineering/01_linux_systems_and_scripting.md) | [`02. Networking & Cloud Networking`](Cloud%20Engineering/02_networking_and_cloud_connectivity.md)
+  - Cloud Architecture & IaC: [`03. Cloud Fundamentals & Multi-Cloud`](Cloud%20Engineering/03_cloud_foundations_and_multicloud.md) | [`04. Infrastructure as Code (IaC)`](Cloud%20Engineering/04_infrastructure_as_code.md)
+  - CI/CD, Containers & Security: [`05. CI/CD & Release Engineering`](Cloud%20Engineering/05_cicd_and_release_engineering.md) | [`06. Containers, Kubernetes & GitOps`](Cloud%20Engineering/06_containers_kubernetes_and_gitops.md) | [`07. Cloud Security, IAM & DevSecOps`](Cloud%20Engineering/07_cloud_security_iam_and_devsecops.md)
+  - Reliability & Platform Operations: [`08. Observability & SRE Reliability`](Cloud%20Engineering/08_observability_and_reliability.md) | [`09. Distributed Storage & Serverless`](Cloud%20Engineering/09_cloud_databases_and_storage.md) | [`10. Platform Engineering & FinOps`](Cloud%20Engineering/10_platform_engineering_and_finops.md)
 
 ---
 
@@ -34,10 +36,11 @@ Concept-first, production-grade curriculum spanning Linux OS internals, software
 In-depth coverage of distributed data platforms, database internals, batch and stream processing, Lakehouse ACID engines, orchestration, and enterprise system design.
 
 - **Core Curriculum ([Study Guide & Index](Data%20Engineering/00_de_study_guide_and_index.md))**:
-  - Relational & analytical query mastery: [SQL Fundamentals](Data%20Engineering/01_sql_fundamentals.md) | [Advanced SQL](Data%20Engineering/02_advanced_sql.md)
-  - Systems & storage engines: [Python for Data Engineering](Data%20Engineering/03_python_for_data_engineering.md) | [Database Internals](Data%20Engineering/04_database_internals_and_performance.md) | [Distributed Systems & APIs](Data%20Engineering/05_distributed_systems_and_apis.md)
-  - Architecture & Lakehouse: [Data Modeling](Data%20Engineering/06_data_architecture_and_modeling.md) | [File Formats & Storage](Data%20Engineering/07_file_formats_and_storage.md) | [Apache Spark & PySpark](Data%20Engineering/08_apache_spark_pyspark.md) | [Databricks & Delta Lake](Data%20Engineering/09_databricks_and_delta_lake.md)
-  - Ingestion, streaming & operations: [Pipeline Design](Data%20Engineering/10_data_pipeline_design_and_ingestion.md) | [Kafka & Streaming](Data%20Engineering/11_streaming_and_kafka_event_streaming.md) | [Airflow & dbt](Data%20Engineering/12_orchestration_airflow_and_dbt.md) | [Azure & DevOps](Data%20Engineering/13_azure_data_engineering_and_devops.md) | [Governance & Security](Data%20Engineering/14_data_governance_security_and_observability.md) | [System Design](Data%20Engineering/15_system_design_for_data_engineering.md)
+  - Relational Mastery & Programming: [`01. SQL Fundamentals & Advanced Querying`](Data%20Engineering/01_sql_and_advanced_querying.md) | [`02. Python for Data Engineering`](Data%20Engineering/02_python_for_data_engineering.md)
+  - Architecture & Distributed Storage: [`03. Data Modeling & Warehousing`](Data%20Engineering/03_data_modeling_and_warehousing.md) | [`04. Database Internals & Distributed Systems`](Data%20Engineering/04_database_internals_and_distributed_systems.md)
+  - Compute Engines & Lakehouse: [`05. Apache Spark & PySpark`](Data%20Engineering/05_apache_spark_and_pyspark.md) | [`06. Databricks & Delta Lake`](Data%20Engineering/06_databricks_and_delta_lake.md)
+  - Governance, Streaming & Pipelines: [`07. Unity Catalog & Governance`](Data%20Engineering/07_unity_catalog_and_governance.md) | [`08. Streaming, Kafka & Auto Loader`](Data%20Engineering/08_streaming_kafka_and_auto_loader.md) | [`09. ETL Pipelines, Orchestration & DevOps`](Data%20Engineering/09_etl_pipelines_and_orchestration.md)
+  - High-Scale System Design: [`10. System Design for Data Engineering`](Data%20Engineering/10_system_design_for_data_engineering.md)
 - **[Interview FAQs & Scenarios](Data%20Engineering/frequently_asked_questions/00_de_faq_study_guide_and_index.md)**: 10 dedicated scenario guides covering real-world SQL puzzles, Spark performance tuning, Delta Lake internals, streaming watermarks, and pipeline troubleshooting.
 
 ---
@@ -46,25 +49,28 @@ In-depth coverage of distributed data platforms, database internals, batch and s
 Deep architectural exploration of JVM mechanics, core Java, modern functional features (Java 8–21), high concurrency, Spring Boot internals, microservices, and cloud operations.
 
 - **Core Curriculum ([Study Guide & Index](Java%20Backend%20Engineering/00_java_study_guide_and_index.md))**:
-  - Language & runtime foundations: [Core Java & OOP](Java%20Backend%20Engineering/01_core_java_and_oop.md) | [Collections & Generics](Java%20Backend%20Engineering/02_java_collections_generics_data_handling.md) | [Modern Java (Records & Streams)](Java%20Backend%20Engineering/03_modern_java_records_sealed_streams_functional.md) | [Concurrency & Multithreading](Java%20Backend%20Engineering/04_java_concurrency_multithreading.md) | [JVM Memory & Runtime](Java%20Backend%20Engineering/05_jvm_memory_io_reflection_runtime.md)
-  - Architecture & Spring platform: [Design Patterns & SOLID](Java%20Backend%20Engineering/06_design_patterns_solid_software_architecture.md) | [Spring Boot Platform](Java%20Backend%20Engineering/07_spring_framework_spring_boot.md) | [Spring Web & REST APIs](Java%20Backend%20Engineering/08_spring_web_rest_apis.md) | [Spring Security & OAuth2](Java%20Backend%20Engineering/11_security_identity_certificate_management.md)
-  - Persistence, messaging & infrastructure: [Databases & SQL](Java%20Backend%20Engineering/09_relational_databases_and_sql.md) | [JPA & Hibernate](Java%20Backend%20Engineering/10_spring_data_jdbc_jpa_hibernate_transactions.md) | [Caching & Kafka](Java%20Backend%20Engineering/12_caching_redis_messaging_kafka_event_driven.md) | [Microservices & System Design](Java%20Backend%20Engineering/13_microservices_distributed_systems_system_design.md) | [Testing & Observability](Java%20Backend%20Engineering/14_testing_observability_performance_production_engineering.md) | [Docker, K8s & Cloud](Java%20Backend%20Engineering/15_docker_kubernetes_cicd_cloud.md)
-- **[Interview FAQs & Scenarios](Java%20Backend%20Engineering/frequently_asked_questions/00_java_faq_study_guide_and_index.md)**: 12 dedicated scenario guides covering HashMap internals, multithreading puzzles, Spring bean lifecycle, JPA N+1 optimization, Kafka consumer lag, and thread dump triage.
+  - Language Foundations & Data Handling: [`01. Core Java & OOP`](Java%20Backend%20Engineering/01_core_java_and_oop.md) | [`02. Collections Framework & Generics`](Java%20Backend%20Engineering/02_java_collections_and_generics.md)
+  - Modern Java & Concurrency: [`03. Modern Java, Records & Streams`](Java%20Backend%20Engineering/03_modern_java_streams_and_records.md) | [`04. Concurrency & Multithreading`](Java%20Backend%20Engineering/04_java_concurrency_and_multithreading.md)
+  - Enterprise Frameworks & Security: [`05. Spring Boot & REST APIs`](Java%20Backend%20Engineering/05_spring_boot_and_rest_apis.md) | [`06. Security & Cryptography`](Java%20Backend%20Engineering/06_security_and_cryptography.md)
+  - Persistence & Messaging: [`07. Databases, JPA & Hibernate`](Java%20Backend%20Engineering/07_databases_jpa_and_hibernate.md) | [`08. Caching, Redis & Messaging`](Java%20Backend%20Engineering/08_caching_redis_and_kafka.md)
+  - Architecture & Cloud Operations: [`09. Microservices & System Design`](Java%20Backend%20Engineering/09_microservices_and_system_design.md) | [`10. Cloud Native, DevOps & Troubleshooting`](Java%20Backend%20Engineering/10_cloud_devops_and_observability.md)
+- **[Interview FAQs & Scenarios](Java%20Backend%20Engineering/frequently_asked_questions/00_java_faq_study_guide_and_index.md)**: 10 dedicated scenario guides covering HashMap internals, multithreading puzzles, Spring bean lifecycle, JPA N+1 optimization, Kafka consumer lag, and thread dump triage.
 
 ---
 
 ### 5. [Python Backend Engineering](Python%20Backend%20Engineering/00_python_study_guide_and_index.md)
-Comprehensive, production-grade curriculum spanning CPython runtime mechanics, object model internals, advanced metaprogramming, high-concurrency AsyncIO and event loops, software architecture (Clean/Hexagonal & DDD), web framework internals (FastAPI & Flask), Pydantic v2 data modeling, SQLAlchemy 2.0 enterprise persistence, HTTP resilience, testing, API security (OAuth2, JWT, Argon2id), production operations (Uvicorn, Gunicorn, Granian, Docker, K8s, OpenTelemetry), and distributed background processing (Celery, ARQ, Kafka, WebSockets, gRPC).
+Comprehensive, production-grade curriculum spanning CPython runtime mechanics, object model internals, advanced metaprogramming, high-concurrency AsyncIO, Clean/Hexagonal architecture, web framework internals (FastAPI & Flask), SQLAlchemy 2.0 enterprise persistence, API security, and distributed systems operations.
 
 - **Core Curriculum ([Study Guide & Index](Python%20Backend%20Engineering/00_python_study_guide_and_index.md))**:
-  - Language, Runtime & Tooling: [Core Python & OOP](Python%20Backend%20Engineering/01_core_python_and_oop.md) | [Advanced Constructs](Python%20Backend%20Engineering/02_advanced_python_programming_constructs.md) | [CPython Runtime & Performance](Python%20Backend%20Engineering/03_cpython_runtime_memory_and_performance.md) | [Concurrency & AsyncIO](Python%20Backend%20Engineering/04_python_concurrency_and_async_programming.md) | [Development Ecosystem & Tooling](Python%20Backend%20Engineering/05_python_development_ecosystem_and_tooling.md)
-  - Architecture & Web Protocols: [Design Patterns & Architecture](Python%20Backend%20Engineering/06_design_patterns_solid_and_software_architecture.md) | [Web Frameworks (FastAPI & Flask)](Python%20Backend%20Engineering/07_web_frameworks_fastapi_and_flask.md) | [APIs & Protocols (REST, gRPC, WebSockets)](Python%20Backend%20Engineering/08_apis_protocols_rest_grpc_websockets.md)
-  - Persistence, Security & Messaging: [Relational Databases & SQL](Python%20Backend%20Engineering/09_relational_databases_and_sql.md) | [SQLAlchemy & Migrations](Python%20Backend%20Engineering/10_sqlalchemy_orm_persistence_and_migrations.md) | [Security & Authentication](Python%20Backend%20Engineering/11_security_identity_and_authentication.md) | [Caching & Event-Driven Messaging](Python%20Backend%20Engineering/12_caching_redis_and_event_driven_messaging.md)
-  - Distributed Systems & Cloud Operations: [Microservices & System Design](Python%20Backend%20Engineering/13_microservices_distributed_systems_system_design.md) | [Testing & Observability](Python%20Backend%20Engineering/14_testing_observability_and_performance_engineering.md) | [Docker, Kubernetes & Cloud](Python%20Backend%20Engineering/15_docker_kubernetes_cicd_and_cloud.md)
+  - Language, Runtime & Tooling: [`01. Core Python & OOP`](Python%20Backend%20Engineering/01_core_python_and_oop.md) | [`02. CPython Runtime & Tooling`](Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
+  - Concurrency & Architecture: [`03. Concurrency & Async Programming`](Python%20Backend%20Engineering/03_python_concurrency_and_asyncio.md) | [`04. Design Patterns & Architecture`](Python%20Backend%20Engineering/04_design_patterns_and_architecture.md)
+  - Web Frameworks & Persistence: [`05. Web Frameworks & API Protocols`](Python%20Backend%20Engineering/05_web_frameworks_and_api_protocols.md) | [`06. Databases & SQLAlchemy ORM`](Python%20Backend%20Engineering/06_databases_and_sqlalchemy_orm.md)
+  - Security & Event Messaging: [`07. Security, Identity & Auth`](Python%20Backend%20Engineering/07_security_and_authentication.md) | [`08. Caching & Event Messaging`](Python%20Backend%20Engineering/08_caching_redis_and_kafka.md)
+  - Distributed Systems & DevOps: [`09. Microservices & System Design`](Python%20Backend%20Engineering/09_microservices_and_system_design.md) | [`10. Testing, Observability & DevOps`](Python%20Backend%20Engineering/10_testing_docker_and_devops.md)
 
 ---
 
-## Directory Structure
+## Directory Tree
 
 ```mermaid
 flowchart TD
@@ -74,31 +80,33 @@ flowchart TD
         
         subgraph AI_Track ["📁 AI Engineering/"]
             direction TB
-            AI_Core["📄 00_ai_study_guide_and_index.md<br/>📄 01–15 Core Modules (ML, LLMs, RAG, Agents, vLLM)"]
+            AI_Core["📄 00_ai_study_guide_and_index.md<br/>📄 01–10 Core Modules (ML, LLMs, RAG, Agents, Serving)"]
+            AI_FAQ["📁 frequently_asked_questions/<br/>(01–03 Scenario-Based Deep Dives)"]
+            AI_Core --- AI_FAQ
         end
 
         subgraph Cloud_Track ["📁 Cloud Engineering/"]
             direction TB
-            Cloud_Core["📄 00_cloud_study_guide_and_index.md<br/>📄 01–15 Core Modules (Linux, K8s, Azure/AWS, SRE, FinOps)"]
+            Cloud_Core["📄 00_cloud_study_guide_and_index.md<br/>📄 01–10 Core Modules (Linux, K8s, Azure/AWS, SRE, FinOps)"]
         end
 
         subgraph Data_Track ["📁 Data Engineering/"]
             direction TB
-            Data_Core["📄 00_de_study_guide_and_index.md<br/>📄 01–15 Core Modules (Spark, Delta, SQL, Airflow, Kafka)"]
-            Data_FAQ["📁 frequently_asked_questions/<br/>(10 Scenario-Based Deep Dives)"]
+            Data_Core["📄 00_de_study_guide_and_index.md<br/>📄 01–10 Core Modules (Spark, Delta, SQL, Airflow, Kafka)"]
+            Data_FAQ["📁 frequently_asked_questions/<br/>(01–10 Scenario-Based Deep Dives)"]
             Data_Core --- Data_FAQ
         end
 
         subgraph Java_Track ["📁 Java Backend Engineering/"]
             direction TB
-            Java_Core["📄 00_java_study_guide_and_index.md<br/>📄 01–15 Core Modules (Core Java, Concurrency, Spring Boot, K8s)"]
-            Java_FAQ["📁 frequently_asked_questions/<br/>(12 Scenario-Based Deep Dives)"]
+            Java_Core["📄 00_java_study_guide_and_index.md<br/>📄 01–10 Core Modules (Core Java, Concurrency, Spring Boot, K8s)"]
+            Java_FAQ["📁 frequently_asked_questions/<br/>(01–10 Scenario-Based Deep Dives)"]
             Java_Core --- Java_FAQ
         end
 
         subgraph Python_Track ["📁 Python Backend Engineering/"]
             direction TB
-            Python_Core["📄 00_python_study_guide_and_index.md<br/>📄 01–15 Core Modules (CPython, AsyncIO, FastAPI, SQLAlchemy)"]
+            Python_Core["📄 00_python_study_guide_and_index.md<br/>📄 01–10 Core Modules (CPython, AsyncIO, FastAPI, SQLAlchemy)"]
         end
     end
 
@@ -109,27 +117,10 @@ flowchart TD
     Readme --- Python_Track
 
     style RepoRoot fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#f8fafc
-    style Readme fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#ffffff
-    style AI_Track fill:#0f172a,stroke:#ec4899,stroke-width:1.5px,color:#f472b6
-    style AI_Core fill:#1f2937,stroke:#ec4899,stroke-width:2px,color:#ffffff
-    style Cloud_Track fill:#0f172a,stroke:#06b6d4,stroke-width:1.5px,color:#67e8f9
-    style Cloud_Core fill:#1f2937,stroke:#06b6d4,stroke-width:2px,color:#ffffff
-    style Data_Track fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
-    style Data_Core fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#ffffff
-    style Data_FAQ fill:#1e293b,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style Readme fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style AI_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Cloud_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Data_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Java_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Java_Core fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#ffffff
-    style Java_FAQ fill:#1e293b,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Python_Track fill:#0f172a,stroke:#10b981,stroke-width:1.5px,color:#6ee7b7
-    style Python_Core fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#ffffff
+    style Python_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
 ```
-
----
-
-## How to Use This Repository
-
-1. **Pick Your Focus Track**: Jump directly into the track corresponding to your specialization ([AI](AI%20Engineering/00_ai_study_guide_and_index.md), [Cloud](Cloud%20Engineering/00_cloud_study_guide_and_index.md), [Data](Data%20Engineering/00_de_study_guide_and_index.md), [Java Backend Engineering](Java%20Backend%20Engineering/00_java_study_guide_and_index.md), or [Python Backend Engineering](Python%20Backend%20Engineering/00_python_study_guide_and_index.md)).
-2. **Follow the Numbered Progression**: Each folder contains numbered modules (`01_...` to `15_...`) designed to be read in logical study order.
-3. **Practice with Real Interview Questions**: Use the `frequently_asked_questions/` directories within the Data Engineering and Java Backend Engineering folders for scenario-based practice questions with end-to-end solutions.
-
-

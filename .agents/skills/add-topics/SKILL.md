@@ -4,7 +4,7 @@ description: >-
   Use this skill whenever a new topic file (e.g. `topic-dump.md`, `*_topic*.md`, `*_topics*.md`,
   `new_topics.md`, or similar) is created or detected under any track folder. Analyzes, deduplicates,
   and seamlessly integrates newly added topics into the existing core curriculum modules (01_*.md
-  through 15_*.md) and master indexes without appending to the end, strictly following AGENTS.md
+  through 10_*.md) and master indexes without appending to the end, strictly following AGENTS.md
   guidelines, and deletes the incoming topic file upon completion.
 ---
 
@@ -24,7 +24,7 @@ flowchart TD
     Parse --> Audit["2. Deduplication & Coverage Audit"]
     Audit --> Decision{"Already Covered?"}
     Decision -- "Fully Covered" --> LogSkip["Log topic as already satisfied"]
-    Decision -- "Partial / Missing" --> TargetSelect["3. Select Target Module (01 to 15)"]
+    Decision -- "Partial / Missing" --> TargetSelect["3. Select Target Module (01 to 10)"]
     TargetSelect --> SlotLocate["4. Locate Precise Insertion Slot (Zero-Append)"]
     SlotLocate --> Author["5. Author Content (Dual-Audience & Zero-ASCII)"]
     Author --> UpdateTOC["6. Update Module TOC & Section 9 Reference Matrix"]
@@ -48,16 +48,16 @@ flowchart TD
 ---
 
 ## Table of Contents
-1. [Trigger Conditions & Flexible Filename Matching](#1-trigger-conditions--flexible-filename-matching)
+1. [Trigger Conditions & Flexible Filename Matching](#1-trigger-conditions-flexible-filename-matching)
 2. [Step-by-Step Execution Protocol](#2-step-by-step-execution-protocol)
-   - [Step 1: Ingestion & Topic Breakdown](#step-1-ingestion--topic-breakdown)
-   - [Step 2: Curriculum Coverage & Deduplication Audit](#step-2-curriculum-coverage--deduplication-audit)
-   - [Step 3: Target Module & Slot Selection (Zero-Append Mandate)](#step-3-target-module--slot-selection-zero-append-mandate)
+   - [Step 1: Ingestion & Topic Breakdown](#step-1-ingestion-topic-breakdown)
+   - [Step 2: Curriculum Coverage & Deduplication Audit](#step-2-curriculum-coverage-deduplication-audit)
+   - [Step 3: Target Module & Slot Selection (Zero-Append Mandate)](#step-3-target-module-slot-selection-zero-append-mandate)
    - [Step 4: Pedagogical Content Authoring](#step-4-pedagogical-content-authoring)
-   - [Step 5: Table of Contents & Cross-Reference Updates](#step-5-table-of-contents--cross-reference-updates)
+   - [Step 5: Table of Contents & Cross-Reference Updates](#step-5-table-of-contents-cross-reference-updates)
    - [Step 6: Master Track Index Synchronization](#step-6-master-track-index-synchronization)
-   - [Step 7: Verification & Post-Ingestion Cleanup](#step-7-verification--post-ingestion-cleanup)
-3. [Summary Comparison & Engineering Reference Matrix](#3-summary-comparison--engineering-reference-matrix)
+   - [Step 7: Verification & Post-Ingestion Cleanup](#step-7-verification-post-ingestion-cleanup)
+3. [Summary Comparison & Engineering Reference Matrix](#3-summary-comparison-engineering-reference-matrix)
 4. [Quality Assurance Checklist](#4-quality-assurance-checklist)
 
 ---
@@ -70,10 +70,10 @@ Activate this skill when:
   - `*_topic.md`, `*_topics.md`, `*topic*.md`, `*topics*.md`
   - `new_topics.md`, `add_topics.md`, `raw_topics.md`
 - A user prompts to "add topics", "integrate new topics", "process topic dump", or points to a file containing raw topics.
-- Invoked programmatically by the `add-questions` skill when an interview question tests an underlying base concept that is not yet documented in the core curriculum (`01_` through `15_`).
+- Invoked programmatically by the `add-questions` skill when an interview question tests an underlying base concept that is not yet documented in the core curriculum (strictly `01_` through `10_`).
 
 > [!NOTE]
-> Canonical track files (such as `00_<track>_study_guide_and_index.md` or numbered modules `01_` through `15_`) are permanent curriculum files and must never be treated as staging/dump files.
+> Canonical track files (such as `00_<track>_study_guide_and_index.md` or numbered modules `01_` through `10_`) are permanent curriculum files and must never be treated as staging/dump files.
 
 ---
 
@@ -87,7 +87,7 @@ Activate this skill when:
    - Core invariants, low-level mechanics, and intended technical depth.
 
 ### Step 2: Curriculum Coverage & Deduplication Audit
-1. Inspect the track's master index (`00_<track_slug>_study_guide_and_index.md`) and candidate module files (`01_` through `15_`).
+1. Inspect the track's master index (`00_<track_slug>_study_guide_and_index.md`) and candidate module files (`01_` through `10_`).
 2. Search across existing modules for the concept:
    - **Fully Covered:** Topic is already thoroughly documented with theoretical mechanics, dark-mode Mermaid diagram, and production code snippet. Mark as redundant and log to the final report.
    - **Partially Covered:** High-level summary or brief mention exists, but lacks engine internals, memory layout, production code, or failure triage. Mark for in-place enrichment.
@@ -100,13 +100,13 @@ Activate this skill when:
 > Never append new topics to the bottom of the file or after Section 9 / Section 10!
 > Every topic must be woven naturally into the chronological complexity flow within `# 1.` through `# 8.`.
 
-1. **Select the Module (01 to 15):**
+1. **Select the Module (01 to 10):**
    - Follow the 5-tier architecture defined in `AGENTS.md`:
-     - **Tier 1 (01–03):** Core Languages & Low-Level Foundations
-     - **Tier 2 (04–06):** Storage Engines, Architecture & Data Modeling
-     - **Tier 3 (07–09):** Core Frameworks, Runtimes & Execution Engines
-     - **Tier 4 (10–12):** Ingestion, Caching, Streaming & Persistence
-     - **Tier 5 (13–15):** Distributed Systems, Cloud, Ops & System Design
+     - **Tier 1 (01–02 or 01–03):** Core Languages & Low-Level Foundations
+     - **Tier 2 (03–04 or 04–05):** Storage Engines, Architecture & Data Modeling
+     - **Tier 3 (05–06 or 06–07):** Core Frameworks, Runtimes & Execution Engines
+     - **Tier 4 (07–08 or 08–09):** Ingestion, Caching, Streaming & Persistence
+     - **Tier 5 (09–10):** Distributed Systems, Cloud, Ops & System Design
 2. **Select the Section or Subsection:**
    - Scan existing sections `# 1.` through `# 8.`.
    - If an existing section covers this domain, insert as a new numbered subsection (e.g. `### 3.4 ...`) in proper progression.
@@ -142,8 +142,10 @@ Author content adhering strictly to `AGENTS.md`:
    - Update the numbered list of sections/subsections with verified GitHub anchors.
 2. **Section 9 Reference Matrix:**
    - Update `# 9. Summary Comparison & Engineering Reference Matrix` to include the new topic's architectural trade-offs, complexity, and operational rules.
-3. **Section 10 References:**
-   - Add authoritative external links (official docs, RFCs, JSRs) to `# 10. References & Further Reading`.
+3. **Closing Structure Preservation:**
+   - If a companion FAQ file exists (`frequently_asked_questions/NN_*_faq.md`), preserve the `# N+1. Interview Questions & Deep-Dive FAQ References` section right before `# References & Further Reading`.
+4. **References Section:**
+   - Add authoritative external links (official docs, RFCs, JSRs) to `# References & Further Reading`.
 
 ### Step 6: Master Track Index Synchronization
 Update `00_<track_slug>_study_guide_and_index.md`:
@@ -181,7 +183,7 @@ Update `00_<track_slug>_study_guide_and_index.md`:
 
 - [ ] Source topic file detected and parsed.
 - [ ] All topics audited against existing modules.
-- [ ] Appropriate target module (`01_` to `15_`) selected based on the 5-Tier syllabus.
+- [ ] Appropriate target module (`01_` to `10_`) selected based on the 5-Tier syllabus.
 - [ ] Topic placed logically inside `# 1.` through `# 8.` (Zero-Append Mandate satisfied).
 - [ ] Dual-audience depth delivered (beginner accessibility + staff-level runtime mechanics).
 - [ ] Dark-mode Mermaid diagram included (Zero-ASCII verified).
@@ -189,6 +191,7 @@ Update `00_<track_slug>_study_guide_and_index.md`:
 - [ ] Strategic alerts (`[!CAUTION]`, `[!IMPORTANT]`, `[!TIP]`) applied.
 - [ ] Module Table of Contents (`## Table of Contents`) updated with valid anchors.
 - [ ] Module Section 9 Comparison Matrix updated.
+- [ ] Closing structure preserved (optional FAQ references retained before references).
 - [ ] Strictly no end-of-file checklists (`- [ ]`); module concludes with summary points/paragraphs followed by references.
 - [ ] Master track index (`00_*_study_guide_and_index.md`) curriculum table updated.
 - [ ] Source topic file deleted after verified completion.
