@@ -144,11 +144,11 @@ The table below maps the **50 canonical Cloud, Infrastructure, Kubernetes, Netwo
 
 Cloud Engineering provides the foundational platform, networking, compute runtime, and security guardrails for distributed data platforms, modern microservices, and AI training/inference infrastructure. Refer to the companion guides across sibling tracks:
 
-- [Linux & Python Foundations for Data Engineering](../Data%20Engineering/02_python_for_data_engineering.md) — Asynchronous I/O, process management, and high-performance scripting.
-- [Database Internals & Storage Engines](../Data%20Engineering/04_database_internals_and_distributed_systems.md) — B+ Trees, LSM-Trees, storage layouts, and transaction locks.
-- [Distributed Systems & Network APIs](../Data%20Engineering/04_database_internals_and_distributed_systems.md) — CAP theorem, consensus protocols, and rate limiting.
-- [Azure Data Engineering & DevOps Pipelines](../Data%20Engineering/09_etl_pipelines_and_orchestration.md) — Azure Data Factory, Synapse, Databricks, and CI/CD pipelines.
-- [Cloud Native, Containers & DevOps for Java](../Java%20Backend%20Engineering/10_cloud_devops_and_observability.md) — JVM container tuning, Kubernetes liveness/readiness probes, and Spring Boot cloud configs.
+- [Linux & Python Foundations for Data Engineering](../../Data%20Engineering/02_python_for_data_engineering.md) — Asynchronous I/O, process management, and high-performance scripting.
+- [Database Internals & Storage Engines](../../Data%20Engineering/04_database_internals_and_distributed_systems.md) — B+ Trees, LSM-Trees, storage layouts, and transaction locks.
+- [Distributed Systems & Network APIs](../../Data%20Engineering/04_database_internals_and_distributed_systems.md) — CAP theorem, consensus protocols, and rate limiting.
+- [Azure Data Engineering & DevOps Pipelines](../../Data%20Engineering/09_etl_pipelines_and_orchestration.md) — Azure Data Factory, Synapse, Databricks, and CI/CD pipelines.
+- [Cloud Native, Containers & DevOps for Java](../../Java%20Backend%20Engineering/10_cloud_devops_and_observability.md) — JVM container tuning, Kubernetes liveness/readiness probes, and Spring Boot cloud configs.
 - [LLMOps & Production Gateways](../AI%20Engineering/07_llmops_and_model_gateways.md) — Production LLM gateways, semantic caching, rate limiting, and observability.
 - [AI Infrastructure & Inference Serving](../AI%20Engineering/08_ai_infrastructure_and_serving.md) — High-performance GPU clusters, NVIDIA H100s, vLLM, and KEDA autoscaling.
 

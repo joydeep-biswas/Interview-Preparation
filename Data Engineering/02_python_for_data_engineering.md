@@ -105,7 +105,7 @@ flowchart TD
 
 > [!NOTE]
 > **Domain Framing: CPython for Data Engineering vs. Python Backend Engineering:**
-> In general software and backend engineering, understanding CPython focuses on request-response lifecycles, AST compiler pipelines, bytecode execution loops (`_PyEval_EvalFrameDefault`), and native C/Rust extensions (see [Python Backend Engineering: 03. CPython Runtime, Memory & Performance](../Python Backend Engineering/02_cpython_runtime_and_memory.md#1-cpython-execution-pipeline--bytecode-internals)).
+> In general software and backend engineering, understanding CPython focuses on request-response lifecycles, AST compiler pipelines, bytecode execution loops (`_PyEval_EvalFrameDefault`), and native C/Rust extensions (see [Python Backend Engineering: 03. CPython Runtime, Memory & Performance](../Supplemental%20Resources/Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md#1-cpython-execution-pipeline--bytecode-internals)).
 >
 > **For a Data Engineer, CPython is viewed through the lens of memory efficiency, garbage collection throughput, and I/O parallelism:**
 > - **The Pointer Overhead Tax:** Standard CPython collections (`list[dict]`) store pointers to heavy heap-allocated `PyObject` structs. When parsing a 10-million-row dataset, this causes a **10x to 50x memory bloat** relative to the raw byte payload and induces massive L1/L2 cache misses through pointer-chasing.
@@ -263,7 +263,7 @@ Python 3.13 introduces experimental **free-threaded builds (`--disable-gil`)**, 
 
 > [!NOTE]
 > **Domain Framing: Advanced Constructs in Data Pipelines:**
-> While backend engineering utilizes Python constructs for object-oriented domain hierarchies, service layers, and web middleware (see [Python Backend Engineering: 01. Core Python & OOP](../Python%20Backend%20Engineering/01_core_python_and_oop.md) and [02. Advanced Python Programming Constructs](../Python%20Backend%20Engineering/01_core_python_and_oop.md)), data engineers harness these constructs to solve pipeline-critical challenges:
+> While backend engineering utilizes Python constructs for object-oriented domain hierarchies, service layers, and web middleware (see [Python Backend Engineering: 01. Core Python & OOP](../Supplemental%20Resources/Python%20Backend%20Engineering/01_core_python_and_oop.md) and [02. Advanced Python Programming Constructs](../Supplemental%20Resources/Python%20Backend%20Engineering/01_core_python_and_oop.md)), data engineers harness these constructs to solve pipeline-critical challenges:
 > - **Generators & Iterators:** Serve as the core pattern for memory-bounded streaming ingestion, enabling pipelines to extract and transform 50GB+ files from S3/Blob storage in fixed 15MB RAM without Out-Of-Memory (OOM) crashes.
 > - **Decorators:** Provide reusable, declarative pipeline telemetry, execution timer instrumentation, and exponential backoff retry policies across unreliable external REST APIs.
 > - **Context Managers:** Guarantee deterministic resource cleanup, closing database cursors, releasing file descriptors, and rolling back database transactions upon ETL worker failures.
@@ -794,7 +794,7 @@ def calculate_sha256_checksum(file_path: str, chunk_size_bytes: int = 65536) -> 
 
 > [!NOTE]
 > **Domain Framing: Concurrency & Systems Engineering:**
-> In backend web engineering, concurrency focuses on ASGI event loops (FastAPI, Starlette) and task-local request storage (see [Python Backend Engineering: 04. Python Concurrency & Async Programming](../Python%20Backend%20Engineering/03_python_concurrency_and_asyncio.md) and [05. Python Development Ecosystem & Tooling](../Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)).
+> In backend web engineering, concurrency focuses on ASGI event loops (FastAPI, Starlette) and task-local request storage (see [Python Backend Engineering: 04. Python Concurrency & Async Programming](../Supplemental%20Resources/Python%20Backend%20Engineering/03_python_concurrency_and_asyncio.md) and [05. Python Development Ecosystem & Tooling](../Supplemental%20Resources/Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)).
 > In data engineering, concurrency choices depend strictly on the workload bottleneck:
 > - **`asyncio`:** For high-throughput network I/O when batch-ingesting data from thousands of external REST API endpoints concurrently.
 > - **`multiprocessing`:** For CPU-bound data parsing, cryptographic hashing, and compression, spawning worker processes that bypass the GIL across multi-core server nodes.
@@ -953,17 +953,17 @@ def run_parallel_hashing(work_chunks: List[List[str]], num_processes: int = 8) -
 1. **CPython Runtime & Internals:**
    - [CPython Internal Design Guide](https://devguide.python.org/internals/)
    - [PEP 703: Making the Global Interpreter Lock Optional in CPython](https://peps.python.org/pep-0703/)
-   - [Companion Module: Python Backend Engineering - CPython Runtime, Memory & Performance](../Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
+   - [Companion Module: Python Backend Engineering - CPython Runtime, Memory & Performance](../Supplemental%20Resources/Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
 2. **Advanced Language Constructs & OOP:**
-   - [Companion Module: Python Backend Engineering - Core Python & OOP](../Python%20Backend%20Engineering/01_core_python_and_oop.md)
-   - [Companion Module: Python Backend Engineering - Advanced Programming Constructs](../Python%20Backend%20Engineering/01_core_python_and_oop.md)
+   - [Companion Module: Python Backend Engineering - Core Python & OOP](../Supplemental%20Resources/Python%20Backend%20Engineering/01_core_python_and_oop.md)
+   - [Companion Module: Python Backend Engineering - Advanced Programming Constructs](../Supplemental%20Resources/Python%20Backend%20Engineering/01_core_python_and_oop.md)
    - [Pydantic v2 Architecture & Rust Core (pydantic-core)](https://docs.pydantic.dev/latest/)
 3. **Modern Vectorized Analytical Engines:**
    - [Apache Arrow In-Memory Format & PyArrow Documentation](https://arrow.apache.org/docs/python/)
    - [Polars User Guide: LazyFrames & Streaming Engine](https://docs.pola.rs/)
    - [DuckDB: An Embeddable Analytical Database](https://duckdb.org/docs/)
 4. **Python Concurrency & Production Systems:**
-   - [Companion Module: Python Backend Engineering - Concurrency & Async Programming](../Python%20Backend%20Engineering/03_python_concurrency_and_asyncio.md)
-   - [Companion Module: Python Backend Engineering - Development Ecosystem & Tooling](../Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
+   - [Companion Module: Python Backend Engineering - Concurrency & Async Programming](../Supplemental%20Resources/Python%20Backend%20Engineering/03_python_concurrency_and_asyncio.md)
+   - [Companion Module: Python Backend Engineering - Development Ecosystem & Tooling](../Supplemental%20Resources/Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
    - [structlog: Fast, Structured Logging for Python](https://www.structlog.org/)
    - [Astral uv: Extremely Fast Python Package Installer and Resolver](https://docs.astral.sh/uv/)

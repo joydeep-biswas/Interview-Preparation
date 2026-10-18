@@ -2271,6 +2271,6 @@ def get_unique_values_order_preserving(d: Dict[Any, Any]) -> List[Any]:
 1. **CPython Runtime & Internals:**
    - [CPython Internal Design Guide](https://devguide.python.org/internals/)
    - [PEP 703: Making the Global Interpreter Lock Optional in CPython](https://peps.python.org/pep-0703/)
-   - [Companion Module: Python Backend Engineering - CPython Runtime, Memory & Performance](../../Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
+   - [Companion Module: Python Backend Engineering - CPython Runtime, Memory & Performance](../../Supplemental%20Resources/Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
 2. **Advanced Language Constructs & OOP:**
-   - [Companion Module: Python Backend Engineering - Core Python & OOP](../../Python%20Backend%20Engineering/01_core_python_and_oop.md)
+   - [Companion Module: Python Backend Engineering - Core Python & OOP](../../Supplemental%20Resources/Python%20Backend%20Engineering/01_core_python_and_oop.md)

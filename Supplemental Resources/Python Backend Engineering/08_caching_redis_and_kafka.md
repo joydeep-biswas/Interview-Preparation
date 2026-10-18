@@ -125,7 +125,7 @@ flowchart TD
 > In Python backend architectures, Redis and message brokers facilitate distributed cache-aside acceleration, idempotent API task queues (Celery/ARQ), and event-driven microservice dispatch.
 >
 > For large-scale data ingestion, exactly-once stream processing, late-arriving event watermarking, and lakehouse storage sinks (Kafka to Delta Lake / Iceberg), see:
-> - [Data Engineering: 11. Streaming & Kafka Event Streaming](../Data%20Engineering/08_streaming_kafka_and_auto_loader.md)
+> - [Data Engineering: 11. Streaming & Kafka Event Streaming](../../Data%20Engineering/08_streaming_kafka_and_auto_loader.md)
 
 ### 1.1 Cache-Aside (Lazy Loading)
 

@@ -1,38 +1,14 @@
 # Interview Preparation & Engineering Knowledge Base
 
-A structured collection of production-grade study guides, architectural deep dives, and real-world interview solutions across five core engineering disciplines: **AI Engineering**, **Cloud Engineering**, **Data Engineering**, **Java Backend Engineering**, and **Python Backend Engineering**.
+A structured collection of production-grade study guides, architectural deep dives, and real-world interview solutions focused on **Data Engineering** and **Java Backend Engineering**, with dedicated resources for **Supplemental Resources** (Universal Interview Prep & Additional Engineering Tracks).
 
 Each track provides a strict 10-module linear curriculum, accompanied by scenario-based interview question deep dives in 1:1 mapped companion guides.
 
 ---
 
-## Tracks Overview
+## Core Engineering Tracks
 
-### 1. [AI Engineering](AI%20Engineering/00_ai_study_guide_and_index.md)
-Comprehensive guides covering applied machine learning, neural architectures, generative AI, vector retrieval, autonomous agent architectures, and LLM serving infrastructure.
-
-- **Core Curriculum ([Study Guide & Index](AI%20Engineering/00_ai_study_guide_and_index.md))**:
-  - Foundations & Neural Architectures: [`01. ML & Deep Learning Fundamentals`](AI%20Engineering/01_machine_learning_and_deep_learning.md) | [`02. LLM & Transformer Architecture`](AI%20Engineering/02_llm_and_transformer_architecture.md)
-  - Orchestration & Knowledge Systems: [`03. Prompt Engineering & Orchestration`](AI%20Engineering/03_prompt_engineering_and_context_design.md) | [`04. Embeddings, Vector DBs & RAG`](AI%20Engineering/04_embeddings_vector_databases_and_rag.md)
-  - Cognitive Agents & Security: [`05. AI Agents & Multi-Agent Systems`](AI%20Engineering/05_ai_agents_and_multi_agent_systems.md) | [`06. LLM Evaluation & Security`](AI%20Engineering/06_llm_evaluation_and_security.md)
-  - Operations & Serving Platforms: [`07. LLMOps & Production Gateways`](AI%20Engineering/07_llmops_and_model_gateways.md) | [`08. AI Cloud Infrastructure & Serving`](AI%20Engineering/08_ai_infrastructure_and_serving.md)
-  - Real-Time & Systems Design: [`09. Multimodal AI & Real-Time Systems`](AI%20Engineering/09_multimodal_and_realtime_ai.md) | [`10. Model Adaptation & Enterprise AI Design`](AI%20Engineering/10_model_adaptation_and_system_design.md)
-- **[Interview FAQs & Scenarios](AI%20Engineering/frequently_asked_questions/00_ai_faq_study_guide_and_index.md)**: Deep-dive interview scenarios covering transformer mechanics, LLM architecture, prompt engineering, and context design.
-
----
-
-### 2. [Cloud Engineering](Cloud%20Engineering/00_cloud_study_guide_and_index.md)
-Concept-first, production-grade curriculum spanning Linux OS internals, software-defined networking, core cloud infrastructure paradigms (Azure & AWS), Infrastructure as Code (Terraform), release engineering, Kubernetes & GitOps, DevSecOps, observability, Site Reliability Engineering, distributed databases, serverless architectures, and FinOps.
-
-- **Core Curriculum ([Study Guide & Index](Cloud%20Engineering/00_cloud_study_guide_and_index.md))**:
-  - Foundations & Networking: [`01. Linux OS & Shell Scripting`](Cloud%20Engineering/01_linux_systems_and_scripting.md) | [`02. Networking & Cloud Networking`](Cloud%20Engineering/02_networking_and_cloud_connectivity.md)
-  - Cloud Architecture & IaC: [`03. Cloud Fundamentals & Multi-Cloud`](Cloud%20Engineering/03_cloud_foundations_and_multicloud.md) | [`04. Infrastructure as Code (IaC)`](Cloud%20Engineering/04_infrastructure_as_code.md)
-  - CI/CD, Containers & Security: [`05. CI/CD & Release Engineering`](Cloud%20Engineering/05_cicd_and_release_engineering.md) | [`06. Containers, Kubernetes & GitOps`](Cloud%20Engineering/06_containers_kubernetes_and_gitops.md) | [`07. Cloud Security, IAM & DevSecOps`](Cloud%20Engineering/07_cloud_security_iam_and_devsecops.md)
-  - Reliability & Platform Operations: [`08. Observability & SRE Reliability`](Cloud%20Engineering/08_observability_and_reliability.md) | [`09. Distributed Storage & Serverless`](Cloud%20Engineering/09_cloud_databases_and_storage.md) | [`10. Platform Engineering & FinOps`](Cloud%20Engineering/10_platform_engineering_and_finops.md)
-
----
-
-### 3. [Data Engineering](Data%20Engineering/00_de_study_guide_and_index.md)
+### 1. [Data Engineering](Data%20Engineering/00_de_study_guide_and_index.md)
 In-depth coverage of distributed data platforms, database internals, batch and stream processing, Lakehouse ACID engines, orchestration, and enterprise system design.
 
 - **Core Curriculum ([Study Guide & Index](Data%20Engineering/00_de_study_guide_and_index.md))**:
@@ -45,7 +21,7 @@ In-depth coverage of distributed data platforms, database internals, batch and s
 
 ---
 
-### 4. [Java Backend Engineering](Java%20Backend%20Engineering/00_java_study_guide_and_index.md)
+### 2. [Java Backend Engineering](Java%20Backend%20Engineering/00_java_study_guide_and_index.md)
 Deep architectural exploration of JVM mechanics, core Java, modern functional features (Java 8–21), high concurrency, Spring Boot internals, microservices, and cloud operations.
 
 - **Core Curriculum ([Study Guide & Index](Java%20Backend%20Engineering/00_java_study_guide_and_index.md))**:
@@ -58,15 +34,21 @@ Deep architectural exploration of JVM mechanics, core Java, modern functional fe
 
 ---
 
-### 5. [Python Backend Engineering](Python%20Backend%20Engineering/00_python_study_guide_and_index.md)
-Comprehensive, production-grade curriculum spanning CPython runtime mechanics, object model internals, advanced metaprogramming, high-concurrency AsyncIO, Clean/Hexagonal architecture, web framework internals (FastAPI & Flask), SQLAlchemy 2.0 enterprise persistence, API security, and distributed systems operations.
+## Supplemental Resources & Additional Tracks
 
-- **Core Curriculum ([Study Guide & Index](Python%20Backend%20Engineering/00_python_study_guide_and_index.md))**:
-  - Language, Runtime & Tooling: [`01. Core Python & OOP`](Python%20Backend%20Engineering/01_core_python_and_oop.md) | [`02. CPython Runtime & Tooling`](Python%20Backend%20Engineering/02_cpython_runtime_and_memory.md)
-  - Concurrency & Architecture: [`03. Concurrency & Async Programming`](Python%20Backend%20Engineering/03_python_concurrency_and_asyncio.md) | [`04. Design Patterns & Architecture`](Python%20Backend%20Engineering/04_design_patterns_and_architecture.md)
-  - Web Frameworks & Persistence: [`05. Web Frameworks & API Protocols`](Python%20Backend%20Engineering/05_web_frameworks_and_api_protocols.md) | [`06. Databases & SQLAlchemy ORM`](Python%20Backend%20Engineering/06_databases_and_sqlalchemy_orm.md)
-  - Security & Event Messaging: [`07. Security, Identity & Auth`](Python%20Backend%20Engineering/07_security_and_authentication.md) | [`08. Caching & Event Messaging`](Python%20Backend%20Engineering/08_caching_redis_and_kafka.md)
-  - Distributed Systems & DevOps: [`09. Microservices & System Design`](Python%20Backend%20Engineering/09_microservices_and_system_design.md) | [`10. Testing, Observability & DevOps`](Python%20Backend%20Engineering/10_testing_docker_and_devops.md)
+For universal interview preparation and additional engineering disciplines, see the **[Supplemental Resources](Supplemental%20Resources/README.md)** directory:
+
+### Pillar 1: Universal Interview Foundations
+- **[Data Structures & Algorithms (DSA)](Supplemental%20Resources/README.md#pillar-1-universal-interview-foundations-roadmap--specifications)** — Core algorithmic patterns, asymptotic complexity, graph algorithms, and dynamic programming.
+- **[System Design (HLD & LLD)](Supplemental%20Resources/README.md#pillar-1-universal-interview-foundations-roadmap--specifications)** — Distributed systems architecture, scalability patterns, consensus, low-level object-oriented design, and design patterns.
+- **[Behavioral & Leadership](Supplemental%20Resources/README.md#pillar-1-universal-interview-foundations-roadmap--specifications)** — STAR-framework response strategies, technical leadership principles, incident post-mortems, and stakeholder triage.
+
+### Pillar 2: Additional Engineering Tracks
+- **[AI Engineering](Supplemental%20Resources/README.md#1-ai-engineering)** — Applied machine learning, transformer architectures, prompt engineering, RAG, multi-agent systems, and inference serving.
+- **[Cloud Engineering](Supplemental%20Resources/README.md#2-cloud-engineering)** — Linux internals, cloud networking, Azure & AWS architecture, Terraform, Kubernetes, SRE, and FinOps.
+- **[Python Backend Engineering](Supplemental%20Resources/README.md#3-python-backend-engineering)** — CPython runtime, async concurrency, FastAPI, SQLAlchemy 2.0, microservices, and enterprise architecture.
+
+👉 **Explore the full roadmaps, syllabi, 10-module curricula, and question banks in the [Supplemental Resources Guide](Supplemental%20Resources/README.md).**
 
 ---
 
@@ -78,18 +60,6 @@ flowchart TD
         direction TB
         Readme["📄 README.md<br/>(Master Curriculum Index & Entry Point)"]
         
-        subgraph AI_Track ["📁 AI Engineering/"]
-            direction TB
-            AI_Core["📄 00_ai_study_guide_and_index.md<br/>📄 01–10 Core Modules (ML, LLMs, RAG, Agents, Serving)"]
-            AI_FAQ["📁 frequently_asked_questions/<br/>(01–03 Scenario-Based Deep Dives)"]
-            AI_Core --- AI_FAQ
-        end
-
-        subgraph Cloud_Track ["📁 Cloud Engineering/"]
-            direction TB
-            Cloud_Core["📄 00_cloud_study_guide_and_index.md<br/>📄 01–10 Core Modules (Linux, K8s, Azure/AWS, SRE, FinOps)"]
-        end
-
         subgraph Data_Track ["📁 Data Engineering/"]
             direction TB
             Data_Core["📄 00_de_study_guide_and_index.md<br/>📄 01–10 Core Modules (Spark, Delta, SQL, Airflow, Kafka)"]
@@ -104,23 +74,40 @@ flowchart TD
             Java_Core --- Java_FAQ
         end
 
-        subgraph Python_Track ["📁 Python Backend Engineering/"]
+        subgraph Supp_Tracks ["📁 Supplemental Resources/"]
             direction TB
-            Python_Core["📄 00_python_study_guide_and_index.md<br/>📄 01–10 Core Modules (CPython, AsyncIO, FastAPI, SQLAlchemy)"]
+            Supp_Readme["📄 README.md<br/>(Hub Index & Foundation Roadmaps)"]
+            DSA_Track["📁 Data Structures & Algorithms (DSA)/"]
+            Sys_Track["📁 System Design (HLD & LLD)/"]
+            Beh_Track["📁 Behavioral & Leadership/"]
+            AI_Track["📁 AI Engineering/<br/>(00–10 Modules & FAQs)"]
+            Cloud_Track["📁 Cloud Engineering/<br/>(00–10 Modules)"]
+            Python_Track["📁 Python Backend Engineering/<br/>(00–10 Modules)"]
+            Supp_Readme --- DSA_Track
+            Supp_Readme --- Sys_Track
+            Supp_Readme --- Beh_Track
+            Supp_Readme --- AI_Track
+            Supp_Readme --- Cloud_Track
+            Supp_Readme --- Python_Track
         end
     end
 
-    Readme --- AI_Track
-    Readme --- Cloud_Track
     Readme --- Data_Track
     Readme --- Java_Track
-    Readme --- Python_Track
+    Readme --- Supp_Tracks
 
     style RepoRoot fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#f8fafc
     style Readme fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
-    style AI_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Cloud_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Data_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
     style Java_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
-    style Python_Track fill:#0f172a,stroke:#3b82f6,stroke-width:1.5px,color:#93c5fd
+    style Supp_Tracks fill:#0f172a,stroke:#64748b,stroke-width:1.5px,color:#f8fafc
+    style Supp_Readme fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#93c5fd
+    style DSA_Track fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#ffffff
+    style Sys_Track fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#ffffff
+    style Beh_Track fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#ffffff
+    style AI_Track fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#ffffff
+    style Cloud_Track fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#ffffff
+    style Python_Track fill:#1f2937,stroke:#3b82f6,stroke-width:1.5px,color:#ffffff
 ```
+
+👉 **Explore the full roadmaps, syllabi, 10-module curricula, and question banks in the [Supplemental Resources Guide](Supplemental%20Resources/README.md).**
