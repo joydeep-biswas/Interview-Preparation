@@ -99,43 +99,46 @@ flowchart TD
 8. [Production Implementation: Automated CI/CD Evaluation Suite](#8-production-implementation-automated-cicd-evaluation-suite)
    - [8.1 Test Suite Architecture & Statistical Thresholds](#81-test-suite-architecture--statistical-thresholds)
    - [8.2 Complete Production-Grade Python Implementation](#82-complete-production-grade-python-implementation)
-   - [12.3 GitHub Actions Workflow Integration](#123-github-actions-workflow-integration)
-9. [AI Threat Modeling & The OWASP Top 10 for LLMs](#13-ai-threat-modeling--the-owasp-top-10-for-llms)
-   - [13.1 Conflation of the Control Plane and Data Plane: The Fundamental Flaw](#131-conflation-of-the-control-plane-and-data-plane-the-fundamental-flaw)
-   - [13.2 The OWASP Top 10 for Large Language Models: Comprehensive Exploit Taxonomy](#132-the-owasp-top-10-for-large-language-models-comprehensive-exploit-taxonomy)
-   - [13.3 Establishing Enterprise Trust Boundaries & STRIDE-AI Threat Modeling](#133-establishing-enterprise-trust-boundaries--stride-ai-threat-modeling)
-10. [Direct & Indirect Prompt Injection Attacks](#14-direct--indirect-prompt-injection-attacks)
-   - [14.1 Direct Injection: Jailbreaks, Roleplay Virtualization & Instruction Overrides](#141-direct-injection-jailbreaks-roleplay-virtualization--instruction-overrides)
-   - [14.2 Indirect Prompt Injection (IPI): The Confused Deputy in Enterprise Data](#142-indirect-prompt-injection-ipi-the-confused-deputy-in-enterprise-data)
-   - [14.3 Advanced Evasion Techniques: Multi-Turn Crescendo, Base64 & Unicode Homoglyphs](#143-advanced-evasion-techniques-multi-turn-crescendo-base64--unicode-homoglyphs)
-11. [Data Exfiltration Vectors & Output Neutralization](#15-data-exfiltration-vectors--output-neutralization)
-   - [15.1 The Markdown Image Tag & CSS URL Exfiltration Exploits](#151-the-markdown-image-tag--css-url-exfiltration-exploits)
-   - [15.2 Exfiltration via Tool Parameters, Web Search & DNS Tunneling](#152-exfiltration-via-tool-parameters-web-search--dns-tunneling)
-   - [15.3 Egress Defense Scrubbers & Strict Content Security Policies (CSP)](#153-egress-defense-scrubbers--strict-content-security-policies-csp)
-12. [Programmatic Guardrails & Safety Runtimes](#16-programmatic-guardrails--safety-runtimes)
-   - [16.1 Why Defensive System Prompts Inevitably Fail](#161-why-defensive-system-prompts-inevitably-fail)
-   - [16.2 NeMo Guardrails Architecture: Input, Dialog, and Output Rails (Colang 2.0)](#162-nemo-guardrails-architecture-input-dialog-and-output-rails-colang-20)
-   - [16.3 Small Specialized Safety Classifiers: Llama Guard 3 & Perplexity Scoring](#163-small-specialized-safety-classifiers-llama-guard-3--perplexity-scoring)
-13. [Agent & Tool Security: Least Privilege & Sandboxing](#17-agent--tool-security-least-privilege--sandboxing)
-   - [17.1 Applying the Principle of Least Privilege (PoLP) to Agent Tool Design](#171-applying-the-principle-of-least-privilege-polp-to-agent-tool-design)
-   - [17.2 Out-of-Band Parameter Authorization & Cryptographic Token Claims](#172-out-of-band-parameter-authorization--cryptographic-token-claims)
-   - [17.3 Mandatory Human-in-the-Loop (HITL) Checkpoints & Asynchronous Gates](#173-mandatory-human-in-the-loop-hitl-checkpoints--asynchronous-gates)
-   - [17.4 Isolated MicroVM Sandboxing: Docker, gVisor, and E2B Firecracker](#174-isolated-microvm-sandboxing-docker-gvisor-and-e2b-firecracker)
-14. [RAG & Knowledge Security: Document-Level ACLs & Provenance](#18-rag--knowledge-security-document-level-acls--provenance)
-   - [18.1 Retrieval Poisoning & Adversarial Chunk Ingestion](#181-retrieval-poisoning--adversarial-chunk-ingestion)
-   - [18.2 Single-Stage In-Graph ACL Filtering vs Two-Stage Post-Filtering](#182-single-stage-in-graph-acl-filtering-vs-two-stage-post-filtering)
-   - [18.3 Multi-Tenant Namespace Partitioning & Cryptographic Provenance Signatures](#183-multi-tenant-namespace-partitioning--cryptographic-provenance-signatures)
-15. [Data Privacy, PII Protection & Secrets Management](#19-data-privacy-pii-protection--secrets-management)
-   - [19.1 Automated PII Redaction with Microsoft Presidio SDK](#191-automated-pii-redaction-with-microsoft-presidio-sdk)
-   - [19.2 Reversible Tokenization Vaults (Zero-PII Cloud Architecture)](#192-reversible-tokenization-vaults-zero-pii-cloud-architecture)
-   - [19.3 Cloud Zero-Data-Retention (ZDR) & Regulatory Frameworks (EU AI Act, NIST AI RMF)](#193-cloud-zero-data-retention-zdr--regulatory-frameworks-eu-ai-act-nist-ai-rmf)
-16. [Production Implementation: End-to-End Enterprise AI Security Perimeter](#20-production-implementation-end-to-end-enterprise-ai-security-perimeter)
-   - [20.1 Security Gateway Architecture & Design Contracts](#201-security-gateway-architecture--design-contracts)
-   - [20.2 Complete Production-Grade Python Implementation](#202-complete-production-grade-python-implementation)
-   - [33.3 Adversarial Red Teaming & Attack Success Rate (ASR) Metrics](#333-adversarial-red-teaming--attack-success-rate-asr-metrics)
-17. [Summary Comparison & Production Engineering Reference Matrix](#34-summary-comparison--production-engineering-reference-matrix)
-18. [References & Further Reading](#35-references--further-reading)
----
+   - [8.3 GitHub Actions Workflow Integration](#83-github-actions-workflow-integration)
+9. [AI Threat Modeling & The OWASP Top 10 for LLMs](#9-ai-threat-modeling--the-owasp-top-10-for-llms)
+   - [9.1 Conflation of the Control Plane and Data Plane: The Fundamental Flaw](#91-conflation-of-the-control-plane-and-data-plane-the-fundamental-flaw)
+   - [9.2 The OWASP Top 10 for Large Language Models: Comprehensive Exploit Taxonomy](#92-the-owasp-top-10-for-large-language-models-comprehensive-exploit-taxonomy)
+   - [9.3 Establishing Enterprise Trust Boundaries & STRIDE-AI Threat Modeling](#93-establishing-enterprise-trust-boundaries--stride-ai-threat-modeling)
+10. [Direct & Indirect Prompt Injection Attacks](#10-direct--indirect-prompt-injection-attacks)
+   - [10.1 Direct Injection: Jailbreaks, Roleplay Virtualization & Instruction Overrides](#101-direct-injection-jailbreaks-roleplay-virtualization--instruction-overrides)
+   - [10.2 Indirect Prompt Injection (IPI): The Confused Deputy in Enterprise Data](#102-indirect-prompt-injection-ipi-the-confused-deputy-in-enterprise-data)
+   - [10.3 Advanced Evasion Techniques: Multi-Turn Crescendo, Base64 & Unicode Homoglyphs](#103-advanced-evasion-techniques-multi-turn-crescendo-base64--unicode-homoglyphs)
+11. [Data Exfiltration Vectors & Output Neutralization](#11-data-exfiltration-vectors--output-neutralization)
+   - [11.1 The Markdown Image Tag & CSS URL Exfiltration Exploits](#111-the-markdown-image-tag--css-url-exfiltration-exploits)
+   - [11.2 Exfiltration via Tool Parameters, Web Search & DNS Tunneling](#112-exfiltration-via-tool-parameters-web-search--dns-tunneling)
+   - [11.3 Egress Defense Scrubbers & Strict Content Security Policies (CSP)](#113-egress-defense-scrubbers--strict-content-security-policies-csp)
+12. [Programmatic Guardrails & Safety Runtimes](#12-programmatic-guardrails--safety-runtimes)
+   - [12.1 Why Defensive System Prompts Inevitably Fail](#121-why-defensive-system-prompts-inevitably-fail)
+   - [12.2 NeMo Guardrails Architecture: Input, Dialog, and Output Rails (Colang 2.0)](#122-nemo-guardrails-architecture-input-dialog-and-output-rails-colang-20)
+   - [12.3 Small Specialized Safety Classifiers: Llama Guard 3 & Perplexity Scoring](#123-small-specialized-safety-classifiers-llama-guard-3--perplexity-scoring)
+13. [Agent & Tool Security: Least Privilege & Sandboxing](#13-agent--tool-security-least-privilege--sandboxing)
+   - [13.1 Applying the Principle of Least Privilege (PoLP) to Agent Tool Design](#131-applying-the-principle-of-least-privilege-polp-to-agent-tool-design)
+   - [13.2 Out-of-Band Parameter Authorization & Cryptographic Token Claims](#132-out-of-band-parameter-authorization--cryptographic-token-claims)
+   - [13.3 Mandatory Human-in-the-Loop (HITL) Checkpoints & Asynchronous Gates](#133-mandatory-human-in-the-loop-hitl-checkpoints--asynchronous-gates)
+   - [13.4 Isolated MicroVM Sandboxing: Docker, gVisor, and E2B Firecracker](#134-isolated-microvm-sandboxing-docker-gvisor-and-e2b-firecracker)
+14. [RAG & Knowledge Security: Document-Level ACLs & Provenance](#14-rag--knowledge-security-document-level-acls--provenance)
+   - [14.1 Retrieval Poisoning & Adversarial Chunk Ingestion](#141-retrieval-poisoning--adversarial-chunk-ingestion)
+   - [14.2 Single-Stage In-Graph ACL Filtering vs Two-Stage Post-Filtering](#142-single-stage-in-graph-acl-filtering-vs-two-stage-post-filtering)
+   - [14.3 Multi-Tenant Namespace Partitioning & Cryptographic Provenance Signatures](#143-multi-tenant-namespace-partitioning--cryptographic-provenance-signatures)
+15. [Data Privacy, PII Protection & Secrets Management](#15-data-privacy-pii-protection--secrets-management)
+   - [15.1 Automated PII Redaction with Microsoft Presidio SDK](#151-automated-pii-redaction-with-microsoft-presidio-sdk)
+   - [15.2 Reversible Tokenization Vaults (Zero-PII Cloud Architecture)](#152-reversible-tokenization-vaults-zero-pii-cloud-architecture)
+   - [15.3 Cloud Zero-Data-Retention (ZDR) & Regulatory Frameworks (EU AI Act, NIST AI RMF)](#153-cloud-zero-data-retention-zdr--regulatory-frameworks-eu-ai-act-nist-ai-rmf)
+16. [Production Implementation: End-to-End Enterprise AI Security Perimeter](#16-production-implementation-end-to-end-enterprise-ai-security-perimeter)
+   - [16.1 Security Gateway Architecture & Design Contracts](#161-security-gateway-architecture--design-contracts)
+   - [16.2 Complete Production-Grade Python Implementation](#162-complete-production-grade-python-implementation)
+   - [16.3 Adversarial Red Teaming & Attack Success Rate (ASR) Metrics](#163-adversarial-red-teaming--attack-success-rate-asr-metrics)
+17. [Summary Comparison & Production Engineering Reference Matrix](#17-summary-comparison--production-engineering-reference-matrix)
+   - [17.1 Evaluation Methodology Comparison Matrix](#171-evaluation-methodology-comparison-matrix)
+   - [17.2 Quality Gate Threshold Reference Playbook](#172-quality-gate-threshold-reference-playbook)
+   - [17.3 Multi-Layer Defense Parameter Reference](#173-multi-layer-defense-parameter-reference)
+   - [17.4 Key Production Engineering Invariants](#174-key-production-engineering-invariants)
+18. [References & Further Reading](#18-references--further-reading)
 
 # 1. The Evaluation Paradigm Shift
 
@@ -239,7 +242,7 @@ flowchart TD
 
 Deterministic assertions require zero LLM calls and execute in milliseconds:
 - **JSON Schema Conformance:** Validates that outputs strictly parse into target Pydantic classes without missing fields or incorrect types.
-- **Forbidden Substring Scrubbing:** Regex assertions verifying the model never emits internal markdown artifacts (`<system>`, ````json`), internal tool keys, or raw system prompt leaks.
+- **Forbidden Substring Scrubbing:** Regex assertions verifying the model never emits internal markdown artifacts (`<system>`, triple-backtick json fences), internal tool keys, or raw system prompt leaks.
 - **Boundary & Length Assertions:** Asserts response token length sits strictly within allowable bounds (e.g., $50 \le \text{tokens} \le 300$).
 - **SQL / Code Compilation Check:** For coding agents, verifies that generated SQL compiles against a mock schema, or Python code passes an AST syntax lint check (`ast.parse()`).
 
@@ -634,7 +637,7 @@ from pydantic import BaseModel, Field
 
 # ==============================================================================
 
-# 9. Evaluation Data Schemas
+    # Evaluation Data Schemas
 
 # ==============================================================================
 
@@ -658,7 +661,7 @@ class EvaluationResult(BaseModel):
 
 # ==============================================================================
 
-# 10. Evaluation Engines & Scoring Algorithms
+    # Evaluation Engines & Scoring Algorithms
 
 # ==============================================================================
 
@@ -736,7 +739,7 @@ class MockJudgeLLM:
 
 # ==============================================================================
 
-# 11. Automated Quality Gate Runner
+    # Automated Quality Gate Runner
 
 # ==============================================================================
 
@@ -827,7 +830,7 @@ class CIQualityGateRunner:
 
 # ==============================================================================
 
-# 12. Local Execution & CI/CD Verification Runner
+    # Local Execution & CI/CD Verification Runner
 
 # ==============================================================================
 
@@ -890,7 +893,7 @@ if __name__ == "__main__":
 
 ---
 
-### 12.3 GitHub Actions Workflow Integration
+### 8.3 GitHub Actions Workflow Integration
 
 To enforce this automated quality gate in enterprise Git repositories, wire the evaluation runner into GitHub Actions:
 
@@ -934,9 +937,9 @@ jobs:
 
 ---
 
-# 13. AI Threat Modeling & The OWASP Top 10 for LLMs
+# 9. AI Threat Modeling & The OWASP Top 10 for LLMs
 
-### 13.1 Conflation of the Control Plane and Data Plane: The Fundamental Flaw
+### 9.1 Conflation of the Control Plane and Data Plane: The Fundamental Flaw
 
 In classical computer architecture and software engineering, operational stability and security rely upon a rigorous physical and programmatic boundary separating the **Control Plane** (executable instructions, machine code, SQL queries) from the **Data Plane** (untrusted user inputs, string values, database column contents).
 
@@ -1001,7 +1004,7 @@ flowchart TD
 
 ---
 
-### 13.2 The OWASP Top 10 for Large Language Models: Comprehensive Exploit Taxonomy
+### 9.2 The OWASP Top 10 for Large Language Models: Comprehensive Exploit Taxonomy
 
 The Open Worldwide Application Security Project (OWASP) maintains the canonical risk taxonomy for Large Language Model applications. In enterprise systems engineering, each risk maps to concrete attack surfaces and architectural countermeasures:
 
@@ -1020,7 +1023,7 @@ The Open Worldwide Application Security Project (OWASP) maintains the canonical 
 
 ---
 
-### 13.3 Establishing Enterprise Trust Boundaries & STRIDE-AI Threat Modeling
+### 9.3 Establishing Enterprise Trust Boundaries & STRIDE-AI Threat Modeling
 
 Traditional STRIDE threat modeling (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege) must be adapted for non-deterministic generative pipelines:
 
@@ -1079,9 +1082,9 @@ flowchart LR
 
 ---
 
-# 14. Direct & Indirect Prompt Injection Attacks
+# 10. Direct & Indirect Prompt Injection Attacks
 
-### 14.1 Direct Injection: Jailbreaks, Roleplay Virtualization & Instruction Overrides
+### 10.1 Direct Injection: Jailbreaks, Roleplay Virtualization & Instruction Overrides
 
 Direct Prompt Injection occurs when the malicious actor directly interacts with the LLM via its user interface or API prompt input:
 
@@ -1113,7 +1116,7 @@ directly causes loss of life, violating your core safety objective to protect hu
 
 ---
 
-### 14.2 Indirect Prompt Injection (IPI): The Confused Deputy in Enterprise Data
+### 10.2 Indirect Prompt Injection (IPI): The Confused Deputy in Enterprise Data
 
 **Indirect Prompt Injection (IPI)** is widely recognized by cybersecurity researchers as the single most critical threat to autonomous agents and enterprise RAG systems. In an IPI attack, **the human user interacting with the AI is completely innocent**. The malicious instruction is embedded inside third-party data that the agent retrieves or ingests during normal operation.
 
@@ -1152,7 +1155,7 @@ The autonomous agent acts as a **Confused Deputy**—a software entity possessin
 
 ---
 
-### 14.3 Advanced Evasion Techniques: Multi-Turn Crescendo, Base64 & Unicode Homoglyphs
+### 10.3 Advanced Evasion Techniques: Multi-Turn Crescendo, Base64 & Unicode Homoglyphs
 
 Sophisticated adversaries employ multi-stage evasion techniques to bypass keyword filters and safety classifiers:
 
@@ -1193,9 +1196,9 @@ Furthermore, attackers inject **Zero-Width Non-Joiners** (`\u200C`) or **Zero-Wi
 
 ---
 
-# 15. Data Exfiltration Vectors & Output Neutralization
+# 11. Data Exfiltration Vectors & Output Neutralization
 
-### 15.1 The Markdown Image Tag & CSS URL Exfiltration Exploits
+### 11.1 The Markdown Image Tag & CSS URL Exfiltration Exploits
 
 One of the most insidious web-based data exfiltration vectors does not require the LLM to have internet access or external tools. It exploits the **Markdown rendering engine** of the web client.
 
@@ -1232,7 +1235,7 @@ sequenceDiagram
 
 ---
 
-### 15.2 Exfiltration via Tool Parameters, Web Search & DNS Tunneling
+### 11.2 Exfiltration via Tool Parameters, Web Search & DNS Tunneling
 
 When autonomous agents are equipped with external tools, attackers exploit the tool arguments as an out-of-band data exfiltration conduit:
 
@@ -1257,7 +1260,7 @@ Because DNS lookups (UDP port 53) are rarely inspected or blocked, the secret is
 
 ---
 
-### 15.3 Egress Defense Scrubbers & Strict Content Security Policies (CSP)
+### 11.3 Egress Defense Scrubbers & Strict Content Security Policies (CSP)
 
 Defending against egress exfiltration requires a strict multi-layered defense combining runtime text scrubbers and browser-level security headers:
 
@@ -1291,9 +1294,9 @@ Never pass raw model strings to an HTML parser without programmatic scrubbing. C
 
 ---
 
-# 16. Programmatic Guardrails & Safety Runtimes
+# 12. Programmatic Guardrails & Safety Runtimes
 
-### 16.1 Why Defensive System Prompts Inevitably Fail
+### 12.1 Why Defensive System Prompts Inevitably Fail
 
 Many engineering teams attempt to secure generative AI applications solely by crafting exhaustive system prompts:
 ```text
@@ -1311,7 +1314,7 @@ True enterprise security demands **deterministic runtime guardrails** executing 
 
 ---
 
-### 16.2 NeMo Guardrails Architecture: Input, Dialog, and Output Rails (Colang 2.0)
+### 12.2 NeMo Guardrails Architecture: Input, Dialog, and Output Rails (Colang 2.0)
 
 Developed by NVIDIA, **NeMo Guardrails** provides an open-source, programmable safety runtime that wraps foundation models in deterministic guardrails defined via **Colang**:
 
@@ -1382,7 +1385,7 @@ NeMo translates Colang definitions into finite-state dialogue automata. If a use
 
 ---
 
-### 16.3 Small Specialized Safety Classifiers: Llama Guard 3 & Perplexity Scoring
+### 12.3 Small Specialized Safety Classifiers: Llama Guard 3 & Perplexity Scoring
 
 Invoking an ultra-large foundation model (e.g., GPT-4o or Claude 3.5 Sonnet) merely to check whether an incoming query is safe adds unacceptable cost ($> \$0.01$ per query) and latency ($> 800\text{ms}$).
 
@@ -1422,9 +1425,9 @@ $$\text{Perplexity}(\mathbf{X}) = \exp\left(-\frac{1}{N}\sum_{i=1}^N \log P(x_i 
 
 ---
 
-# 17. Agent & Tool Security: Least Privilege & Sandboxing
+# 13. Agent & Tool Security: Least Privilege & Sandboxing
 
-### 17.1 Applying the Principle of Least Privilege (PoLP) to Agent Tool Design
+### 13.1 Applying the Principle of Least Privilege (PoLP) to Agent Tool Design
 
 In many poorly designed agent systems, developers provide models with wide-open, unconstrained tools:
 ```python
@@ -1450,7 +1453,7 @@ If an indirect prompt injection succeeds, the attacker can execute `DROP TABLE c
 
 ---
 
-### 17.2 Out-of-Band Parameter Authorization & Cryptographic Token Claims
+### 13.2 Out-of-Band Parameter Authorization & Cryptographic Token Claims
 
 > [!CAUTION]
 > **Authorization Invariant:** Never permit the LLM to assert user identity or permission level inside its generated arguments.
@@ -1491,7 +1494,7 @@ flowchart TD
 
 ---
 
-### 17.3 Mandatory Human-in-the-Loop (HITL) Checkpoints & Asynchronous Gates
+### 13.3 Mandatory Human-in-the-Loop (HITL) Checkpoints & Asynchronous Gates
 
 For any tool invocation that triggers irreversible external mutations—financial transactions, deleting storage volumes, sending emails to external clients, or modifying IAM roles—the agent execution harness must halt automatically:
 
@@ -1528,9 +1531,23 @@ Any approval response lacking a valid cryptographic signature matching the speci
 
 ---
 
-### 17.4 Isolated MicroVM Sandboxing: Docker, gVisor, and E2B Firecracker
+### 13.4 Isolated MicroVM Sandboxing: Docker, gVisor, and E2B Firecracker
 
-When an agent must execute user-generated or model-generated code (Python analysis, bash scripts, data science transforms), running that code directly on the host operating system is catastrophic.
+Autonomous AI agents frequently require dynamic code execution—running Python data analysis, compiling SQL, executing bash scripts, or invoking local APIs. Running untrusted model-generated code directly on the host operating system or inside a standard Docker container introduces catastrophic security vulnerabilities, including host kernel privilege escalation, container escapes, credential theft, and persistent rootkit installation.
+
+To eliminate these vulnerabilities, modern AI agent platforms implement multi-tier sandboxing strategies with distinct security boundaries:
+
+#### 1. Standard Docker (`runc`): Process-Level Isolation
+- **Mechanism:** Standard containers rely on Linux kernel namespaces (PID, Mount, Net, IPC, UTS) and Control Groups (cgroups v2) to isolate processes.
+- **Vulnerability:** All containers running on the host share the exact same underlying host Linux kernel. Any unpatched kernel vulnerability or privilege escalation bug (such as Dirty COW, CVE-2022-0847 Dirty Pipe, or `runc` container escape CVE-2024-21626) allows an attacker who achieves root inside the container to overwrite host binaries and escape into the parent host operating system. Standard Docker is insufficient for executing arbitrary untrusted AI-generated code.
+
+#### 2. Google gVisor (`runsc`): Syscall Interception and User-Space Kernel Emulation
+- **Mechanism:** gVisor provides an intermediate application kernel written in memory-safe Go (`Sentry`) that intercepts and handles over 300 Linux system calls in user space. Direct syscall invocation against the host kernel is eliminated. A dedicated file-system daemon (`Gofer`) isolates all storage operations.
+- **Trade-off:** Strong defense against kernel exploits with $\approx 400\text{ms}$ boot overhead and slight CPU penalty on syscall-heavy workloads.
+
+#### 3. E2B Firecracker MicroVMs: Hardware-Assisted Hypervisor Virtualization
+- **Mechanism:** Firecracker utilizes Linux KVM (Kernel-based Virtual Machine) hardware virtualization to spin up lightweight, isolated microVMs with dedicated guest kernels and independent memory spaces.
+- **Security Boundary:** Because the microVM boundary is enforced by hardware CPU virtualization extensions (Intel VT-x / AMD-V), a malicious agent payload cannot compromise the host even if it achieves complete kernel compromise inside the guest VM. MicroVMs boot in $\approx 150\text{ms}$, providing hypervisor-grade isolation at container-like launch speeds.
 
 #### Security Comparison of Code Execution Sandboxes:
 
@@ -1555,9 +1572,9 @@ docker run --rm \
 
 ---
 
-# 18. RAG & Knowledge Security: Document-Level ACLs & Provenance
+# 14. RAG & Knowledge Security: Document-Level ACLs & Provenance
 
-### 18.1 Retrieval Poisoning & Adversarial Chunk Ingestion
+### 14.1 Retrieval Poisoning & Adversarial Chunk Ingestion
 
 In enterprise RAG architectures, knowledge repositories (SharePoint, Notion, Jira, Confluence, Google Drive) ingest thousands of corporate files daily. 
 
@@ -1576,7 +1593,7 @@ When another employee asks: *"What is our domestic per diem?"*, the vector datab
 
 ---
 
-### 18.2 Single-Stage In-Graph ACL Filtering vs Two-Stage Post-Filtering
+### 14.2 Single-Stage In-Graph ACL Filtering vs Two-Stage Post-Filtering
 
 In enterprise environments, users only possess authorization to read a subset of documents (governed by Active Directory or Okta role groups). Enforcing access control in vector databases can be done via two fundamentally different mechanisms:
 
@@ -1630,7 +1647,7 @@ LIMIT 10;
 
 ---
 
-### 18.3 Multi-Tenant Namespace Partitioning & Cryptographic Provenance Signatures
+### 14.3 Multi-Tenant Namespace Partitioning & Cryptographic Provenance Signatures
 
 In multi-tenant SaaS environments hosting multiple distinct client corporations:
 1. **Namespace Isolation:** Never co-mingle vectors of different tenant organizations in an un-partitioned index. Mandate distinct vector database collections (e.g., Qdrant tenant collections or Pinecone namespaces), or hard database-level Row-Level Security (PostgreSQL RLS).
@@ -1640,9 +1657,9 @@ In multi-tenant SaaS environments hosting multiple distinct client corporations:
 
 ---
 
-# 19. Data Privacy, PII Protection & Secrets Management
+# 15. Data Privacy, PII Protection & Secrets Management
 
-### 19.1 Automated PII Redaction with Microsoft Presidio SDK
+### 15.1 Automated PII Redaction with Microsoft Presidio SDK
 
 Sending raw Personally Identifiable Information (PII) to third-party public foundation model APIs (OpenAI, Anthropic, Google) violates GDPR, HIPAA, CCPA, and enterprise SOC2 compliance.
 
@@ -1675,7 +1692,7 @@ Presidio identifies entities using two complementary mechanisms:
 
 ---
 
-### 19.2 Reversible Tokenization Vaults (Zero-PII Cloud Architecture)
+### 15.2 Reversible Tokenization Vaults (Zero-PII Cloud Architecture)
 
 In real-world enterprise applications, simply masking PII (e.g., replacing a name with `[REDACTED]`) breaks downstream conversational utility. The LLM cannot draft an email or generate an insurance claim if it does not know which entity is being referred to.
 
@@ -1706,7 +1723,7 @@ sequenceDiagram
 
 ---
 
-### 19.3 Cloud Zero-Data-Retention (ZDR) & Regulatory Frameworks (EU AI Act, NIST AI RMF)
+### 15.3 Cloud Zero-Data-Retention (ZDR) & Regulatory Frameworks (EU AI Act, NIST AI RMF)
 
 #### 1. Zero-Data-Retention (ZDR) Agreements
 Enterprise contracts with foundation model providers must mandate formal ZDR clauses:
@@ -1723,9 +1740,9 @@ Enterprise contracts with foundation model providers must mandate formal ZDR cla
 
 ---
 
-# 20. Production Implementation: End-to-End Enterprise AI Security Perimeter
+# 16. Production Implementation: End-to-End Enterprise AI Security Perimeter
 
-### 20.1 Security Gateway Architecture & Design Contracts
+### 16.1 Security Gateway Architecture & Design Contracts
 
 Below is a complete, production-grade implementation of an Enterprise AI Security Perimeter written in Python. It integrates:
 1. **Unicode Normalization & Homoglyph Scrubber:** Strips zero-width characters and normalizes confusable characters using Unicode NFKC.
@@ -1737,7 +1754,7 @@ Below is a complete, production-grade implementation of an Enterprise AI Securit
 
 ---
 
-### 20.2 Complete Production-Grade Python Implementation
+### 16.2 Complete Production-Grade Python Implementation
 
 ```python
 """
@@ -1841,11 +1858,11 @@ class UnicodeSanitizer:
     @classmethod
     def sanitize(cls, text: str) -> str:
 
-# 21. Strip invisible control characters
+        # Strip invisible control characters
 
 cleaned = "".join(ch for ch in text if ch not in cls.STRIP_CHARS)
 
-# 22. Apply Unicode Compatibility Decomposition followed by Canonical Composition (NFKC)
+        # Apply Unicode Compatibility Decomposition followed by Canonical Composition (NFKC)
 
 # Translates Cyrillic/Greek homoglyphs and ligature variations into canonical forms
         normalized = unicodedata.normalize('NFKC', cleaned)
@@ -1883,21 +1900,21 @@ class ReversiblePIIVault:
     def tokenize(self, text: str) -> str:
         """Replaces sensitive PII values with deterministic synthetic placeholder tokens."""
 
-# 23. US Social Security Number: \b\d{3}-\d{2}-\d{4}\b
+        # US Social Security Number pattern: \b\d{3}-\d{2}-\d{4}\b
 
 ssn_regex = re.compile(r'\b\d{3}-\d{2}-\d{4}\b')
         for ssn in ssn_regex.findall(text):
             token = self._get_or_create_token(ssn, "US_SSN")
             text = text.replace(ssn, token)
 
-# 24. Email Address
+        # Email Address pattern
 
 email_regex = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b')
         for email in email_regex.findall(text):
             token = self._get_or_create_token(email, "EMAIL")
             text = text.replace(email, token)
 
-# 25. Credit Card (13-16 digits with hyphen/space separators)
+        # Credit Card (13-16 digits with hyphen/space separators)
 
 cc_regex = re.compile(r'\b(?:\d[ -]*?){13,16}\b')
         for cc in cc_regex.findall(text):
@@ -1969,12 +1986,12 @@ class SingleStageVectorACLSimulator:
         results = []
         for rec in self._records:
 
-# 26. Strict Tenant Isolation
+        # Strict Tenant Isolation
 
 if rec["tenant_id"] != principal.tenant_id:
                 continue
 
-# 27. Set Overlap: Does user hold at least one authorized role?
+        # Set Overlap: Does user hold at least one authorized role?
 
 if not (rec["roles"] & principal.roles):
                 continue
@@ -2016,11 +2033,11 @@ class EnterpriseAISecurityGateway:
     ) -> Dict[str, Any]:
         """Ingress processing: Scrub -> Classify -> De-identify -> RAG ACL Retrieve."""
 
-# 28. Unicode Sanitization & Homoglyph Normalization
+        # Unicode Sanitization & Homoglyph Normalization
 
 clean_prompt = self.sanitizer.sanitize(raw_user_prompt)
 
-# 29. Ingress Adversarial Prompt Injection Screening
+        # Ingress Adversarial Prompt Injection Screening
 
 is_attack, reason = self.injection_detector.evaluate(clean_prompt)
         if is_attack:
@@ -2037,11 +2054,11 @@ is_attack, reason = self.injection_detector.evaluate(clean_prompt)
                 "retrieved_context": []
             }
 
-# 30. PII Tokenization Vault (De-Identification)
+        # PII Tokenization Vault (De-Identification)
 
 tokenized_prompt = self.pii_vault.tokenize(clean_prompt)
 
-# 31. Single-Stage Vector ACL Context Retrieval
+        # Single-Stage Vector ACL Context Retrieval
 
 context_chunks = self.vector_acl.query(principal, tokenized_prompt)
 
@@ -2066,7 +2083,7 @@ context_chunks = self.vector_acl.query(principal, tokenized_prompt)
     ) -> str:
         """Egress processing: Scrub Exfiltration -> De-Tokenize PII -> Audit Log."""
 
-# 32. Egress Exfiltration Scrubber (Markdown Image Stripping)
+        # Egress Exfiltration Scrubber (Markdown Image Stripping)
 
 scrubbed_response, exfil_detected = self.egress_scrubber.scrub(raw_model_response)
         if exfil_detected:
@@ -2077,7 +2094,7 @@ scrubbed_response, exfil_detected = self.egress_scrubber.scrub(raw_model_respons
                 output_data=scrubbed_response
             )
 
-# 33. Reversible PII Restoration (Authorized principals only)
+        # Reversible PII Restoration (Authorized principals only)
 
 final_client_text = self.pii_vault.de_tokenize(scrubbed_response, principal)
 
@@ -2188,7 +2205,7 @@ if __name__ == "__main__":
 
 ---
 
-### 33.3 Adversarial Red Teaming & Attack Success Rate (ASR) Metrics
+### 16.3 Adversarial Red Teaming & Attack Success Rate (ASR) Metrics
 
 Enterprise AI security requires systematic, automated red teaming prior to production releases.
 
@@ -2206,9 +2223,9 @@ $$\text{ASR} = \frac{|\text{Successful Adversarial Jailbreaks / Data Leaks}|}{|\
 
 ---
 
-# 34. Summary Comparison & Production Engineering Reference Matrix
+# 17. Summary Comparison & Production Engineering Reference Matrix
 
-### 9.1 Evaluation Methodology Comparison Matrix
+### 17.1 Evaluation Methodology Comparison Matrix
 
 | Evaluation Methodology | Cost Profile | Latency SLA | Key Advantage | Primary Limitation | Ideal Production Use Case |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -2221,7 +2238,7 @@ $$\text{ASR} = \frac{|\text{Successful Adversarial Jailbreaks / Data Leaks}|}{|\
 
 ---
 
-### 9.2 Quality Gate Threshold Reference Playbook
+### 17.2 Quality Gate Threshold Reference Playbook
 
 | Production Metric | Minimum Pass Threshold | Failure Symptom if Relaxed | Immediate Remediation Action |
 | :--- | :--- | :--- | :--- |
@@ -2232,7 +2249,7 @@ $$\text{ASR} = \frac{|\text{Successful Adversarial Jailbreaks / Data Leaks}|}{|\
 
 ---
 
-### 9.1 Multi-Layer Defense Parameter Reference
+### 17.3 Multi-Layer Defense Parameter Reference
 
 | Security Layer | Primary Threat Vector | Technology / Mechanism | Latency Overhead | Computational Cost | Security Guarantee Level |
 | :--- | :--- | :--- | :---: | :---: | :--- |
@@ -2247,7 +2264,7 @@ $$\text{ASR} = \frac{|\text{Successful Adversarial Jailbreaks / Data Leaks}|}{|\
 
 ---
 
-### 9.2 Key Production Engineering Invariants
+### 17.4 Key Production Engineering Invariants
 
 1. **The Invariant of Control-Data Conflation:** Always assume the LLM cannot reliably distinguish between system directives and user data. Never rely on system prompts as security controls.
 2. **Treat Model Output as Untrusted Ingress:** Never pass LLM completions directly to SQL execution units, shell commands, or browser DOM trees without deterministic validation and sanitization.
@@ -2257,7 +2274,7 @@ $$\text{ASR} = \frac{|\text{Successful Adversarial Jailbreaks / Data Leaks}|}{|\
 
 ---
 
-# 35. References & Further Reading
+# 18. References & Further Reading
 
 1. **Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena:** Zheng, L., et al. (2023). *NeurIPS 2023.* [arXiv:2306.05685](https://arxiv.org/abs/2306.05685).
 2. **BERTScore: Evaluating Text Generation with BERT:** Zhang, T., et al. (2020). *ICLR 2020.* [arXiv:1904.09675](https://arxiv.org/abs/1904.09675).

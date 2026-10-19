@@ -167,6 +167,21 @@ await self.redis.set(key, json.dumps(data), ex=ttl_seconds)
 
 ### 4.2 Write-Through, Write-Behind (Write-Back), and Read-Through
 
+#### Cache Topology Patterns & Persistence Consistency
+Integrating an in-memory caching layer (Redis, Memcached) with a persistent relational or NoSQL database introduces dual-write consistency challenges. Applications choose from four primary caching topologies based on their read-to-write ratios, acceptable staleness bounds, and durability guarantees:
+
+1. **Cache-Aside (Lazy Loading — Industry Standard):**
+   - **Operational Flow:** The application code is directly responsible for coordinating between the cache and the database. On reads, the app queries the cache; on a miss, it fetches from the database and writes the result to the cache. On mutations, the app writes to the database and invalidates (deletes) the cached key.
+   - **Advantage:** Resilient against cache outages. If Redis crashes, requests degrade gracefully to direct database queries.
+
+2. **Read-Through & Write-Through (Unified Storage Facade):**
+   - **Operational Flow:** The application interacts solely with the caching layer as its primary datastore. On reads (Read-Through), the cache transparently intercepts misses, fetches from the backing database, caches the result, and returns it. On writes (Write-Through), the cache writes synchronously to both the in-memory store and the underlying database before returning success.
+   - **Trade-Off:** Eliminates application caching boilerplate, but incurs higher write latency because every write requires two synchronous network roundtrips.
+
+3. **Write-Behind / Write-Back (Asynchronous Batched Persistence):**
+   - **Operational Flow:** The application writes directly to the in-memory cache, which returns immediate success ($O(1)$ sub-millisecond response). A background daemon or queue periodically flushes dirty cache entries asynchronously in bulk batches to the persistent database.
+   - **Extreme Performance vs. Durability Risk:** Absorbs massive write bursts (e.g., IoT telemetry or gaming clickstreams), but introduces a critical **data loss hazard**: if the Redis node crashes before dirty entries flush to disk, unpersisted transactions are permanently lost.
+
 | Caching Pattern | Write Flow | Read Flow | Primary Advantage | Production Risk |
 | :--- | :--- | :--- | :--- | :--- |
 | **Cache-Aside** | App writes to DB, invalidates cache | App checks cache, populates on miss | Resilient; cache failure doesn't kill DB writes | Stale reads if invalidation fails |

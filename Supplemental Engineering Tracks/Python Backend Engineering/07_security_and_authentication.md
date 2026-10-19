@@ -115,6 +115,19 @@ To understand security engineering, you must strictly decouple two distinct phas
 
 ### 1.2 State Comparison: Stateful Sessions vs. Stateless Claims
 
+#### Architectural Mechanisms: Centralized State vs. Cryptographic Self-Containment
+Backend identity management dictates server memory scaling, cache invalidation strategies, and session revocation models. Systems divide along whether authentication state is held on the server or embedded cryptographically within the client request:
+
+1. **Stateful Server-Side Sessions (Cookie-Based):**
+   - **Operational Mechanism:** Upon successful login, the server generates a cryptographically random 128-bit session identifier (e.g., stored in Redis or database `sessions` table) and returns it in a secure `Set-Cookie: session_id=...; HttpOnly; Secure; SameSite=Strict` header.
+   - **The Verification Overhead:** For every incoming HTTP request, the backend must query Redis or the relational database to look up the session ID, verify expiration, and retrieve user roles.
+   - **The Revocation Superpower:** Revocation is instant and absolute. If an administrator freezes an account or a user clicks "Logout all devices", deleting the session record in Redis invalidates authentication across all nodes immediately.
+
+2. **Stateless Claims-Based Tokens (JSON Web Tokens - JWT):**
+   - **Operational Mechanism:** The server cryptographically signs a payload containing user claims (`sub`, `roles`, `exp`) using an asymmetric private key (RS256/EdDSA). The client stores this string and presents it in the `Authorization: Bearer <token>` header.
+   - **Zero-Database Verification:** Any microservice possessing the public key can verify the signature and trust the claims entirely through local CPU mathematical operations without querying a shared database.
+   - **The Revocation Dilemma:** Because the token is self-contained and trusted until its expiration timestamp (`exp`), a stolen token remains valid until expiry. Mitigating this requires short token lifetimes ($5 - 15$ minutes) combined with sliding refresh tokens or distributed token blocklists.
+
 | Dimension | Stateful Server Sessions (Cookies) | Stateless Token (JWT) | Pre-Shared API Keys |
 | :--- | :--- | :--- | :--- |
 | **Storage Location** | Server RAM / Redis / DB table | Client Memory / Encrypted Cookie | Client Environment / Secret Vault |

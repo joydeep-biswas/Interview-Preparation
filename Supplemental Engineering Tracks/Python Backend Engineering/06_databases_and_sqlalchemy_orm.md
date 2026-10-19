@@ -675,6 +675,14 @@ flowchart TD
 
 ### 5.2 Specialized Index Types: Hash, GIN (JSONB), GiST, and BRIN (Time Series)
 
+#### Physical Index Layouts & Access Method Mechanics
+While standard B-Tree indexes serve as the general-purpose foundation for relational primary keys and scalar lookups, complex backend data models—such as semi-structured JSON documents, geospatial geometries, and petabyte-scale append-only event streams—require specialized storage structures:
+
+1. **Hash Indexes:** Bucket-based hashing that maps column values to discrete bucket pages. Delivers constant-time $O(1)$ lookups for exact equality (`=`), but fails completely for range queries or ordering because hashing intentionally destroys key sort order.
+2. **GIN (Generalized Inverted Index):** Designed for compound attributes (PostgreSQL `JSONB`, `ARRAY`, full-text lexemes). Decomposes documents into discrete key-value paths and creates an inverted mapping where each unique component references a posting tree of table row pointers (`ctid`), allowing ultra-fast containment evaluation (`@>`).
+3. **GiST (Generalized Search Tree):** A height-balanced search tree for multi-dimensional data (e.g., PostGIS geometric polygons, coordinates, and network CIDR ranges). Uses bounding-box predicate evaluation to rapidly discard subtrees that do not intersect query search envelopes.
+4. **BRIN (Block Range Index):** Designed for massive, physically ordered append-only tables (time-series, audit logs). Divides table blocks into 128-page ranges and records strictly the `[min, max]` values for each range. Achieves a microscopic storage footprint ($<0.1\%$ of B-Tree size) by performing coarse block skipping during table scans.
+
 | Index Type | Internal Data Structure | Best Use Case | Unsupported Operations |
 | :--- | :--- | :--- | :--- |
 | **B-Tree** | Balanced multi-way tree | Equality (`=`), Range (`<, <=, >, >=`), `ORDER BY` | Full-text search, array containment |

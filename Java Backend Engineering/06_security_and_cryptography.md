@@ -1313,6 +1313,19 @@ sequenceDiagram
 
 ### 5.3 Java Keystore (`KeyStore`) vs Truststore (`TrustStore`)
 
+#### Public Key Infrastructure (PKI) & Java Cryptographic Storage
+In the Java Virtual Machine, secure TLS/SSL socket handshakes rely on the Java Cryptography Architecture (JCA) `KeyStore` API (`java.security.KeyStore`) to manage cryptographic keys and certificates. Although both are physically represented by identical storage formats (standardized on PKCS#12 `.p12` since Java 9, replacing legacy proprietary `.jks`), they fulfill fundamentally opposite security roles in the TLS handshake:
+
+1. **Java KeyStore (`keystore.p12` — Identity Assertion):**
+   - **Operational Role:** Answers the cryptographic question: *"Who am I to the outside world?"*
+   - **Cryptographic Contents:** Contains the server's or client's own **Private Key** paired with its corresponding public **Leaf Certificate** (and intermediate signing certificates forming the certificate chain up to the root CA).
+   - **Protection Requirements:** Because it contains private asymmetric keys capable of decrypting traffic or signing data, KeyStores must be encrypted with robust passphrases, stored with restrictive file permissions (`chmod 600`), and injected dynamically via cloud secrets vaults (AWS Secrets Manager, Azure Key Vault).
+
+2. **Java TrustStore (`truststore.p12` / `cacerts` — Peer Verification):**
+   - **Operational Role:** Answers the cryptographic question: *"Whom do I trust?"*
+   - **Cryptographic Contents:** Contains strictly **Public Certificates** of trusted Root Certificate Authorities (CAs) and Intermediate CAs. It holds zero private keys.
+   - **Verification Mechanics:** When a Spring Boot microservice establishes an outbound HTTPS connection to an external payment API, the JVM inspects the server's presented certificate and traverses up its cryptographic signature chain. If the signing root CA exists inside the JVM's TrustStore, the connection is trusted; otherwise, the JVM aborts with a fatal `sun.security.validator.ValidatorException: PKIX path building failed`.
+
 | Dimension | Java KeyStore (`keystore.p12`) | Java TrustStore (`truststore.p12` / `cacerts`) |
 | :--- | :--- | :--- |
 | **Architectural Purpose** | **"Who I Am" (Authentication Identity)** | **"Whom I Trust" (Verification Registry)** |

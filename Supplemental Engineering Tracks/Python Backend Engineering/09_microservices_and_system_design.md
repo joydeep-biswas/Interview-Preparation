@@ -96,7 +96,7 @@ flowchart TD
 4. [Distributed Consistency: CAP & PACELC Theorems](#4-distributed-consistency-cap--pacelc-theorems)
    - [4.1 Deconstructing the CAP Theorem: Consistency, Availability, Partition Tolerance](#41-deconstructing-the-cap-theorem-consistency-availability-partition-tolerance)
    - [4.2 The PACELC Theorem: Latency vs. Consistency in Normal Operations](#42-the-pacelc-theorem-latency-vs-consistency-in-normal-operations)
-   - [4.3 Strong Consistency vs. Eventual Consistency](#43-strong-consistency-vs-eventual-consistency)
+   - [4.3 Spectrum of Distributed Consistency Models](#43-spectrum-of-distributed-consistency-models)
 5. [Distributed Transactions: The Saga Pattern](#5-distributed-transactions-the-saga-pattern)
    - [5.1 Why Two-Phase Commit (2PC / XA) Fails in Microservices](#51-why-two-phase-commit-2pc--xa-fails-in-microservices)
    - [5.2 Saga Choreography (Event-Driven Decentralization)](#52-saga-choreography-event-driven-decentralization)
@@ -108,21 +108,21 @@ flowchart TD
    - [6.2 Base62 Encoding vs. MD5/Murmur3 Hash Truncation](#62-base62-encoding-vs-md5murmur3-hash-truncation)
    - [6.3 Key Generation Service (KGS) Pre-Allocation Architecture](#63-key-generation-service-kgs-pre-allocation-architecture)
    - [6.4 End-to-End Python Implementation with FastAPI and Redis](#64-end-to-end-python-implementation-with-fastapi-and-redis)
-7. [System Design Blueprint 2: High-Throughput Distributed Rate Limiter](#12-system-design-blueprint-2-high-throughput-distributed-rate-limiter)
-   - [12.1 Requirements & Mathematical Latency Budgets](#121-requirements--mathematical-latency-budgets)
-   - [12.2 Token Bucket vs. Sliding Window Log vs. Sliding Window Counter](#122-token-bucket-vs-sliding-window-log-vs-sliding-window-counter)
-   - [12.3 Atomic Lua Script Implementation in Distributed Redis Cluster](#123-atomic-lua-script-implementation-in-distributed-redis-cluster)
-   - [12.4 Client Header Standards (X-RateLimit-Limit, Remaining, Reset)](#124-client-header-standards-x-ratelimit-limit-remaining-reset)
-8. [System Design Blueprint 3: Real-Time Multi-Channel Notification Engine](#13-system-design-blueprint-3-real-time-multi-channel-notification-engine)
-   - [13.1 Requirements, Fan-Out Topologies & Channel Dispatchers](#131-requirements-fan-out-topologies--channel-dispatchers)
-   - [13.2 Priority Queuing, Backpressure & User Preference Aggregation](#132-priority-queuing-backpressure--user-preference-aggregation)
-   - [13.3 End-to-End Python Implementation with Kafka and AsyncIO Workers](#133-end-to-end-python-implementation-with-kafka-and-asyncio-workers)
-9. [System Design Blueprint 4: E-Commerce Distributed Checkout & Inventory Reservation](#14-system-design-blueprint-4-e-commerce-distributed-checkout--inventory-reservation)
-   - [14.1 The Overselling Problem: Flash Sales & Hot Keys](#141-the-overselling-problem-flash-sales--hot-keys)
-   - [14.2 Two-Phase Inventory Reservation with TTL Expiration](#142-two-phase-inventory-reservation-with-ttl-expiration)
-   - [14.3 Complete End-to-End Orchestrated Checkout Saga Implementation](#143-complete-end-to-end-orchestrated-checkout-saga-implementation)
-10. [Summary Comparison & Production Engineering Reference Matrix](#15-summary-comparison--production-engineering-reference-matrix)
-11. [References & Further Reading](#16-references--further-reading)
+7. [System Design Blueprint 2: High-Throughput Distributed Rate Limiter](#7-system-design-blueprint-2-high-throughput-distributed-rate-limiter)
+   - [7.1 Requirements & Mathematical Latency Budgets](#71-requirements--mathematical-latency-budgets)
+   - [7.2 Token Bucket vs. Sliding Window Log vs. Sliding Window Counter](#72-token-bucket-vs-sliding-window-log-vs-sliding-window-counter)
+   - [7.3 Atomic Lua Script Implementation in Distributed Redis Cluster](#73-atomic-lua-script-implementation-in-distributed-redis-cluster)
+   - [7.4 Client Header Standards (X-RateLimit-Limit, Remaining, Reset)](#74-client-header-standards-x-ratelimit-limit-remaining-reset)
+8. [System Design Blueprint 3: Real-Time Multi-Channel Notification Engine](#8-system-design-blueprint-3-real-time-multi-channel-notification-engine)
+   - [8.1 Requirements, Fan-Out Topologies & Channel Dispatchers](#81-requirements-fan-out-topologies--channel-dispatchers)
+   - [8.2 Priority Queuing, Backpressure & User Preference Aggregation](#82-priority-queuing-backpressure--user-preference-aggregation)
+   - [8.3 End-to-End Python Implementation with Kafka and AsyncIO Workers](#83-end-to-end-python-implementation-with-kafka-and-asyncio-workers)
+9. [System Design Blueprint 4: E-Commerce Distributed Checkout & Inventory Reservation](#9-system-design-blueprint-4-e-commerce-distributed-checkout--inventory-reservation)
+   - [9.1 The Overselling Problem: Flash Sales & Hot Keys](#91-the-overselling-problem-flash-sales--hot-keys)
+   - [9.2 Two-Phase Inventory Reservation with TTL Expiration](#92-two-phase-inventory-reservation-with-ttl-expiration)
+   - [9.3 Complete End-to-End Orchestrated Checkout Saga Implementation](#93-complete-end-to-end-orchestrated-checkout-saga-implementation)
+10. [Summary Comparison & Production Engineering Reference Matrix](#10-summary-comparison--production-engineering-reference-matrix)
+11. [References & Further Reading](#11-references--further-reading)
 ---
 
 # 1. Decomposition Paradigms: Monolith vs. Modular Monolith vs. Microservices
@@ -355,6 +355,15 @@ flowchart TD
     style S3 fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f8fafc
 ```
 
+#### Operational Responsibilities of an Enterprise API Gateway
+
+Without a dedicated API Gateway, client applications must establish direct connections with dozens of discrete microservices. This naive approach introduces severe operational vulnerabilities:
+1. **Proliferation of Cryptographic Handshakes:** Clients must perform separate TLS handshakes with every microservice, incurring hundreds of milliseconds of latency on mobile networks.
+2. **Duplicated Non-Functional Concerns:** Every microservice team must independently implement rate limiting, CORS headers, token parsing, and IP filtering, multiplying maintenance overhead and security vulnerabilities.
+3. **Architecture Leaks:** Exposing internal microservice IP addresses, hostnames, and network topologies to the public internet makes internal services vulnerable to direct port scanning and lateral movement attacks.
+
+An enterprise API Gateway acts as an intelligent, high-performance reverse proxy that centralizes these cross-cutting operational concerns:
+
 | Gateway Responsibility | Description & Mechanism | Downstream Benefit |
 | :--- | :--- | :--- |
 | **TLS / SSL Termination** | Offloads RSA / ECDSA cryptographic decryption at ingress | Internal microservices run lightweight unencrypted HTTP/2 or gRPC |
@@ -380,11 +389,22 @@ The **BFF Pattern** deploys distinct, lightweight API gateways tailored specific
 
 ### 4.1 Deconstructing the CAP Theorem: Consistency, Availability, Partition Tolerance
 
-Formulated by Eric Brewer in 2000, the **CAP Theorem** states that a distributed data store can guarantee at most **two out of three** properties simultaneously:
+Formulated by Eric Brewer in 2000 and mathematically proven by Seth Gilbert and Nancy Lynch in 2002, the **CAP Theorem** defines the fundamental bounds of distributed data stores. It asserts that across an asynchronous network subject to partitions, a system can simultaneously guarantee at most **two out of three** properties:
 
-1. **Consistency (Linearizability)**: Every read receives the most recent write or an error. All nodes see the exact same data at the exact same instant.
-2. **Availability**: Every non-failing node returns a non-error response for every request (without guarantee that it contains the most recent write).
-3. **Partition Tolerance**: The system continues to operate despite an arbitrary number of messages being dropped or delayed by the network between nodes.
+1. **Consistency (Linearizability / Strong Consistency):** Every read operation receives the most recent committed write or an error. Formally, all read and write operations appear to execute atomically at a discrete point in real time across the entire cluster.
+2. **Availability:** Every non-failing node must return a successful (non-error) response for every received request, though it offers no guarantee that the response reflects the most recent write.
+3. **Partition Tolerance:** The cluster continues operating despite arbitrary network delays, message drops, or total physical disconnection between partitions of nodes.
+
+#### The Physical Inevitability of Network Partitions ($P$)
+
+In distributed cloud environments (AWS, GCP, hybrid on-premise data centers), **Network Partitions ($P$) are a physical certainty**, not a configurable option:
+- Undersea cables get severed by anchors; datacenter top-of-rack switches overheat and reboot.
+- Operating system TCP socket buffers overflow, causing packet drops.
+- Garbage collection stop-the-world pauses in Java or Go runtimes delay heartbeat packets beyond detection timeouts, causing neighboring nodes to declare a false partition.
+
+Because network hardware cannot guarantee zero message drops, distributed system architects **cannot choose "CA"**. When a physical network partition occurs, the system faces an unavoidable binary dilemma:
+* **Choose Consistency (CP):** The system refuses to acknowledge writes or returns HTTP 503 errors on the isolated partition until quorum is restored. This prevents conflicting writes and data corruption (split-brain syndrome), sacrificing availability.
+* **Choose Availability (AP):** Nodes on both sides of the partition accept writes locally and serve reads. While availability remains 100%, state diverges across partitions. When the partition heals, conflicts must be reconciled via heuristics such as Last-Write-Wins (LWW) or mathematically sound Conflict-free Replicated Data Types (CRDTs).
 
 ```mermaid
 flowchart TD
@@ -424,13 +444,6 @@ flowchart TD
     style AP_Path fill:#1f2937,stroke:#10b981,stroke-width:1.5px,color:#fff
 ```
 
-#### Distributed CAP & PACELC Trade-Off Matrix
-
-| System Class | PACELC Classification | Behavior During Network Partition ($P$) | Normal Operating Latency ($E$) | Canonical Distributed Systems | Production Workloads |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **CP (Consistent)** | **PC/EC** | **Rejects writes or returns 503** if quorum cannot be acknowledged; guarantees zero data divergence. | High commit latency; requires synchronous consensus rounds across replicas before returning 200. | Google Cloud Spanner, CockroachDB, etcd, ZooKeeper, Raft. | Financial transaction ledgers, inventory reservation, distributed locks. |
-| **AP (Available)** | **PA/EL** | **Accepts local writes and serves reads**; partitions diverge and accumulate state drift. | Extremely low latency ($< 5\text{ms}$); writes acknowledge to memory/commit log immediately. | Apache Cassandra, Amazon DynamoDB, Couchbase, ScyllaDB. | High-throughput IoT telemetry, user shopping carts, social feeds, metrics ingestion. |
-
 > [!IMPORTANT]
 > ### The Reality of CAP
 > In real-world physical networks (AWS, GCP, on-premise data centers), **Network Partitions ($P$) are a physical inevitability** (routers fail, optic cables are cut, switches reboot).
@@ -442,19 +455,56 @@ flowchart TD
 
 ### 4.2 The PACELC Theorem: Latency vs. Consistency in Normal Operations
 
-The CAP theorem only describes behavior *during a network partition*. But what happens during the $99.99\%$ of the time when the network is healthy?
-The **PACELC Theorem** (Daniel Abadi) extends CAP:
+The CAP theorem only describes behavior *during a network partition*. However, enterprise cloud networks operate in a healthy, unpartitioned state for over $99.99\%$ of their lifespan. What architectural trade-offs govern the system during these normal operating conditions?
+
+To resolve this limitation, computer scientist Daniel Abadi formulated the **PACELC Theorem** in 2012:
 
 $$\mathbf{If\ Partition\ (P):}\ \text{Choose between Availability (A) and Consistency (C)}$$
 $$\mathbf{Else\ (E):}\ \text{Choose between Latency (L) and Consistency (C)}$$
 
-* **PC/EC (e.g., Spanner, Google Megastore)**: In a partition, guarantees Consistency; in normal operations, chooses Consistency over Latency (waits for synchronous cross-datacenter commits).
-* **PA/EL (e.g., DynamoDB, Cassandra with Eventual Consistency)**: In a partition, chooses Availability; in normal operations, chooses ultra-low Latency (returns write response after local node writes, replicating to other nodes asynchronously).
+#### PACELC Classification Quadrants:
+1. **PC/EC (Consistent in Partition, Consistent in Normal Operations):**
+   - *Partition behavior:* Halts or rejects non-quorum writes to prevent divergence.
+   - *Normal behavior:* Synchronously waits for replica consensus rounds across datacenters before acknowledging HTTP 200, sacrificing latency for zero-lag consistency.
+   - *Examples:* Google Cloud Spanner (TrueTime API), CockroachDB, etcd, ZooKeeper.
+2. **PC/EL (Consistent in Partition, Low Latency in Normal Operations):**
+   - *Partition behavior:* Retains write consistency on the majority partition; rejects writes on minority.
+   - *Normal behavior:* Acknowledges writes after local leader commit, replicating asynchronously to read replicas to provide ultra-low read latency (at the expense of stale reads).
+   - *Examples:* PostgreSQL with asynchronous read replicas, MongoDB default read preference.
+3. **PA/EL (Available in Partition, Low Latency in Normal Operations):**
+   - *Partition behavior:* Accepts local writes and serves reads on all partitions.
+   - *Normal behavior:* Returns write acknowledgment immediately after persisting to local commit log/in-memory buffer, propagating changes asynchronously via gossip protocols.
+   - *Examples:* Amazon DynamoDB (eventual consistency), Apache Cassandra, Couchbase, ScyllaDB.
+4. **PA/EC (Available in Partition, Consistent in Normal Operations):**
+   - *Theoretical quadrant:* Highly atypical; sacrifices latency during normal operations for cross-node synchronization, yet permits unrestricted local diverging writes when partitions occur.
+
+#### Distributed CAP & PACELC Trade-Off Matrix
+
+| System Class | PACELC Classification | Behavior During Network Partition ($P$) | Normal Operating Latency ($E$) | Canonical Distributed Systems | Production Workloads |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **CP (Consistent)** | **PC/EC** | **Rejects writes or returns 503** if quorum cannot be acknowledged; guarantees zero data divergence. | High commit latency; requires synchronous consensus rounds across replicas before returning 200. | Google Cloud Spanner, CockroachDB, etcd, ZooKeeper, Raft. | Financial transaction ledgers, inventory reservation, distributed locks. |
+| **AP (Available)** | **PA/EL** | **Accepts local writes and serves reads**; partitions diverge and accumulate state drift. | Extremely low latency ($< 5\text{ms}$); writes acknowledge to memory/commit log immediately. | Apache Cassandra, Amazon DynamoDB, Couchbase, ScyllaDB. | High-throughput IoT telemetry, user shopping carts, social feeds, metrics ingestion. |
+
 ---
 
-### 4.3 Strong Consistency vs. Eventual Consistency
+### 4.3 Spectrum of Distributed Consistency Models
 
-In distributed microservices architectures, data consistency models fall across a spectrum:
+Data consistency in distributed architectures is not a binary choice between "instant consistency" and "complete chaos." It exists across a rigorous mathematical spectrum of isolation levels and delivery guarantees:
+
+#### 1. Linearizable Consistency (Strong Consistency)
+- **Mechanism:** The highest standard of consistency. All operations appear to execute atomically at a single point in real-world time. Once a write has completed at time $t$, any read initiated at time $t' > t$ across any node in the global cluster is guaranteed to return that value or a newer write.
+- **Quorum Mathematics:** Enforced via strict majority quorums:
+  $$W + R > N$$
+  Where $N$ is total replicas, $W$ is write quorum size, and $R$ is read quorum size. When $W + R > N$, the read and write sets must overlap on at least one replica holding the latest version.
+
+#### 2. Sequential Consistency (Lamport, 1979)
+- **Mechanism:** Operations are executed in some sequential order that is identical for all nodes, and operations of each individual process appear in this sequence in the order specified by its program. However, operations do not need to adhere to an absolute external wall-clock time. Reads may lag real-time clock values, but never move backward.
+
+#### 3. Causal Consistency
+- **Mechanism:** Operations that are causally related ($A \to B$, where $B$ depends on or is triggered by $A$) must be observed in the exact same order by every process in the distributed network. Operations that are concurrent and not causally related can be observed in different orders by different nodes.
+
+#### 4. Eventual Consistency
+- **Mechanism:** The weakest formal guarantee. Replicas accept updates independently. If no new updates are made to a specific key, all replicas will eventually converge to identical state via background gossip, read repair, or anti-entropy trees. Reads can return stale data for unbounded periods under heavy load.
 
 | Consistency Model | Write Behavior | Read Guarantee | Enterprise Trade-off | Typical Backends |
 | :--- | :--- | :--- | :--- | :--- |
@@ -463,9 +513,9 @@ In distributed microservices architectures, data consistency models fall across 
 | **Causal Consistency** | Causal dependencies preserved ($A \to B$) | Dependent reads always see antecedent writes | Concurrent independent writes may diverge temporarily | MongoDB (Causal Sessions) |
 | **Eventual Consistency** | Asynchronous replication; local write acknowledgment | Reads may return stale data until replication converges | Ultra-low write latency ($<2\text{ms}$); maximum horizontal scale | Amazon DynamoDB, Apache Cassandra, Kafka consumers |
 
-#### Production Guideline:
-- Use **Strong Consistency** for financial ledgers, inventory deductions, and authentication credentials where stale reads cause business fraud or overselling.
-- Use **Eventual Consistency** for metrics, user activity streams, notifications, search indexes, and cache invalidation where sub-second latency and uninterrupted availability outweigh instant synchronization.
+#### Production Architectural Decision Matrix:
+- **Deploy Strong Consistency for:** Financial ledgers, double-entry bookkeeping, seat/inventory reservation, and cryptographic authentication where reading stale state leads to economic loss or regulatory violation.
+- **Deploy Eventual Consistency for:** Analytical telemetry, social media feeds, notification logs, search indexing, and product review tallies where sub-second response times and uninterrupted uptime take absolute precedence over momentary synchronization lag.
 
 ---
 
@@ -753,18 +803,13 @@ class ShortenResponse(BaseModel):
 
 @app.post("/v1/urls", response_model=ShortenResponse, status_code=status.HTTP_201_CREATED)
 async def create_short_url(payload: ShortenRequest):
+    # Step 1: Acquire unique global sequence ID from Redis atomic INCR
+    seq_id = await redis.incr("global_url_counter")
 
-# 7. Acquire unique global sequence ID from Redis atomic INCR
+    # Step 2: Convert integer to 7-character Base62 string
+    short_code = encode_base62(seq_id)
 
-seq_id = await redis.incr("global_url_counter")
-
-# 8. Convert integer to 7-character Base62 string
-
-short_code = encode_base62(seq_id)
-
-# 9. Store mapping in Redis cache & PostgreSQL
-
-# URL cache with 30-day TTL
+    # Step 3: Store mapping in Redis cache & PostgreSQL (URL cache with 30-day TTL)
     await redis.set(f"url:{short_code}", str(payload.long_url), ex=30 * 86400)
 
     return ShortenResponse(
@@ -774,26 +819,23 @@ short_code = encode_base62(seq_id)
 
 @app.get("/{short_code}")
 async def redirect_short_url(short_code: str):
-
-# 10. Query Redis Cache (Sub-2ms response)
-
-long_url = await redis.get(f"url:{short_code}")
+    # Step 1: Query Redis Cache (Sub-2ms response)
+    long_url = await redis.get(f"url:{short_code}")
     
     if not long_url:
         # Fallback: Query primary PostgreSQL database on cache miss...
         raise HTTPException(status_code=404, detail="Short URL not found")
 
-# 11. Return HTTP 301 (Permanent Redirect - browsers cache redirect locally)
-
-# or HTTP 302 (Temporary Redirect - allows server to track click analytics on every visit)
+    # Step 2: Return HTTP 301 (Permanent Redirect - browsers cache redirect locally)
+    # or HTTP 302 (Temporary Redirect - allows server to track click analytics on every visit)
     return RedirectResponse(url=long_url, status_code=status.HTTP_302_FOUND)
 ```
 
 ---
 
-# 12. System Design Blueprint 2: High-Throughput Distributed Rate Limiter
+# 7. System Design Blueprint 2: High-Throughput Distributed Rate Limiter
 
-### 12.1 Requirements & Mathematical Latency Budgets
+### 7.1 Requirements & Mathematical Latency Budgets
 
 * **Throughput**: 100,000 incoming requests per second across 50 API nodes.
 * **Latency Overhead**: Must add less than $2\text{ ms}$ of latency to the request path.
@@ -801,7 +843,7 @@ long_url = await redis.get(f"url:{short_code}")
 
 ---
 
-### 12.2 Token Bucket vs. Sliding Window Log vs. Sliding Window Counter
+### 7.2 Token Bucket vs. Sliding Window Log vs. Sliding Window Counter
 
 * **Token Bucket**: Requires storing two fields: `tokens` and `last_updated_timestamp`. When requests arrive, tokens are replenished based on elapsed time. Highly efficient, but requires locks or Lua scripts to prevent lost increments under concurrency.
 * **Sliding Window Counter**: Hybrid algorithm combining past window count and current window count:
@@ -810,7 +852,7 @@ long_url = await redis.get(f"url:{short_code}")
 
 ---
 
-### 12.3 Atomic Lua Script Implementation in Distributed Redis Cluster
+### 7.3 Atomic Lua Script Implementation in Distributed Redis Cluster
 
 ```lua
 -- Redis Sliding Window Counter Implementation (Atomic Lua)
@@ -843,7 +885,7 @@ end
 
 ---
 
-### 12.4 Client Header Standards (X-RateLimit-Limit, Remaining, Reset)
+### 7.4 Client Header Standards (X-RateLimit-Limit, Remaining, Reset)
 
 Standardized response headers must be returned on every request to prevent client confusion:
 * `X-RateLimit-Limit`: Maximum quota allowed in the window (e.g., `100`).
@@ -853,9 +895,9 @@ Standardized response headers must be returned on every request to prevent clien
 
 ---
 
-# 13. System Design Blueprint 3: Real-Time Multi-Channel Notification Engine
+# 8. System Design Blueprint 3: Real-Time Multi-Channel Notification Engine
 
-### 13.1 Requirements, Fan-Out Topologies & Channel Dispatchers
+### 8.1 Requirements, Fan-Out Topologies & Channel Dispatchers
 
 * **Requirement**: Ingest 50,000 events/sec (e.g. "Order Shipped", "Breaking News") and deliver notifications across **Email (SendGrid)**, **SMS (Twilio)**, **Push (FCM/APNS)**, and **WebSockets**.
 * **Fan-Out Dilemma**: A single influencer posting an update can trigger notifications to 10,000,000 followers.
@@ -896,14 +938,14 @@ flowchart TD
 
 ---
 
-### 13.2 Priority Queuing, Backpressure & User Preference Aggregation
+### 8.2 Priority Queuing, Backpressure & User Preference Aggregation
 
 1. **Strict Channel Segregation**: Never mix transactional OTP SMS messages with marketing emails in the same queue! A burst of marketing emails will delay two-factor authentication codes, resulting in failed logins.
 2. **Do-Not-Disturb (DND) Filtering**: Check user timezone and DND preferences. If a non-urgent notification falls between 10 PM and 7 AM, schedule it into a delay queue.
 
 ---
 
-### 13.3 End-to-End Python Implementation with Kafka and AsyncIO Workers
+### 8.3 End-to-End Python Implementation with Kafka and AsyncIO Workers
 
 ```python
 import asyncio
@@ -935,9 +977,9 @@ async def push_notification_dispatcher():
 
 ---
 
-# 14. System Design Blueprint 4: E-Commerce Distributed Checkout & Inventory Reservation
+# 9. System Design Blueprint 4: E-Commerce Distributed Checkout & Inventory Reservation
 
-### 14.1 The Overselling Problem: Flash Sales & Hot Keys
+### 9.1 The Overselling Problem: Flash Sales & Hot Keys
 
 During a flash sale (e.g. 500 units of a limited-edition sneaker with 200,000 customers clicking "Buy Now" at 10:00 AM):
 * Standard SQL `SELECT stock FROM inventory WHERE id = 1` followed by `UPDATE inventory SET stock = stock - 1` results in **severe overselling** (selling 1,500 units when only 500 exist!).
@@ -945,7 +987,7 @@ During a flash sale (e.g. 500 units of a limited-edition sneaker with 200,000 cu
 
 ---
 
-### 14.2 Two-Phase Inventory Reservation with TTL Expiration
+### 9.2 Two-Phase Inventory Reservation with TTL Expiration
 
 **Production Solution**: Move hot inventory counters to **Redis memory with Lua script decrement and atomic expiration**:
 
@@ -971,7 +1013,7 @@ end
 
 ---
 
-### 14.3 Complete End-to-End Orchestrated Checkout Saga Implementation
+### 9.3 Complete End-to-End Orchestrated Checkout Saga Implementation
 
 ```python
 import asyncio
@@ -1035,7 +1077,7 @@ class CheckoutSagaEngine:
 
 ---
 
-# 15. Summary Comparison & Production Engineering Reference Matrix
+# 10. Summary Comparison & Production Engineering Reference Matrix
 
 | Architectural Pattern | Primary Purpose | Consistency Model | Recovery / Resilience Mechanism |
 | :--- | :--- | :--- | :--- |
@@ -1050,7 +1092,7 @@ class CheckoutSagaEngine:
 
 ---
 
-# 16. References & Further Reading
+# 11. References & Further Reading
 
 1. **Designing Data-Intensive Applications** (Martin Kleppmann): The gold standard for distributed systems foundations.
 2. **Building Microservices: Designing Fine-Grained Systems** (Sam Newman): [https://samnewman.io/books/building_microservices_2nd_edition/](https://samnewman.io/books/building_microservices_2nd_edition/)
@@ -1058,6 +1100,6 @@ class CheckoutSagaEngine:
 4. **The CAP Theorem** (Seth Gilbert and Nancy Lynch, MIT): [https://groups.csail.mit.edu/tds/papers/Lynch/sigact-podc-column-2002.pdf](https://groups.csail.mit.edu/tds/papers/Lynch/sigact-podc-column-2002.pdf)
 5. **Consistency Tradeoffs in Modern Distributed Database System Design (PACELC)** (Daniel Abadi): [https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf](https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf)
 6. **Related Guides**:
-   - See [08. APIs and Protocols: REST, gRPC, and WebSockets](05_web_frameworks_and_api_protocols.md) for gRPC microservices and circuit breakers.
-   - See [12. Caching, Redis, and Event-Driven Messaging](08_caching_redis_and_kafka.md) for Kafka partitioning and Celery workflows.
-   - See [14. Testing, Observability, and Performance Engineering](10_testing_docker_and_devops.md) for OpenTelemetry distributed tracing across microservices.
+   - See [05. APIs and Protocols: REST, gRPC, and WebSockets](05_web_frameworks_and_api_protocols.md) for gRPC microservices and circuit breakers.
+   - See [08. Caching, Redis, and Event-Driven Messaging](08_caching_redis_and_kafka.md) for Kafka partitioning and Celery workflows.
+   - See [10. Testing, Observability, and Performance Engineering](10_testing_docker_and_devops.md) for OpenTelemetry distributed tracing across microservices.

@@ -936,6 +936,24 @@ WHERE validation_status != 'PASS';
 
 ### 8.1 Tooling Landscape: Elementary, Great Expectations, Monte Carlo, OpenLineage
 
+Data observability and quality frameworks ensure pipelines detect silent data corruption, schema drift, volumetric anomalies, and lineage breaks before bad data propagates to downstream business reporting and machine learning models. The ecosystem bifurcates into distinct operational archetypes:
+
+1. **Assertion-Based Data Contract Testing (e.g., Great Expectations):**
+   - **Operational Paradigm:** Pre-flight and in-flight assertion testing. Engineers write explicit, declarative test suites ("Expectations") such as `expect_column_values_to_not_be_null` or `expect_table_row_count_to_be_between`.
+   - **Pipeline Integration:** Embedded directly into orchestration tasks (Airflow, Prefect) or Spark/Python transformation code. If an assertion fails, the pipeline halts or routes bad batches to dead-letter quarantine queues before writing to production tables.
+
+2. **In-Warehouse Analytical Observability (e.g., Elementary Data):**
+   - **Operational Paradigm:** Warehouse-native observability specifically optimized for modern SQL and dbt transformation workflows.
+   - **Mechanics:** Installs as a lightweight dbt package that models metadata, test results, and runtime performance tables directly inside the data warehouse (Snowflake, BigQuery, Databricks). It uses historical query logs and statistical modeling to detect volume anomalies, execution duration spikes, and schema drift without sending raw customer data outside the warehouse boundary.
+
+3. **Autonomous End-to-End SaaS Observability (e.g., Monte Carlo, Datadog Data Observability):**
+   - **Operational Paradigm:** Agentless, ML-driven enterprise telemetry. Connects via read-only service accounts to cloud warehouses, lakehouses, orchestrators, and BI dashboards.
+   - **Autonomous Baselines:** Learns normal data freshness intervals, row arrival rates, and schema modifications over time. When an upstream API silently deprecates a column or an ingestion pipeline drops 50% of daily transactions, it flags anomaly alerts with automated downstream impact radiuses directly into Slack and PagerDuty.
+
+4. **Open Standard Lineage Telemetry (e.g., OpenLineage & Marquez):**
+   - **Operational Paradigm:** Standardized, vendor-neutral lineage instrumentation governed under the Linux Foundation.
+   - **Event-Driven Telemetry:** Spark listeners, Airflow plugins, and Flink operators emit standardized JSON events describing dataset inputs, outputs, job runtimes, and facet schemas at `START`, `RUNNING`, and `COMPLETE` phases, creating a unified cross-engine graph in backend engines like Marquez or DataHub.
+
 | Tool | Category | Deployment Model | Key Strengths & Production Fit |
 | :--- | :--- | :--- | :--- |
 | **Great Expectations (GX)** | Assertion Testing | Python Library / Open Source | Declarative data contracts executed during batch ETL or pre-flight pipelines. |

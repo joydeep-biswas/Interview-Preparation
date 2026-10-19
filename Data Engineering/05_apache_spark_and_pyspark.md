@@ -201,6 +201,21 @@ flowchart TD
     style DS fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
+#### Detailed Mechanical Breakdown
+1. **Resilient Distributed Datasets (RDDs):**
+   - **Internal Mechanics:** RDDs represent the original Spark 1.0 distributed collection. An RDD consists of five core properties: a list of partitions, an iterator function computing elements of each partition, a list of dependencies on parent RDDs (lineage), and optionally a Partitioner (for key-value pairs) and preferred node locations (data locality).
+   - **Performance Bottleneck:** RDDs operate on opaque JVM objects (`RDD[T]`). Because Spark cannot inspect the internal schema or field types of `T`, it cannot optimize operations. In Python (`PySpark`), RDD transformations require serializing objects between Python worker processes and the JVM via Py4J/sockets (`PickleSerializer`), incurring massive CPU and memory serialization overhead. Furthermore, every row is a distinct Java object, leading to severe JVM garbage collection pauses.
+
+2. **DataFrames:**
+   - **Internal Mechanics:** Introduced in Spark 1.3, DataFrames organize data into named columns with an explicit schema (`StructType`). Under the hood, a DataFrame is represented as an untyped `Dataset[Row]`.
+   - **Optimization Engine:** DataFrames unlock the **Catalyst Optimizer** (logical planning, constant folding, predicate pushdown, projection pruning) and **Project Tungsten** (off-heap memory management via binary `UnsafeRow` formats and whole-stage code generation).
+   - **PySpark Parity:** In PySpark, DataFrame operations execute in native C++/JVM Tungsten routines without serializing Python objects back and forth, offering equal execution speed to Scala.
+
+3. **Datasets:**
+   - **Internal Mechanics:** Introduced in Spark 1.6, Datasets combine the object-oriented, strongly-typed programming model of RDDs with the relational execution benefits of Catalyst. In Scala and Java, Datasets are typed as `Dataset[T]`, where `T` is a case class or POJO.
+   - **Encoder Serialization:** Instead of standard Java serialization or Kryo, Datasets use specialized **Encoders** that generate custom bytecode to serialize and deserialize JVM objects directly into Tungsten off-heap binary memory without heap allocations.
+   - **Language Support:** Available strictly in Scala and Java. Python does not support Datasets because Python is dynamically typed at runtime.
+
 #### Comparison Matrix
 | Feature | RDD | DataFrame | Dataset |
 | :--- | :--- | :--- | :--- |
@@ -470,9 +485,20 @@ flowchart TD
 
 ### 1.8 Transformations vs Actions
 
-#### Definition
-- **Transformations:** Produce a new DataFrame/RDD from an existing one without evaluating data (lazy).
-- **Actions:** Trigger actual execution across cluster worker nodes and either return values to the Driver program or write files to external storage.
+#### Definition & Core Concepts
+Every operation in Apache Spark belongs to one of two fundamental functional categories: **Transformations** or **Actions**. Understanding this bifurcation is essential to avoid unnecessary data scans and cluster resource exhaustion.
+
+1. **Transformations (Lazy Computation):**
+   - **Operational Mechanics:** Transformations take an existing DataFrame or RDD and return a new DataFrame/RDD without evaluating data or reading bytes from underlying storage. Instead of computing values immediately, Spark records each transformation as a logical operator node in an internal directed acyclic graph (**Lineage Graph** / Logical Plan).
+   - **Narrow vs. Wide Dependency:**
+     - **Narrow Transformations (`select`, `filter`, `withColumn`):** Each partition of the child DataFrame depends on exactly one partition of the parent DataFrame. These operations execute locally within executor memory without network transfer (in-memory pipelining).
+     - **Wide Transformations (`groupBy`, `join`, `distinct`):** Multiple child partitions depend on data distributed across multiple parent partitions. These require **shuffling**, where executors exchange data over the cluster network, establishing distinct execution **Stages**.
+
+2. **Actions (Eager Execution):**
+   - **Operational Mechanics:** Actions trigger the physical execution of the entire upstream DAG. When an action is invoked, Spark's `DAGScheduler` decomposes the logical plan into physical stages, creates tasks corresponding to data partitions, and submits them to the `TaskScheduler` for executor thread execution.
+   - **Output Destination:** Actions terminate a pipeline by either:
+     - Pulling computed results back to the client Driver process (`collect()`, `take()`, `first()`, `count()`).
+     - Writing processed data out to durable persistent storage (`write.parquet()`, `write.saveAsTable()`).
 
 #### Catalog Matrix
 | Operation Type | Method Examples | Execution Behavior |
@@ -1596,6 +1622,15 @@ df_transformed.unpersist()
 
 ### 17.4 Spark Storage Levels
 
+#### Storage Levels Architecture & Trade-Offs
+Caching a DataFrame via `.cache()` or `.persist()` instructs Spark to retain computed partition data in memory or disk across action boundaries. However, caching is not free—it consumes cluster RAM and CPU cycles. Spark provides fine-grained control over persistence behavior through **Storage Levels**, balancing three fundamental dimensions:
+1. **Memory vs. Disk:** Whether data is held strictly in RAM (`MEMORY_ONLY`), stored in RAM with automatic overflow spilling to local NVMe storage (`MEMORY_AND_DISK`), or persisted directly to disk without consuming heap memory (`DISK_ONLY`).
+2. **Deserialized vs. Serialized:** 
+   - **Deserialized (Default for RDDs):** Stores raw Java objects. Avoids CPU deserialization overhead during subsequent reads, but increases memory footprint by $2\times - 5\times$ due to JVM object headers and pointer bloat, triggering heavy GC pressure.
+   - **Serialized (`_SER`):** Serializes objects into compact byte arrays (using Java or Kryo serializer). Reduces memory footprint drastically, but requires CPU cycles to deserialize records every time they are accessed.
+   *(Note: Spark SQL DataFrames automatically cache using Tungsten columnar in-memory format, regardless of whether `_SER` is specified).*
+3. **Replication Factor (`_2`):** Suffixing any storage level with `_2` (e.g., `MEMORY_AND_DISK_2`) replicates every partition across two distinct physical worker nodes. If a worker node crashes, the partition is read immediately from the peer node without needing to recompute the lineage graph.
+
 #### Storage Levels Comparison
 | Storage Level | Space Used | CPU Overhead | Stored on Disk? | Stored in Memory? | Serialized? |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -1717,6 +1752,27 @@ In the **Executors** tab:
 ---
 
 ### 18.3 Diagnosing Out-Of-Memory (OOM) Errors
+
+#### Anatomy of Spark Out-Of-Memory Exceptions
+In distributed computing, memory errors occur in distinct runtime tiers. Diagnosing an OOM requires identifying whether the failure occurred on the **Driver process**, within an **Executor JVM heap**, or resulted from **OS / Container Manager memory eviction**.
+
+1. **Driver-Side OOM (`java.lang.OutOfMemoryError: Java heap space` on Driver):**
+   - **Mechanism:** The Driver orchestrates the cluster and maintains execution state, task metadata, and broadcast variables. The Driver is not an execution worker.
+   - **Root Causes:**
+     - Executing eager actions like `df.collect()` or `df.toPandas()` that retrieve all distributed partition data across the entire cluster onto the single Driver JVM.
+     - Excessive Broadcast Joins: Broadcasting a DataFrame (`broadcast(df)`) that exceeds `spark.driver.memory` or creating multiple large broadcast structures simultaneously.
+     - Massive DAG metadata: Generating millions of small stages or recursive lineage chains that exhaust Driver heap space.
+
+2. **Executor-Side OOM (`java.lang.OutOfMemoryError: Java heap space` on Worker):**
+   - **Mechanism:** Executors process tasks in parallel inside their allocated JVM heaps (`spark.executor.memory`).
+   - **Root Causes:**
+     - **Data Skew:** A single wide transformation partition receives 80% of the dataset keys, causing one executor task to attempt aggregating gigabytes of data in its memory execution pool.
+     - **Oversized Partitions:** Having too few partitions (`spark.sql.shuffle.partitions = 200` default on a multi-terabyte dataset), causing individual partitions to exceed available task memory slots.
+     - **Memory Leaks in Non-Vectorized Python UDFs:** Standard Python UDFs allocate memory in external Python daemon worker processes (`PySpark`). If objects are retained across batches without proper garbage collection, heap exhaustion occurs.
+
+3. **Container Eviction (`Container killed by YARN/K8s for exceeding memory limits`):**
+   - **Mechanism:** Cluster managers (Kubernetes / YARN) monitor total physical container memory, encompassing both JVM heap (`spark.executor.memory`) and off-heap native overhead (`spark.executor.memoryOverhead`).
+   - **Root Causes:** Intensive off-heap operations (PyArrow serialization, native C/C++ libraries, decompression buffers, or Netty shuffle network buffers) exceeding the standard 10% memory overhead limit (`max(384MB, 0.10 * executorMemory)`).
 
 #### Driver OOM vs. Executor OOM
 | Failure Mode | Root Cause | Solution |

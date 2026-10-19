@@ -432,7 +432,28 @@ flowchart LR
     style G3 fill:#1e293b,stroke:#eab308,stroke-width:1px,color:#fff
 ```
 
-#### Detailed Breakdown of Layers
+#### 1. The 3-Tier Refining Paradigm: Mechanics & Invariants
+The Medallion Architecture (popularized by Databricks and widely adopted across cloud data platforms) solves the dual challenge of preserving raw audit data while simultaneously delivering high-speed, cleansed analytics to business users. Rather than attempting a single, monolithic ETL hop that mixes ingestion and business logic, the Medallion framework progressively refines data across three distinct physical layers:
+
+##### A. The Bronze Layer (Raw Ingestion / System of Record)
+- **Role & Invariant:** The Bronze layer serves as the immutable, append-only landing zone. Its sole contract is **raw source fidelity**. Incoming events, whether from Apache Kafka topics, CDC streams, or third-party REST APIs, are written exactly as received, including unparsed JSON payloads, schema variations, and corrupt values.
+- **Why Never Clean in Bronze:** Preserving raw historical events enables deterministic **re-processing and backfilling**. If downstream business logic changes or a data pipeline bug is discovered six months later, engineers can replay the entire Bronze layer from day one.
+- **Storage & Metadata:** Typically stored as append-only Delta Lake or Apache Iceberg tables. Every record is enriched with pipeline metadata columns: `_ingestion_timestamp`, `_source_file_path`, and `_kafka_offset`.
+
+##### B. The Silver Layer (Cleansed, Conformed & Deduplicated)
+- **Role & Invariant:** The Silver layer acts as the validated, standardized enterprise data backbone. It represents a clean, conformed view of business entities (Customers, Orders, Invoices).
+- **Transformation Operations:**
+  1. **Schema Enforcement & Casting:** Strict data types are applied; strings are cast to explicit `DATE`, `TIMESTAMP`, or `DECIMAL` types.
+  2. **Deduplication:** At-least-once message delivery duplicates are eliminated using window ranking (`ROW_NUMBER() OVER (PARTITION BY entity_id ORDER BY updated_at DESC)`) or transactional `MERGE` statements.
+  3. **Data Quality Assertions:** Foreign key relationships are validated; invalid records are routed to quarantine dead-letter tables.
+  4. **Structure Flattening:** Nested, semi-structured JSON arrays are unpacked into relational columns.
+
+##### C. The Gold Layer (Curated, Aggregated & Analytics-Ready)
+- **Role & Invariant:** The Gold layer is the presentation tier optimized for query performance, executive dashboards, and self-serve business intelligence.
+- **Transformation Operations:** Data is structured into Kimball-style **Star Schemas** (Fact and Dimension tables), pre-aggregated daily/monthly summary cubes, or wide flat feature stores for machine learning models.
+- **Performance Characteristics:** Read-heavy, heavily cached, partitioned by date, and indexed for rapid analytical scans.
+
+#### 2. Architectural Comparison Matrix Across Medallion Layers
 
 | Property | Bronze Layer (Raw) | Silver Layer (Enriched / Conformed) | Gold Layer (Curated / Analytical) |
 | :--- | :--- | :--- | :--- |
@@ -598,7 +619,20 @@ flowchart TD
     style DV_Core fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fff
 ```
 
-#### Architectural Comparison Matrix
+#### 1. Foundational Philosophies: Inmon vs. Kimball vs. Data Vault 2.0
+Modern enterprise data warehouses are shaped by three seminal architectural philosophies, each answering a different organizational priority:
+
+1. **Bill Inmon (Corporate Information Factory - CIF):**
+   - **Core Thesis:** Top-down enterprise design. The warehouse must serve as a single, normalized (3NF), centralized repository of corporate truth. Departmental data marts are derived downstream from this 3NF core.
+   - **Strengths & Weaknesses:** Completely eliminates data redundancy and guarantees relational referential integrity. However, it requires years of upfront data modeling and multi-table join queries (10–15 joins) that perform poorly on analytical engines.
+2. **Ralph Kimball (Dimensional Data Warehouse):**
+   - **Core Thesis:** Bottom-up business process design. The warehouse is composed of conformed dimensional Star Schemas modeled around discrete business processes (Orders, Shipments, Invoicing).
+   - **Strengths & Weaknesses:** Extremely intuitive for business analysts, supports drag-and-drop BI tools, and minimizes query joins ($O(1)$ fact-to-dimension join depth). However, dimensions denormalize redundant attributes and require Slowly Changing Dimension (SCD) pipelines to track history.
+3. **Dan Linstedt (Data Vault 2.0):**
+   - **Core Thesis:** Agile, parallel, audit-first distributed integration. Separates business identity (**Hubs**), business relationships (**Links**), and historical context/attributes (**Satellites**).
+   - **Strengths & Weaknesses:** Replaces relational foreign keys with deterministic cryptographic hash keys (MD5 or SHA-256), allowing dozens of source systems to load concurrently into the warehouse without locking tables. Provides 100% auditability and insert-only loading. However, querying the raw vault requires creating an Information Mart layer of dimensional views for BI consumers.
+
+#### 2. Architectural Comparison Matrix
 
 | Evaluation Dimension | Bill Inmon (CIF - 3NF) | Ralph Kimball (Dimensional) | Dan Linstedt (Data Vault 2.0) |
 | :--- | :--- | :--- | :--- |
@@ -930,7 +964,18 @@ erDiagram
     }
 ```
 
-#### 2. Star vs. Snowflake: Exhaustive Architectural Trade-off
+#### 2. Star vs. Snowflake: Architectural Mechanics & Modern Storage Dynamics
+
+##### The Normalization Divergence
+- **Star Schema:** Dimensions are intentionally **denormalized**. Repeated string attributes (such as `region_name`, `country_name`, and `state_name`) are stored directly inside `dim_store`. This trades disk redundancy for query simplicity: any analytical question requires joining the central fact table to the dimension in a single $O(1)$ depth hop.
+- **Snowflake Schema:** Dimensions are **partially or fully normalized** into 3NF-like sub-dimension tables (`dim_store` $\to$ `dim_city` $\to$ `dim_region`). While this guarantees that string values are stored only once, answering an analytical query requires joining through 3–5 hierarchical dimension tables, creating execution bottlenecks.
+
+##### Why the Modern Lakehouse Killed the Snowflake Schema
+Historically in on-premise RDBMS storage (1990s–2000s), uncompressed spinning disks made storing repeated strings expensive. However, modern analytical query engines (Snowflake, Databricks, BigQuery) store data in columnar formats (Apache Parquet, ORC):
+1. **Dictionary Encoding:** Columnar engines replace recurring strings in a column with 1-byte integer tokens in a small dictionary header. Storing `'California'` 100 million times consumes virtually the same storage footprint as storing it once.
+2. **Distributed Broadcast Hash Joins:** Distributed query engines can broadcast a single denormalized `dim_store` table across worker nodes in memory. Navigating a normalized snowflake hierarchy forces multiple expensive shuffle joins across the network.
+
+#### 3. Architectural Comparison Matrix: Star vs. Snowflake
 
 | Architectural Dimension | Star Schema | Snowflake Schema |
 | :--- | :--- | :--- |
@@ -946,7 +991,22 @@ erDiagram
 
 ### 2.6 Fact Tables Taxonomy
 
-Kimball dimensional modeling identifies four distinct types of fact tables, each tailored to a specific temporal behavior and measurement pattern.
+#### 1. Overview: Fact Table Fundamentals, Grain & Metric Additivity
+In dimensional modeling, a **Fact Table** represents the numerical measurements, metrics, and business facts generated by an enterprise operational process. Every fact table design is governed by two fundamental invariants:
+
+##### The Principle of Atomic Grain
+The **Grain** is the foundational contract of the fact table, answering the question: *What does a single row represent?*
+$$\text{Atomic Grain Rule: Always model facts at the lowest achievable atomic grain.}$$
+Higher-level rollups and aggregations can always be computed on the fly or cached in Gold marts, but atomic transaction details can never be recovered once lost.
+
+##### The 3 Types of Metric Additivity
+1. **Fully Additive Measures:** Numerical values that can be mathematically summed across **all** dimensions (e.g., `sales_amount`, `units_sold`). Summing sales across dates, stores, products, and customer cohorts yields valid business totals.
+2. **Semi-Additive Measures:** Numerical values that can be summed across some dimensions (e.g., store, account, product), but **never across the Time dimension**. For example, a bank account balance of \$10,000 on Monday and \$10,000 on Tuesday does not mean you have \$20,000! Time aggregation requires calculating the closing balance (`LAST_VALUE`) or period average (`AVG`).
+3. **Non-Additive Measures:** Values that cannot be meaningfully summed across *any* dimension (e.g., unit prices, exchange rates, profit margin percentages). Ratios must be stored as raw numerator and denominator components (`total_profit` and `total_revenue`) so the ratio is computed *after* aggregation:
+   $$\text{Margin \%} = \frac{\sum \text{profit}}{\sum \text{revenue}} \times 100 \quad \left(\text{NEVER } \sum \frac{\text{profit}}{\text{revenue}}\right)$$
+
+#### 2. The 4 Fact Table Types Reference Matrix
+Kimball dimensional modeling identifies four distinct types of fact tables, each tailored to a specific temporal behavior and measurement pattern:
 
 | Fact Table Type | Temporal Grain | Row Insertion & Mutation Pattern | Metric Additivity | Canonical Enterprise Scenario |
 | :--- | :--- | :--- | :--- | :--- |

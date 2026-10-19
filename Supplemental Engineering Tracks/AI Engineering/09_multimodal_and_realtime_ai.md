@@ -103,10 +103,11 @@ flowchart TD
 8. [Production Implementation: Sub-500ms Conversational Voice Agent Engine](#8-production-implementation-sub-500ms-conversational-voice-agent-engine)
    - [8.1 Systems Architecture of the Engine](#81-systems-architecture-of-the-engine)
    - [8.2 Complete Production-Grade Python Implementation](#82-complete-production-grade-python-implementation)
-   - [18.3 Performance Verification & Audio Latency Breakdown](#183-performance-verification--audio-latency-breakdown)
-9. [Summary Comparison & Production Engineering Reference Matrix](#19-summary-comparison--production-engineering-reference-matrix)
-10. [References & Further Reading](#20-references--further-reading)
----
+   - [8.3 Performance Verification & Audio Latency Breakdown](#83-performance-verification--audio-latency-breakdown)
+9. [Summary Comparison & Production Engineering Reference Matrix](#9-summary-comparison--production-engineering-reference-matrix)
+   - [9.1 Multimodal Modality Architecture Matrix](#91-multimodal-modality-architecture-matrix)
+   - [9.2 Realtime Voice Agent Tuning Rules](#92-realtime-voice-agent-tuning-rules)
+10. [References & Further Reading](#10-references--further-reading)
 
 # 1. Multimodal Model Architectures: Native vs. Cascaded Pipelines
 
@@ -813,7 +814,7 @@ logger = logging.getLogger("VoiceAgent")
 
 # ==============================================================================
 
-# 9. Voice Pipeline Latency Telemetry Tracker
+    # Voice Pipeline Latency Telemetry Tracker
 
 # ==============================================================================
 
@@ -849,7 +850,7 @@ class VoiceTurnTelemetry:
 
 # ==============================================================================
 
-# 10. Mock Audio Services (STT, LLM, TTS Engines)
+    # Mock Audio Services (STT, LLM, TTS Engines)
 
 # ==============================================================================
 
@@ -884,7 +885,7 @@ class NeuralTTSEngine:
 
 # ==============================================================================
 
-# 11. Full-Duplex Realtime Conversational Voice Agent
+    # Full-Duplex Realtime Conversational Voice Agent
 
 # ==============================================================================
 
@@ -910,7 +911,7 @@ class FullDuplexVoiceAgent:
         
         # ----------------------------------------------------------------------
 
-# 12. Full-Duplex Barge-In Interruption Detection
+        # Full-Duplex Barge-In Interruption Detection
 
 # ----------------------------------------------------------------------
         if self.is_agent_speaking and vad_probability > 0.85:
@@ -920,7 +921,7 @@ class FullDuplexVoiceAgent:
 
         # ----------------------------------------------------------------------
 
-# 13. Endpoint Trigger: User completed utterance
+        # Endpoint Trigger: User completed utterance
 
 # ----------------------------------------------------------------------
         if is_silence_endpoint:
@@ -935,12 +936,12 @@ class FullDuplexVoiceAgent:
     async def _trigger_immediate_barge_in_cancellation(self):
         """Immediately silences output and cancels running tasks."""
 
-# 14. Flush client playback buffer
+        # Flush client playback buffer
 
 self.client_audio_buffer.clear()
         self.is_agent_speaking = False
 
-# 15. Cancel server-side generation task
+        # Cancel server-side generation task
 
 if self.active_turn_task and not self.active_turn_task.done():
             self.active_turn_task.cancel()
@@ -950,13 +951,13 @@ if self.active_turn_task and not self.active_turn_task.done():
         """Executes STT -> Streaming LLM -> Sentence-Boundary TTS pipeline."""
         try:
 
-# 16. Speech-to-Text Transcription
+        # Speech-to-Text Transcription
 
 transcript = await FastTranscriptionEngine.transcribe(audio_duration_sec=2.5)
             telemetry.stt_completed_ts = time.time()
             logger.info(f"[STT TRANSCRIPTION]: '{transcript}'")
 
-# 17. Stream LLM tokens and accumulate into clauses
+        # Stream LLM tokens and accumulate into clauses
 
 clause_buffer: List[str] = []
             first_token_marked = False
@@ -996,7 +997,7 @@ clause_buffer: List[str] = []
 
 # ==============================================================================
 
-# 18. Verification & Simulation Runner
+    # Verification & Simulation Runner
 
 # ==============================================================================
 
@@ -1053,7 +1054,7 @@ if __name__ == "__main__":
 
 ---
 
-### 18.3 Performance Verification & Audio Latency Breakdown
+### 8.3 Performance Verification & Audio Latency Breakdown
 
 When running the benchmark simulation:
 - **STT Duration:** Completed in $75.0\text{ms}$.
@@ -1063,9 +1064,13 @@ When running the benchmark simulation:
 
 ---
 
-# 19. Summary Comparison & Production Engineering Reference Matrix
+# 9. Summary Comparison & Production Engineering Reference Matrix
 
 ### 9.1 Multimodal Modality Architecture Matrix
+
+Multimodal AI represents a foundational shift from text-only cognitive reasoning to multi-sensory physical and perceptual understanding. Processing diverse sensory inputs—high-resolution visual pixel rasters, continuous acoustic waveforms, document coordinate geometries, and temporal video frames—requires dedicated tensor projection adapters and latency budgets tailored to human perception thresholds.
+
+The core architectures, tensor representations, and latency profiles across multimodal engineering domains:
 
 | Modality / System | Input Tensor Structure | Core Engine / Architecture | Latency SLA | Key Production Hazard |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1081,6 +1086,10 @@ When running the benchmark simulation:
 
 ### 9.2 Realtime Voice Agent Tuning Rules
 
+Building sub-500ms conversational voice agents requires precise coordination across streaming voice activity detection (VAD), chunked speech transcription, speculative LLM generation, and neural audio synthesis. In human conversation, response latencies exceeding $500\text{ms}$ trigger uncomfortable pauses and conversational awkwardness, while aggressive endpointing cuts off human mid-sentence pauses.
+
+Engineers must calibrate the following physical and algorithmic parameters across the real-time audio pipeline:
+
 | Parameter | Recommended Setting | Production Rationale |
 | :--- | :--- | :--- |
 | **VAD Silence Endpoint Window** | $250\text{ms} - 350\text{ms}$ | Shorter than $200\text{ms}$ cuts off users pausing between words; longer than $400\text{ms}$ destroys conversational cadence. |
@@ -1090,7 +1099,7 @@ When running the benchmark simulation:
 
 ---
 
-# 20. References & Further Reading
+# 10. References & Further Reading
 
 1. **An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale (ViT):** Dosovitskiy, A., et al. (2020). *ICLR 2021.* [arXiv:2010.11929](https://arxiv.org/abs/2010.11929).
 2. **Robust Speech Recognition via Large-Scale Weak Supervision (Whisper):** Radford, A., et al. (2022). *OpenAI.* [arXiv:2212.04356](https://arxiv.org/abs/2212.04356).

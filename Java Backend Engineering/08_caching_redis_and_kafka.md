@@ -644,6 +644,25 @@ flowchart TD
 
 ### 2.4 Core Data Structures & Production Use Cases
 
+#### Redis In-Memory Data Models & Object Encoding Architecture
+Redis is not merely a key-value cache; it is a **data structure server**. Under the hood, every Redis key points to a generic `redisObject` header structure that tracks the object type (`type`), encoding implementation (`encoding`), and least recently used eviction metadata (`lru`). Understanding these underlying encodings allows engineers to optimize memory density by orders of magnitude:
+
+1. **Strings (`REDIS_STRING`):**
+   - **Internal Encodings:** Encoded as **`int`** (for integer values stored as 64-bit numbers to enable atomic `INCR`/`DECR`), **`embstr`** (raw memory buffer allocated contiguously with the `redisObject` header for strings $\le 44$ bytes to maximize CPU cache locality), or **`raw`** (dynamically resizable Simple Dynamic String `sds` for strings $> 44$ bytes).
+   - **Use Case:** Session token caching, idempotency locks, atomic counters, and full JSON payload cache entries.
+
+2. **Hashes (`REDIS_HASH`):**
+   - **Internal Encodings:** Encoded as a memory-compact contiguous **`listpack`** when holding small numbers of short fields (zero pointer overhead), dynamically upgrading to a full **`hashtable`** with MurmurHash and incremental rehashing when thresholds are breached.
+   - **Use Case:** Storing entity attributes without serializing/deserializing entire JSON blobs on partial updates.
+
+3. **Lists (`REDIS_LIST`):**
+   - **Internal Encodings:** Implemented via **`quicklist`**, a doubly-linked list of contiguous memory chunks (`listpacks`), balancing low insertion costs with CPU cache efficiency.
+   - **Use Case:** High-throughput job queues (`LPUSH` / `BRPOP`), audit event buffers.
+
+4. **Sorted Sets (`REDIS_ZSET`):**
+   - **Internal Encodings:** Dual-index architecture combining a **SkipList** (ordered by floating-point score for $O(\log N)$ range queries) and a **HashTable** (mapping member strings to scores for $O(1)$ lookups).
+   - **Use Case:** Sliding-window rate limiters, priority queues, and real-time leaderboards.
+
 | Data Structure | Description | Time Complexity | Enterprise Production Scenario |
 | :--- | :--- | :---: | :--- |
 | **String** | Binary-safe strings, integers, raw byte arrays (Max 512 MB). | $O(1)$ | Session token storage, atomic counters (`INCR`), payload caching. |

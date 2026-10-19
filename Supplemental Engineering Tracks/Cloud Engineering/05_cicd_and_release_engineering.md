@@ -101,6 +101,7 @@ flowchart TD
    - [10.2 Scenario 2: Flagger Canary Rollout Failure Caused by Cold Cache Latency](#102-scenario-2-flagger-canary-rollout-failure-caused-by-cold-cache-latency)
    - [10.3 Scenario 3: Database Migration Script Deadlocking Production Tables (AccessExclusiveLock)](#103-scenario-3-database-migration-script-deadlocking-production-tables-accessexclusivelock)
 11. [Summary Comparison & Production Engineering Reference Matrix](#11-summary-comparison--production-engineering-reference-matrix)
+   - [11.1 Progressive Release Strategies & Rollback Dynamics Matrix](#111-progressive-release-strategies--rollback-dynamics-matrix)
 12. [References & Further Reading](#12-references--further-reading)
 ---
 
@@ -180,6 +181,10 @@ flowchart TD
 ```
 
 #### Shift-Left Testing Pyramid Reference Matrix
+
+Structuring test automation into a coherent pyramid is the primary engineering defense against sluggish deployment cycles, brittle test suites, and high production defect escape rates. By sizing test volume inversely proportional to execution duration and infrastructure complexity—maximizing fast, deterministic static code analysis and in-memory unit tests while minimizing expensive, flaky end-to-end browser journeys—teams achieve rapid build feedback loops while catching regressions early in the lifecycle.
+
+The architectural scope, execution requirements, and cost characteristics across the four validation tiers:
 
 | Pyramid Tier | Validation Scope & Tooling | Target Execution Speed | Infrastructure Requirements | Cost to Triage / Fix |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1080,6 +1085,12 @@ stages:
 
 # 11. Summary Comparison & Production Engineering Reference Matrix
 
+### 11.1 Progressive Release Strategies & Rollback Dynamics Matrix
+
+Deploying software into high-availability cloud environments demands rigorous evaluation of release blast radius, compute provisioning costs, cutover latency, and recovery time objectives (RTO). Naive recreate patterns accept full service downtime in exchange for zero state drift, rolling deployments provide zero-downtime updates at minimal extra cost but suffer from mixed-version coexistence, blue-green deployments guarantee instantaneous rollbacks at the cost of duplicate compute footprints, and progressive canary rollouts systematically minimize blast radius via automated Prometheus Golden Signal analysis.
+
+The operational parameters, cost profiles, and recovery dynamics across modern release strategies:
+
 | Release Strategy | Deployment Risk | Infrastructure Cost | Cutover Speed | Rollback Time |
 | :--- | :--- | :--- | :--- | :--- |
 | **Recreate** | **Extreme** (Service downtime) | 1x Baseline capacity | Slow (Full reboot required) | Minutes (Re-deploy old image) |
@@ -1091,8 +1102,8 @@ stages:
 
 # 12. References & Further Reading
 
-- [Continuous Delivery: Reliable Software Releases through Build, Test, and Deployment Automation (Humble & Farley)](https://continuousdelivery.com/) — The foundational continuous delivery book.
-- [SLSA: Supply-chain Levels for Software Artifacts](https://slsa.dev/spec/v1.0/) — Industry standard for end-to-end supply chain integrity.
-- [Sigstore Cosign Documentation](https://docs.sigstore.dev/cosign/overview/) — Keyless container image signing and attestation.
-- [GitHub Actions Workload Identity Federation](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect) — Keyless cloud authentication via OIDC.
-- [Flagger Progressive Delivery Documentation](https://docs.flagger.app/) — Automated canary analysis and traffic shifting on Kubernetes.
+1. **Continuous Delivery: Reliable Software Releases through Build, Test, and Deployment Automation:** Humble, J., & Farley, D. (2010). Addison-Wesley Professional. [continuousdelivery.com](https://continuousdelivery.com/).
+2. **SLSA Specification: Supply-chain Levels for Software Artifacts (Version 1.0):** OpenSSF. [slsa.dev/spec/v1.0](https://slsa.dev/spec/v1.0/).
+3. **Sigstore Cosign: Container Image Signing, Verification and Storage:** Linux Foundation Project. [docs.sigstore.dev/cosign](https://docs.sigstore.dev/cosign/overview/).
+4. **GitHub Actions OpenID Connect (OIDC) Workload Identity Federation:** Hardening cloud credential exchange. [docs.github.com/actions/deployment](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect).
+5. **Flagger Progressive Delivery Operator for Kubernetes:** Automated canary analysis and traffic routing with Istio, Envoy, and Linkerd. [docs.flagger.app](https://docs.flagger.app/).

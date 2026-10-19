@@ -703,6 +703,25 @@ flowchart TD
 
 ### 6.2 Triggers: Micro-Batch vs. Fixed Interval vs. AvailableNow vs. Continuous
 
+#### Streaming Execution Cadence & Trigger Mechanics
+In Spark Structured Streaming, the **Trigger** defines the execution timing of streaming queries—determining whether data is evaluated continuously as single events arrive or processed in discretized micro-batches. Choosing the right trigger governs pipeline latency, compute cost, and small-file storage compaction.
+
+1. **Default Micro-Batch (Unspecified Trigger):**
+   - **Operational Mechanism:** Executes in an eager continuous micro-batch loop. As soon as the previous micro-batch finishes writing and commits its offsets to the checkpoint directory, the engine immediately checks for newly arrived data and launches the next batch ($100\text{ ms} - 500\text{ ms}$ latency).
+   - **Characteristics:** Maximizes pipeline freshness but can lead to high compute costs and small file proliferation if ingestion rates are sparse.
+
+2. **Fixed Interval Micro-Batch (`processingTime='interval'`):**
+   - **Operational Mechanism:** The engine executes micro-batches at deterministic clock intervals (e.g., every 10 seconds or every 5 minutes). If the prior batch completes in 2 seconds, the engine idles for the remaining 8 seconds before scanning for new records.
+   - **Characteristics:** Allows write buffers to accumulate, producing larger, well-compacted Parquet files and reducing cloud storage API write costs.
+
+3. **Incremental Batch / AvailableNow (`availableNow=True`):**
+   - **Operational Mechanism:** Processes all newly arrived data since the last run across one or more dynamically sized micro-batches, and then **cleanly shuts down the streaming query**.
+   - **Characteristics:** Unifies streaming logic with batch cost economics. Pipelines can run on a cron schedule (e.g., once every 4 hours or nightly), spinning up on-demand ephemeral compute clusters, processing accumulated increments, and terminating immediately.
+
+4. **Continuous Processing (`continuous='interval'`):**
+   - **Operational Mechanism:** A radical departure from micro-batching. Long-running tasks run continuously on executors, reading and writing events record-by-record with asynchronous epoch checkpointing.
+   - **Characteristics:** Delivers true sub-millisecond latencies ($\approx 1\text{ ms}$), but supports only a restricted subset of SQL operations (no stateful aggregations, windowing, or full outer joins).
+
 | Trigger Type | Code Syntax | Latency Profile | Primary Use Case |
 | :--- | :--- | :--- | :--- |
 | **Default (Micro-Batch)** | `.trigger()` (Unspecified) | $100\text{ ms} - 500\text{ ms}$ | Standard streaming pipelines (processes as fast as possible). |
@@ -889,6 +908,20 @@ flowchart LR
 
 ### 7.2 Stream Engines Compared: Spark Streaming vs. Apache Flink vs. Kafka Streams
 
+Distributed stream processing architectures solve the challenge of executing stateful computations (windowed aggregations, sessionization, joins) over continuous unbounded data streams. Three dominant engines lead the modern enterprise landscape:
+
+1. **Spark Structured Streaming (Micro-Batch & Hybrid Engine):**
+   - **Architectural Mechanics:** Built on Spark SQL's Catalyst and Tungsten engines. By default, it operates on a **micro-batch model**: discretization of time into small bounded batches. It maintains state in memory or an embedded RocksDB instance on executors, checkpointing metadata and offsets to distributed storage.
+   - **Production Strengths:** Seamless unification with batch queries and Delta Lake. Allows data engineers to reuse identical DataFrame APIs, machine learning pipelines, and SQL models across both real-time and historical analytics.
+
+2. **Apache Flink (True Event-by-Event Stream Processing):**
+   - **Architectural Mechanics:** A ground-up streaming execution engine where batch processing is simply a special case of streaming (finite streams). Flink processes each incoming event immediately through an asynchronous, distributed dataflow pipeline.
+   - **Stateful Management & Fault Tolerance:** Employs the **Chandy-Lamport distributed snapshotting algorithm** to periodically take lightweight, asynchronous checkpoints of state stored in an off-heap RocksDB state backend, achieving true sub-10ms event-time latency with strict exactly-once guarantees.
+
+3. **Kafka Streams (Embedded Client Library):**
+   - **Architectural Mechanics:** Not a distributed compute cluster (has no master, driver, or dedicated workers). Instead, it is a **lightweight Java client library** embedded directly inside standard backend Java/Scala microservices (e.g., Spring Boot).
+   - **Stateful Management:** Maintains local state in an embedded RocksDB database within the microservice container, backed by internal Kafka changelog topics for crash recovery. Scales horizontally by adding more application container instances matching topic partition counts.
+
 | Dimension | Spark Structured Streaming | Apache Flink | Kafka Streams |
 | :--- | :--- | :--- | :--- |
 | **Processing Paradigm** | **Micro-batch** (default) & continuous | **True Event-by-Event Continuous Streaming** | True Event-by-Event Continuous Streaming |
@@ -901,6 +934,20 @@ flowchart LR
 ---
 
 ### 7.3 Cloud Message Brokers: Kafka vs. AWS Kinesis vs. Azure Event Hubs
+
+Distributed append-only message brokers serve as the durable ingestion backbone for streaming architectures, decoupling event producers from downstream stream consumers.
+
+1. **Apache Kafka (Confluent / Amazon MSK):**
+   - **Architecture:** Partitioned append-only log running on dedicated broker clusters. Producers write records to partition ends; consumers track positions using committed offsets.
+   - **Storage Mechanics:** Retains raw byte segments sequentially on disk. Modern architectures leverage **Tiered Storage** (e.g., in Confluent Cloud and Kafka 3.6+), offloading older log segments to cloud object storage (S3/GCS) to enable infinite retention at commodity storage costs without broker disk saturation.
+
+2. **AWS Kinesis Data Streams:**
+   - **Architecture:** Fully managed AWS streaming service scaled by **Shards** ($1\text{ MB/sec}$ ingress, $2\text{ MB/sec}$ egress per shard).
+   - **Characteristics:** Tight integration with AWS IAM, Lambda, and DynamoDB. Uses the Kinesis Client Library (KCL) for worker coordination. Data retention caps at 365 days.
+
+3. **Azure Event Hubs:**
+   - **Architecture:** Azure-native managed distributed event ingestion platform scaled via **Throughput Units (TUs)** and partitions.
+   - **Kafka Protocol Compatibility:** Provides a Kafka-compatible endpoint, allowing existing Kafka applications, Spark Structured Streaming, and Flink jobs to produce and consume directly from Event Hubs without code modifications.
 
 | Metric | Apache Kafka (Confluent / MSK) | AWS Kinesis Data Streams | Azure Event Hubs |
 | :--- | :--- | :--- | :--- |

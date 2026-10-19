@@ -79,7 +79,7 @@ flowchart TD
 
 > [!TIP]
 > **Deep-Dive Interview Scenario(s):**
-> - For granular late-arriving data strategies, watermarks, and stateful deduplication, see [Data Engineering: 10. System Design Master Guide](../../../Data%20Engineering/10_system_design_for_data_engineering.md#anchor) and [DE FAQ 10: Enterprise System Design Capstone](../../../Data%20Engineering/frequently_asked_questions/10_system_design_for_data_engineering_faq.md#q4-enterprise-system-design-capstone-global-real-time-analytics-lakehouse).
+> - For granular late-arriving data strategies, watermarks, and stateful deduplication, see [Data Engineering: 10. System Design Master Guide](../../../Data%20Engineering/10_system_design_for_data_engineering.md#31-architecture-medallion-flow-with-delta-lake--iceberg) and [DE FAQ 10: Enterprise System Design Capstone](../../../Data%20Engineering/frequently_asked_questions/10_system_design_for_data_engineering_faq.md#q4-enterprise-system-design-capstone-global-real-time-analytics-lakehouse).
 
 ---
 
@@ -190,6 +190,10 @@ flowchart LR
 ---
 
 ## Summary & Data Engineering High-Level Design Reference Matrix
+
+Modern high-scale data engineering architectures balance trade-offs across end-to-end latency, storage economics, data freshness, and analytical query performance. By organizing data ingestion and transformation into standardized Medallion layers (Bronze raw ingestion, Silver cleansed state, and Gold analytical aggregations), data platforms decouple real-time streaming pipelines from heavy batch OLAP engines while preserving ACID transaction guarantees through open table formats like Delta Lake and Apache Iceberg.
+
+The reference matrix below synthesizes core architectural patterns, storage formats, engine technologies, operational SLAs, and critical failure modes across the enterprise high-level data pipelines covered in this guide:
 
 | Architectural Pattern | Primary Engine | Storage Format | Typical Latency SLA | Key Production Failure Mode |
 | :--- | :--- | :--- | :--- | :--- |

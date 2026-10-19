@@ -101,6 +101,8 @@ flowchart TD
    - [9.1 Maximum Transmission Unit (MTU) and the ICMP Black Hole Outage](#91-maximum-transmission-unit-mtu-and-the-icmp-black-hole-outage)
    - [9.2 Production Python Network Health & Latency Auditor](#92-production-python-network-health--latency-auditor)
 10. [Senior SRE Network Troubleshooting Runbooks](#10-senior-sre-network-troubleshooting-runbooks)
+   - [10.1 Runbook 1: Diagnosing Connection Timeouts vs. Connection Refused](#101-runbook-1-diagnosing-connection-timeouts-vs-connection-refused)
+   - [10.2 Runbook 2: Diagnosing Path MTU Black Holes](#102-runbook-2-diagnosing-path-mtu-black-holes)
 11. [Enterprise Cloud Network Architecture & CIDR Planning](#11-enterprise-cloud-network-architecture--cidr-planning)
    - [11.1 The Airline Hub Analogy & Why Hub-and-Spoke Dominates](#111-the-airline-hub-analogy--why-hub-and-spoke-dominates)
    - [11.2 Global Non-Overlapping RFC 1918 Address Allocation Strategies](#112-global-non-overlapping-rfc-1918-address-allocation-strategies)
@@ -137,6 +139,8 @@ flowchart TD
    - [20.3 Scenario 3: Ephemeral SNAT Exhaustion on High-Throughput Egress](#203-scenario-3-ephemeral-snat-exhaustion-on-high-throughput-egress)
    - [20.4 Scenario 4: Subnet IP Exhaustion During Sudden Kubernetes Cluster Scaling](#204-scenario-4-subnet-ip-exhaustion-during-sudden-kubernetes-cluster-scaling)
 21. [Summary Comparison & Production Engineering Reference Matrix](#21-summary-comparison--production-engineering-reference-matrix)
+   - [21.1 Core Networking Fundamentals & Diagnostic Matrix](#211-core-networking-fundamentals--diagnostic-matrix)
+   - [21.2 Cloud Network Architecture & Infrastructure Component Reference](#212-cloud-network-architecture--infrastructure-component-reference)
 22. [References & Further Reading](#22-references--further-reading)
 
 ---
@@ -181,6 +185,12 @@ flowchart LR
     style Payload fill:#1f2937,stroke:#f59e0b,stroke-width:1.5px,color:#fff
     style FCS fill:#1f2937,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
 ```
+
+#### Conceptual & Operational Comparison: OSI vs. TCP/IP
+
+While the ISO/OSI model provides an authoritative 7-layer theoretical taxonomy for protocol classification and architectural analysis, production internet infrastructure and cloud networks run strictly on the pragmatic 4-layer TCP/IP protocol suite (RFC 1122). In production software systems, Layers 5 (Session), 6 (Presentation), and 7 (Application) collapse into application process memory, while Layers 1 and 2 are implemented directly by physical NICs, top-of-rack switches, and hypervisor virtual switches.
+
+The structural and architectural mapping across both models:
 
 #### Comparison: Theoretical OSI vs. Pragmatic TCP/IP
 
@@ -366,6 +376,8 @@ In traditional on-premises networking, **2 IP addresses** are reserved per subne
 > 4. `x.x.x.3`: Reserved by cloud provider for future internal infrastructure routing.
 > 5. `x.x.x.255`: Subnet Broadcast Address.
 
+Because every virtual cloud subnet permanently forfeits 5 control-plane IP addresses regardless of subnet size, selecting CIDR masks requires calculating the actual usable capacity for compute nodes, pods, and private endpoints:
+
 #### Cloud Subnet Capacity Reference Table:
 
 | CIDR Prefix | Total IPs ($2^{32-N}$) | On-Prem Usable ($2^H - 2$) | Cloud Usable (AWS/Azure: $2^H - 5$) | Typical Cloud Use Case |
@@ -482,6 +494,8 @@ sequenceDiagram
 ---
 
 ### 4.2 Comprehensive Record Types (A, AAAA, CNAME, ALIAS, MX, TXT, SOA, SRV)
+
+DNS zone databases store discrete resource records (RRs) that dictate how resolvers route network traffic, authenticate domain ownership, and locate internal services. Each record type serves a specialized architectural purpose across internet edge routing and internal VPC name resolution:
 
 | Record Type | Target Value | Description & Cloud Engineering Role |
 | :--- | :--- | :--- |
@@ -913,17 +927,17 @@ if __name__ == "__main__":
 
 # 10. Senior SRE Network Troubleshooting Runbooks
 
-### Runbook 1: Diagnosing Connection Timeouts vs. Connection Refused
+### 10.1 Runbook 1: Diagnosing Connection Timeouts vs. Connection Refused
 - **`Connection Refused`:** The packet reached the destination host, but **no process is listening on that port**, or a local firewall sent an explicit `TCP RST`.
   - *Action:* Verify process is running (`systemctl status`), verify listening ports (`ss -tulpn | grep <port>`).
 - **`Connection Timed Out`:** Packets are being **silently dropped** by a middlebox, firewall, or security group.
   - *Action:* Check cloud Security Groups, Subnet NACLs, route table default gateway, and test with `nc -zv -w 3 <IP> <PORT>`.
 
-### Runbook 2: Diagnosing Path MTU Black Holes
+### 10.2 Runbook 2: Diagnosing Path MTU Black Holes
 ```bash
 # Test MTU with Don't Fragment (DF) flag set from Linux
 # Syntax: ping -M do -s <packet_size> <target_ip>
-# 1472 bytes payload + 28 bytes IP/ICMP header = 1500 bytes MTU
+# Note: 1472 bytes payload + 28 bytes IP/ICMP header = 1500 bytes MTU
 ping -M do -s 1472 8.8.8.8
 ```
 - If it responds: Standard 1500 byte MTU is healthy.
@@ -1654,6 +1668,12 @@ if __name__ == "__main__":
 
 # 21. Summary Comparison & Production Engineering Reference Matrix
 
+### 21.1 Core Networking Fundamentals & Diagnostic Matrix
+
+Production networking requires rapid triage across protocol boundaries. When latency spikes or connection timeouts occur, engineers isolate the root cause across the 5-tuple connection path—verifying TCP state transitions, socket buffer limits, DNS propagation, and SNAT allocations.
+
+The operational characteristics, failure modes, and first-line resolution commands across core networking protocols:
+
 | Networking Concept | Architectural Role | Core Failure Mode | First-Line Diagnostic Command | Production Resolution |
 | :--- | :--- | :--- | :--- | :--- |
 | **TCP 3-Way Handshake** | Establish connection & sequence sync | SYN Queue exhaustion / Drops | `netstat -s \| grep -i listen` | Enable `tcp_syncookies = 1`, increase `somaxconn`. |
@@ -1665,6 +1685,12 @@ if __name__ == "__main__":
 | **Layer 4 vs L7 LB** | Traffic distribution | L7 CPU saturation, Host unreach | `curl -Iv https://endpoint/healthz` | Offload static traffic to CDN, scale proxy replicas. |
 
 ---
+
+### 21.2 Cloud Network Architecture & Infrastructure Component Reference
+
+Modern enterprise cloud fabrics decouple edge ingress, cross-spoke routing, egress inspection, and private PaaS connectivity into distinct managed services. Designing resilient multi-region environments requires balancing bandwidth ceilings, failover SLAs, and protocol encapsulation overhead.
+
+Architectural comparison of enterprise cloud networking primitives:
 
 | Cloud Network Component | Primary Purpose | OSI Layer | Scalability Ceiling | High Availability Standard |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1679,14 +1705,12 @@ if __name__ == "__main__":
 
 # 22. References & Further Reading
 
-- [RFC 793: Transmission Control Protocol](https://datatracker.ietf.org/doc/html/rfc793) — Standard TCP protocol specifications.
-- [RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3](https://datatracker.ietf.org/doc/html/rfc8446) — Modern TLS 1.3 cryptographic handshake.
-- [RFC 1918: Address Allocation for Private Internets](https://datatracker.ietf.org/doc/html/rfc1918) — Private IPv4 ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).
-- [W. Richard Stevens: TCP/IP Illustrated, Volume 1 (The Protocols)](https://www.pearson.com/) — The definitive computer networking reference.
-- [Cloudflare Learning: How DNS & BGP Anycast Work](https://www.cloudflare.com/learning/) — Industry-standard network systems architecture guide.
-
-- [Microsoft Azure Virtual Network Reference Architecture](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/hub-spoke) — Official enterprise hub-and-spoke guidelines.
-- [AWS Transit Gateway Architecture Guide](https://docs.aws.amazon.com/whitepapers/latest/building-scalable-secure-multi-vpc-network-infrastructure/welcome.html) — Scalable transit fabrics across thousands of VPCs.
-- [RFC 1918: Address Allocation for Private Internets](https://datatracker.ietf.org/doc/html/rfc1918) — Standard private IPv4 address reservations.
-- [RFC 8926: Geneve: Generic Network Virtualization Encapsulation](https://datatracker.ietf.org/doc/html/rfc8926) — Protocol specification for Gateway Load Balancers.
-- [BGP Routing & Path Selection Standards (RFC 4271)](https://datatracker.ietf.org/doc/html/rfc4271) — Border Gateway Protocol mechanics and route selection hierarchy.
+1. **RFC 793: Transmission Control Protocol:** Information Sciences Institute, University of Southern California. [datatracker.ietf.org/doc/html/rfc793](https://datatracker.ietf.org/doc/html/rfc793).
+2. **RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3:** Rescorla, E. (2018). IETF. [datatracker.ietf.org/doc/html/rfc8446](https://datatracker.ietf.org/doc/html/rfc8446).
+3. **RFC 1918: Address Allocation for Private Internets:** Rekhter, Y., et al. (1996). [datatracker.ietf.org/doc/html/rfc1918](https://datatracker.ietf.org/doc/html/rfc1918).
+4. **TCP/IP Illustrated, Volume 1: The Protocols (2nd Edition):** Fall, K. R., & Stevens, W. R. (2011). Addison-Wesley Professional.
+5. **RFC 4271: A Border Gateway Protocol 4 (BGP-4):** Rekhter, Y., & Li, T. (2006). [datatracker.ietf.org/doc/html/rfc4271](https://datatracker.ietf.org/doc/html/rfc4271).
+6. **RFC 8926: Geneve: Generic Network Virtualization Encapsulation:** Gross, J., et al. (2020). [datatracker.ietf.org/doc/html/rfc8926](https://datatracker.ietf.org/doc/html/rfc8926).
+7. **Microsoft Azure Virtual Network Architecture Center:** Hub-and-Spoke and Virtual WAN reference topologies. [learn.microsoft.com/azure/architecture](https://learn.microsoft.com/azure/architecture/).
+8. **AWS Scalable and Secure Multi-VPC Network Infrastructure:** Amazon Web Services (2024). [docs.aws.amazon.com/whitepapers](https://docs.aws.amazon.com/whitepapers/).
+9. **Cloudflare Learning Center: Architecture of DNS, Anycast, and DDoS Defense:** [cloudflare.com/learning](https://www.cloudflare.com/learning/).

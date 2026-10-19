@@ -69,40 +69,41 @@ flowchart TD
 2. [Kubernetes Control Plane Internals & etcd Mechanics](#2-kubernetes-control-plane-internals--etcd-mechanics)
    - [2.1 The 6-Stage API Server Request Processing Pipeline](#21-the-6-stage-api-server-request-processing-pipeline)
    - [2.2 etcd Consensus Architecture: Raft, BoltDB B+ Trees, and Compaction](#22-etcd-consensus-architecture-raft-boltdb-b-trees-and-compaction)
-   - [7.3 Controller Manager Reconciliation Loops, Informers, and Leader Election](#73-controller-manager-reconciliation-loops-informers-and-leader-election)
-3. [Pod Lifecycle, Two-Phase Scheduling & Advanced Placement](#8-pod-lifecycle-two-phase-scheduling--advanced-placement)
-   - [8.1 Pod Phase States, Container Lifecycle Hooks, and Health Probes](#81-pod-phase-states-container-lifecycle-hooks-and-health-probes)
-   - [8.2 Two-Phase Scheduling: Filtering (Predicates) and Scoring (Priorities)](#82-two-phase-scheduling-filtering-predicates-and-scoring-priorities)
-   - [8.3 Taints, Tolerations, Node Affinity, and Topology Spread Constraints](#83-taints-tolerations-node-affinity-and-topology-spread-constraints)
-4. [Resource Management, QoS Classes, and Autoscaling](#9-resource-management-qos-classes-and-autoscaling)
-   - [9.1 Requests vs. Limits: CFS Quotas and The OOM Killer](#91-requests-vs-limits-cfs-quotas-and-the-oom-killer)
-   - [9.2 Quality of Service (QoS) Classes: Guaranteed, Burstable, BestEffort](#92-quality-of-service-qos-classes-guaranteed-burstable-besteffort)
-   - [9.3 Autoscaling Fleets: HPA, VPA, and Event-Driven KEDA](#93-autoscaling-fleets-hpa-vpa-and-event-driven-keda)
-   - [9.4 Cluster Autoscaler vs. Karpenter Just-In-Time Node Provisioning](#94-cluster-autoscaler-vs-karpenter-just-in-time-node-provisioning)
-5. [Kubernetes Networking, CNI Plugins, and Gateway API](#10-kubernetes-networking-cni-plugins-and-gateway-api)
-   - [10.1 The Three Fundamental Pod-to-Pod Networking Laws](#101-the-three-fundamental-pod-to-pod-networking-laws)
-   - [10.2 CNI Architecture Comparison: Flannel vs. Calico vs. Azure CNI vs. Cilium](#102-cni-architecture-comparison-flannel-vs-calico-vs-azure-cni-vs-cilium)
-   - [10.3 Service Datapaths: kube-proxy (iptables / IPVS) vs. eBPF (Cilium)](#103-service-datapaths-kube-proxy-iptables--ipvs-vs-ebpf-cilium)
-   - [10.4 Modern Ingress & The Kubernetes Gateway API](#104-modern-ingress--the-kubernetes-gateway-api)
-6. [Storage Subsystem: CSI, Persistent Volumes, and StatefulSets](#11-storage-subsystem-csi-persistent-volumes-and-statefulsets)
-   - [11.1 Container Storage Interface (CSI) Dynamic Volume Provisioning](#111-container-storage-interface-csi-dynamic-volume-provisioning)
-   - [11.2 StatefulSet Invariants: Deterministic Ordinal Identity and Headless DNS](#112-statefulset-invariants-deterministic-ordinal-identity-and-headless-dns)
-7. [Security, RBAC, and Workload Identity](#12-security-rbac-and-workload-identity)
-   - [12.1 Role-Based Access Control (RBAC): Roles, ClusterRoles, and Bindings](#121-role-based-access-control-rbac-roles-clusterroles-and-bindings)
-   - [12.2 Pod Security Standards (PSS) & Admission Webhook Enforcement](#122-pod-security-standards-pss--admission-webhook-enforcement)
-   - [12.3 Cloud Workload Identity Federation in Kubernetes](#123-cloud-workload-identity-federation-in-kubernetes)
-8. [GitOps Continuous Delivery with Argo CD](#13-gitops-continuous-delivery-with-argo-cd)
-   - [13.1 Continuous Reconciliation, Drift Healing, and State Convergence](#131-continuous-reconciliation-drift-healing-and-state-convergence)
-   - [13.2 Production Argo CD ApplicationSet & Sync Wave Orchestration](#132-production-argo-cd-applicationset--sync-wave-orchestration)
-9. [Senior SRE Kubernetes Troubleshooting Runbooks](#14-senior-sre-kubernetes-troubleshooting-runbooks)
-   - [14.1 CrashLoopBackOff Triage (Exit Codes 1, 137, 143)](#141-crashloopbackoff-triage-exit-codes-1-137-143)
-   - [17.2 Pod Pending Triage (Scheduling Starvation & PVC Mount Deadlocks)](#172-pod-pending-triage-scheduling-starvation--pvc-mount-deadlocks)
-   - [18.3 Pod Stuck in Terminating & Finalizer Deadlock Resolution](#183-pod-stuck-in-terminating--finalizer-deadlock-resolution)
-   - [21.4 ImagePullBackOff & Upstream Registry Rate-Limiting Runbook](#214-imagepullbackoff--upstream-registry-rate-limiting-runbook)
-   - [22.5 NodeNotReady Triage (Kubelet PIDs Exhaustion & Disk Pressure)](#225-nodenotready-triage-kubelet-pids-exhaustion--disk-pressure)
-   - [26.6 Production Python Kubernetes Cluster Diagnostics Script](#266-production-python-kubernetes-cluster-diagnostics-script)
-10. [Summary Comparison & Production Engineering Reference Matrix](#27-summary-comparison--production-engineering-reference-matrix)
-11. [References & Further Reading](#28-references--further-reading)
+   - [2.3 Controller Manager Reconciliation Loops, Informers, and Leader Election](#23-controller-manager-reconciliation-loops-informers-and-leader-election)
+3. [Pod Lifecycle, Two-Phase Scheduling & Advanced Placement](#3-pod-lifecycle-two-phase-scheduling--advanced-placement)
+   - [3.1 Pod Phase States, Container Lifecycle Hooks, and Health Probes](#31-pod-phase-states-container-lifecycle-hooks-and-health-probes)
+   - [3.2 Two-Phase Scheduling: Filtering (Predicates) and Scoring (Priorities)](#32-two-phase-scheduling-filtering-predicates-and-scoring-priorities)
+   - [3.3 Taints, Tolerations, Node Affinity, and Topology Spread Constraints](#33-taints-tolerations-node-affinity-and-topology-spread-constraints)
+4. [Resource Management, QoS Classes, and Autoscaling](#4-resource-management-qos-classes-and-autoscaling)
+   - [4.1 Requests vs. Limits: CFS Quotas and The OOM Killer](#41-requests-vs-limits-cfs-quotas-and-the-oom-killer)
+   - [4.2 Quality of Service (QoS) Classes: Guaranteed, Burstable, BestEffort](#42-quality-of-service-qos-classes-guaranteed-burstable-besteffort)
+   - [4.3 Autoscaling Fleets: HPA, VPA, and Event-Driven KEDA](#43-autoscaling-fleets-hpa-vpa-and-event-driven-keda)
+   - [4.4 Cluster Autoscaler vs. Karpenter Just-In-Time Node Provisioning](#44-cluster-autoscaler-vs-karpenter-just-in-time-node-provisioning)
+5. [Kubernetes Networking, CNI Plugins, and Gateway API](#5-kubernetes-networking-cni-plugins-and-gateway-api)
+   - [5.1 The Three Fundamental Pod-to-Pod Networking Laws](#51-the-three-fundamental-pod-to-pod-networking-laws)
+   - [5.2 CNI Architecture Comparison: Flannel vs. Calico vs. Azure CNI vs. Cilium](#52-cni-architecture-comparison-flannel-vs-calico-vs-azure-cni-vs-cilium)
+   - [5.3 Service Datapaths: kube-proxy (iptables / IPVS) vs. eBPF (Cilium)](#53-service-datapaths-kube-proxy-iptables--ipvs-vs-ebpf-cilium)
+   - [5.4 Modern Ingress & The Kubernetes Gateway API](#54-modern-ingress--the-kubernetes-gateway-api)
+6. [Storage Subsystem: CSI, Persistent Volumes, and StatefulSets](#6-storage-subsystem-csi-persistent-volumes-and-statefulsets)
+   - [6.1 Container Storage Interface (CSI) Dynamic Volume Provisioning](#61-container-storage-interface-csi-dynamic-volume-provisioning)
+   - [6.2 StatefulSet Invariants: Deterministic Ordinal Identity and Headless DNS](#62-statefulset-invariants-deterministic-ordinal-identity-and-headless-dns)
+7. [Security, RBAC, and Workload Identity](#7-security-rbac-and-workload-identity)
+   - [7.1 Role-Based Access Control (RBAC): Roles, ClusterRoles, and Bindings](#71-role-based-access-control-rbac-roles-clusterroles-and-bindings)
+   - [7.2 Pod Security Standards (PSS) & Admission Webhook Enforcement](#72-pod-security-standards-pss--admission-webhook-enforcement)
+   - [7.3 Cloud Workload Identity Federation in Kubernetes](#73-cloud-workload-identity-federation-in-kubernetes)
+8. [GitOps Continuous Delivery with Argo CD](#8-gitops-continuous-delivery-with-argo-cd)
+   - [8.1 Continuous Reconciliation, Drift Healing, and State Convergence](#81-continuous-reconciliation-drift-healing-and-state-convergence)
+   - [8.2 Production Argo CD ApplicationSet & Sync Wave Orchestration](#82-production-argo-cd-applicationset--sync-wave-orchestration)
+9. [Senior SRE Kubernetes Troubleshooting Runbooks](#9-senior-sre-kubernetes-troubleshooting-runbooks)
+   - [9.1 CrashLoopBackOff Triage (Exit Codes 1, 137, 143)](#91-crashloopbackoff-triage-exit-codes-1-137-143)
+   - [9.2 Pod Pending Triage (Scheduling Starvation & PVC Mount Deadlocks)](#92-pod-pending-triage-scheduling-starvation--pvc-mount-deadlocks)
+   - [9.3 Pod Stuck in Terminating & Finalizer Deadlock Resolution](#93-pod-stuck-in-terminating--finalizer-deadlock-resolution)
+   - [9.4 ImagePullBackOff & Upstream Registry Rate-Limiting Runbook](#94-imagepullbackoff--upstream-registry-rate-limiting-runbook)
+   - [9.5 NodeNotReady Triage (Kubelet PIDs Exhaustion & Disk Pressure)](#95-nodenotready-triage-kubelet-pids-exhaustion--disk-pressure)
+   - [9.6 Production Python Kubernetes Cluster Diagnostics Script](#96-production-python-kubernetes-cluster-diagnostics-script)
+10. [Summary Comparison & Production Engineering Reference Matrix](#10-summary-comparison--production-engineering-reference-matrix)
+    - [10.1 Kubernetes Subsystem Architecture & Failure Mode Reference Matrix](#101-kubernetes-subsystem-architecture--failure-mode-reference-matrix)
+11. [References & Further Reading](#11-references--further-reading)
 ---
 
 # 1. The Kubernetes Paradigm & The Port Authority Analogy
@@ -284,7 +285,7 @@ Over time, historical MVCC revisions cause the etcd database file (`member/snap/
 
 ```bash
 
-# 3. Check etcd database endpoint status and DB size
+# Check etcd database endpoint status and DB size
 
 ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
@@ -292,7 +293,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --key=/etc/kubernetes/pki/etcd/server.key \
   endpoint status --write-out=table
 
-# 4. Get current global revision number
+# Get current global revision number
 
 CURRENT_REV=$(ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
@@ -300,7 +301,7 @@ CURRENT_REV=$(ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --key=/etc/kubernetes/pki/etcd/server.key \
   endpoint status --write-out=json | grep -o '"revision":[0-9]*' | head -1 | cut -d: -f2)
 
-# 5. Compact all revisions older than current revision
+# Compact all revisions older than current revision
 
 ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
@@ -308,7 +309,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --key=/etc/kubernetes/pki/etcd/server.key \
   compact $CURRENT_REV
 
-# 6. Defragment physical disk storage to reclaim free space
+# Defragment physical disk storage to reclaim free space
 
 ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
@@ -316,7 +317,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --key=/etc/kubernetes/pki/etcd/server.key \
   defrag
 
-# 7. Clear any active NOSPACE alarms
+# Clear any active NOSPACE alarms
 
 ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
@@ -331,7 +332,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
 
 ---
 
-### 7.3 Controller Manager Reconciliation Loops, Informers, and Leader Election
+### 2.3 Controller Manager Reconciliation Loops, Informers, and Leader Election
 
 The `kube-controller-manager` is a daemon process executing multiple autonomous reconciliation loops (DeploymentController, ReplicaSetController, NodeLifecycleController, EndpointSliceController).
 
@@ -381,9 +382,9 @@ Multiple replicas of `kube-controller-manager` or `kube-scheduler` run concurren
 
 ---
 
-# 8. Pod Lifecycle, Two-Phase Scheduling & Advanced Placement
+# 3. Pod Lifecycle, Two-Phase Scheduling & Advanced Placement
 
-### 8.1 Pod Phase States, Container Lifecycle Hooks, and Health Probes
+### 3.1 Pod Phase States, Container Lifecycle Hooks, and Health Probes
 
 A Pod is the smallest deployable compute unit in Kubernetes. It encapsulates one or more tightly coupled containers sharing network namespaces (`IP`, ports) and storage volumes.
 
@@ -454,7 +455,7 @@ flowchart TD
 
 ---
 
-### 8.2 Two-Phase Scheduling: Filtering (Predicates) and Scoring (Priorities)
+### 3.2 Two-Phase Scheduling: Filtering (Predicates) and Scoring (Priorities)
 
 The `kube-scheduler` monitors unscheduled pods (`spec.nodeName == ""`) and selects the optimal node across two distinct pipeline phases:
 
@@ -495,7 +496,7 @@ The node with the highest cumulative score is selected. The scheduler commits a 
 
 ---
 
-### 8.3 Taints, Tolerations, Node Affinity, and Topology Spread Constraints
+### 3.3 Taints, Tolerations, Node Affinity, and Topology Spread Constraints
 
 #### Taints & Tolerations:
 Taints allow a node to **repel** a set of pods. Pods will only schedule onto a tainted node if they possess an explicit matching toleration.
@@ -551,9 +552,9 @@ spec:
 
 ---
 
-# 9. Resource Management, QoS Classes, and Autoscaling
+# 4. Resource Management, QoS Classes, and Autoscaling
 
-### 9.1 Requests vs. Limits: CFS Quotas and The OOM Killer
+### 4.1 Requests vs. Limits: CFS Quotas and The OOM Killer
 
 Every container definition should declare resource **requests** and **limits** for both CPU and Memory:
 
@@ -579,7 +580,7 @@ resources:
 
 ---
 
-### 9.2 Quality of Service (QoS) Classes: Guaranteed, Burstable, BestEffort
+### 4.2 Quality of Service (QoS) Classes: Guaranteed, Burstable, BestEffort
 
 Kubernetes automatically calculates the QoS class for a Pod based on its requests and limits configuration. The QoS class determines the pod's `oom_score_adj` in the Linux kernel:
 
@@ -591,7 +592,7 @@ Kubernetes automatically calculates the QoS class for a Pod based on its request
 
 ---
 
-### 9.3 Autoscaling Fleets: HPA, VPA, and Event-Driven KEDA
+### 4.3 Autoscaling Fleets: HPA, VPA, and Event-Driven KEDA
 
 #### Horizontal Pod Autoscaler (HPA):
 The HPA controller queries the Kubernetes Metrics Server every 15 seconds, calculating target replicas using the mathematical formula:
@@ -652,7 +653,11 @@ spec:
 
 ---
 
-### 9.4 Cluster Autoscaler vs. Karpenter Just-In-Time Node Provisioning
+### 4.4 Cluster Autoscaler vs. Karpenter Just-In-Time Node Provisioning
+
+Scaling Kubernetes worker nodes to meet dynamic application demand has evolved from coarse node-group expansion to flexible, just-in-time machine provisioning. Legacy Cluster Autoscaler operates by resizing pre-defined cloud Auto Scaling Groups (AWS ASGs or Azure VMSS), which introduces significant spin-up latency and instance rigidities. In contrast, modern open-source Karpenter and AKS Fleet Autoscalers directly evaluate unschedulable pod resource requirements against cloud pricing APIs, provisioning right-sized instances on the fly.
+
+The architectural, operational, and cost trade-offs between node-group and just-in-time autoscaling:
 
 | Feature | Legacy Cluster Autoscaler | Modern Karpenter / AKS Fleet Autoscaler |
 | :--- | :--- | :--- |
@@ -663,9 +668,9 @@ spec:
 
 ---
 
-# 10. Kubernetes Networking, CNI Plugins, and Gateway API
+# 5. Kubernetes Networking, CNI Plugins, and Gateway API
 
-### 10.1 The Three Fundamental Pod-to-Pod Networking Laws
+### 5.1 The Three Fundamental Pod-to-Pod Networking Laws
 
 Kubernetes imposes a strict IP-per-Pod networking model governed by three non-negotiable architectural axioms:
 1. **Every Pod receives its own unique IP address** within the cluster, shared by all containers in that Pod.
@@ -674,7 +679,7 @@ Kubernetes imposes a strict IP-per-Pod networking model governed by three non-ne
 
 ---
 
-### 10.2 CNI Architecture Comparison: Flannel vs. Calico vs. Azure CNI vs. Cilium
+### 5.2 CNI Architecture Comparison: Flannel vs. Calico vs. Azure CNI vs. Cilium
 
 The Container Network Interface (CNI) plugin is responsible for attaching network interfaces (`veth` pairs) to Pod network namespaces and establishing inter-node routing:
 
@@ -687,7 +692,7 @@ The Container Network Interface (CNI) plugin is responsible for attaching networ
 
 ---
 
-### 10.3 Service Datapaths: kube-proxy (iptables / IPVS) vs. eBPF (Cilium)
+### 5.3 Service Datapaths: kube-proxy (iptables / IPVS) vs. eBPF (Cilium)
 
 Kubernetes `Services` provide stable virtual IP addresses (`ClusterIP`) that load balance across dynamic ephemeral Pod IPs. The data path is implemented via three architectures:
 
@@ -713,7 +718,7 @@ flowchart TD
 
 ---
 
-### 10.4 Modern Ingress & The Kubernetes Gateway API
+### 5.4 Modern Ingress & The Kubernetes Gateway API
 
 The legacy `Ingress` API suffered from severe architectural limitations: it forced vendors to use unstandardized, proprietary annotations (e.g. `nginx.ingress.kubernetes.io/canary-weight`) and combined infrastructure management with application routing.
 
@@ -747,9 +752,9 @@ spec:
 
 ---
 
-# 11. Storage Subsystem: CSI, Persistent Volumes, and StatefulSets
+# 6. Storage Subsystem: CSI, Persistent Volumes, and StatefulSets
 
-### 11.1 Container Storage Interface (CSI) Dynamic Volume Provisioning
+### 6.1 Container Storage Interface (CSI) Dynamic Volume Provisioning
 
 The Container Storage Interface (CSI) standardizes how Kubernetes interfaces with cloud block, file, and object storage:
 
@@ -777,7 +782,7 @@ flowchart TD
 
 ---
 
-### 11.2 StatefulSet Invariants: Deterministic Ordinal Identity and Headless DNS
+### 6.2 StatefulSet Invariants: Deterministic Ordinal Identity and Headless DNS
 
 Unlike Deployments where pods are fungible and randomly named (`web-7f89d-abc`), **StatefulSets** are engineered for stateful distributed databases (Kafka, Cassandra, PostgreSQL):
 
@@ -790,9 +795,9 @@ Unlike Deployments where pods are fungible and randomly named (`web-7f89d-abc`),
 
 ---
 
-# 12. Security, RBAC, and Workload Identity
+# 7. Security, RBAC, and Workload Identity
 
-### 12.1 Role-Based Access Control (RBAC): Roles, ClusterRoles, and Bindings
+### 7.1 Role-Based Access Control (RBAC): Roles, ClusterRoles, and Bindings
 
 Kubernetes RBAC enforces the principle of least privilege:
 
@@ -830,7 +835,7 @@ roleRef:
 
 ---
 
-### 12.2 Pod Security Standards (PSS) & Admission Webhook Enforcement
+### 7.2 Pod Security Standards (PSS) & Admission Webhook Enforcement
 
 Kubernetes native Pod Security Admission classifies workloads into 3 PSS profiles:
 1. **`Privileged`:** Completely unrestricted; allows full root host access, host networking, and raw devices.
@@ -854,7 +859,7 @@ metadata:
 
 ---
 
-### 12.3 Cloud Workload Identity Federation in Kubernetes
+### 7.3 Cloud Workload Identity Federation in Kubernetes
 
 Storing long-lived cloud API access keys inside Kubernetes Secrets is a severe security vulnerability. Modern cloud platforms utilize **Workload Identity Federation**:
 1. Kubernetes provides a cryptographically signed OIDC Service Account token.
@@ -864,9 +869,9 @@ Storing long-lived cloud API access keys inside Kubernetes Secrets is a severe s
 
 ---
 
-# 13. GitOps Continuous Delivery with Argo CD
+# 8. GitOps Continuous Delivery with Argo CD
 
-### 13.1 Continuous Reconciliation, Drift Healing, and State Convergence
+### 8.1 Continuous Reconciliation, Drift Healing, and State Convergence
 
 In a GitOps delivery model, **Git is the single declarative source of truth** for infrastructure and application state:
 - Developers commit changes (e.g. updating image tag `v2.4.0` $\to$ `v2.4.1`) to a Git repository via pull requests.
@@ -877,7 +882,7 @@ In a GitOps delivery model, **Git is the single declarative source of truth** fo
 
 ---
 
-### 13.2 Production Argo CD ApplicationSet & Sync Wave Orchestration
+### 8.2 Production Argo CD ApplicationSet & Sync Wave Orchestration
 
 #### Enterprise GitOps Fleet Repository Folder Treeview
 
@@ -970,9 +975,9 @@ spec:
 
 ---
 
-# 14. Senior SRE Kubernetes Troubleshooting Runbooks
+# 9. Senior SRE Kubernetes Troubleshooting Runbooks
 
-### 14.1 CrashLoopBackOff Triage (Exit Codes 1, 137, 143)
+### 9.1 CrashLoopBackOff Triage (Exit Codes 1, 137, 143)
 
 ```mermaid
 flowchart TD
@@ -991,28 +996,28 @@ flowchart TD
 #### Diagnostic Commands:
 ```bash
 
-# 15. Inspect exact termination reason and exit code
+# Inspect exact termination reason and exit code
 
 kubectl get pod <pod_name> -n <namespace> -o jsonpath='{.status.containerStatuses[*].lastState.terminated}'
 
-# 16. View previous container instance logs before it crashed
+# View previous container instance logs before it crashed
 
 kubectl logs <pod_name> -n <namespace> --previous --tail=100
 
-# 17. Check node kernel dmesg for OOM-killer invocations
+# Check node kernel dmesg for OOM-killer invocations
 
 kubectl get node <node_name> -o jsonpath='{.status.conditions[?(@.type=="MemoryPressure")].status}'
 ```
 
 ---
 
-### 17.2 Pod Pending Triage (Scheduling Starvation & PVC Mount Deadlocks)
+### 9.2 Pod Pending Triage (Scheduling Starvation & PVC Mount Deadlocks)
 
 A Pod in `Pending` state has not been scheduled or cannot attach required storage:
 
 ```bash
 
-# 18. Inspect scheduler failure events
+# Inspect scheduler failure events
 
 kubectl describe pod <pod_name> -n <namespace> | grep -A 10 Events:
 
@@ -1026,7 +1031,7 @@ kubectl describe pod <pod_name> -n <namespace> | grep -A 10 Events:
 
 ---
 
-### 18.3 Pod Stuck in Terminating & Finalizer Deadlock Resolution
+### 9.3 Pod Stuck in Terminating & Finalizer Deadlock Resolution
 
 When a Pod or Namespace remains stuck in `Terminating` for hours:
 
@@ -1036,16 +1041,16 @@ A **Finalizer** (`metadata.finalizers`) is blocking deletion. A controller is wa
 #### Remediation Protocol:
 ```bash
 
-# 19. Inspect active finalizers
+# Inspect active finalizers
 
 kubectl get pod <pod_name> -n <namespace> -o jsonpath='{.metadata.finalizers}'
 
-# 20. If storage detachment is deadlocked and node is gone, patch finalizer to empty:
+# If storage detachment is deadlocked and node is gone, patch finalizer to empty:
 
 kubectl patch pod <pod_name> -n <namespace> \
   -p '{"metadata":{"finalizers":null}}' --type=merge
 
-# 21. For namespaces stuck terminating due to orphan CRDs:
+# For namespaces stuck terminating due to orphan CRDs:
 
 kubectl get namespace <ns_name> -o json \
   | tr -d "\n" | sed "s/\"finalizers\": \[[^]]\+\]/\"finalizers\": []/" \
@@ -1054,12 +1059,12 @@ kubectl get namespace <ns_name> -o json \
 
 ---
 
-### 21.4 ImagePullBackOff & Upstream Registry Rate-Limiting Runbook
+### 9.4 ImagePullBackOff & Upstream Registry Rate-Limiting Runbook
 
 #### Diagnostic Workflow:
 ```bash
 
-# 22. Describe pod to check image pull error string
+# Describe pod to check image pull error string
 
 kubectl describe pod <pod_name> -n <namespace> | grep -E "(Failed|BackOff|Warning)"
 
@@ -1073,27 +1078,27 @@ kubectl describe pod <pod_name> -n <namespace> | grep -E "(Failed|BackOff|Warnin
 
 ---
 
-### 22.5 NodeNotReady Triage (Kubelet PIDs Exhaustion & Disk Pressure)
+### 9.5 NodeNotReady Triage (Kubelet PIDs Exhaustion & Disk Pressure)
 
 If a node transitions to `NotReady`:
 
 ```bash
 
-# 23. Inspect node condition details
+# Inspect node condition details
 
 kubectl describe node <node_name> | grep -A 5 Conditions:
 
-# 24. SSH into host node and inspect kubelet journal logs
+# SSH into host node and inspect kubelet journal logs
 
 journalctl -u kubelet -n 200 --no-pager
 
-# 25. Check if node hit PID exhaustion (fork bomb or zombie processes):
+# Check if node hit PID exhaustion (fork bomb or zombie processes):
 
 # Verify current process count vs kernel maximum:
 cat /sys/fs/cgroup/pids/pids.current
 sysctl kernel.pid_max
 
-# 26. Check disk inodes and usage:
+# Check disk inodes and usage:
 
 df -h
 df -i
@@ -1104,7 +1109,7 @@ crictl rmi --prune
 
 ---
 
-### 26.6 Production Python Kubernetes Cluster Diagnostics Script
+### 9.6 Production Python Kubernetes Cluster Diagnostics Script
 
 The production Python engine below audits all pods across all namespaces, detects OOM-killed workloads, calculates crash frequencies, identifies pending scheduling bottlenecks, and outputs structured JSON triage reports:
 
@@ -1251,7 +1256,13 @@ if __name__ == "__main__":
 
 ---
 
-# 27. Summary Comparison & Production Engineering Reference Matrix
+# 10. Summary Comparison & Production Engineering Reference Matrix
+
+### 10.1 Kubernetes Subsystem Architecture & Failure Mode Reference Matrix
+
+Operating enterprise Kubernetes clusters requires balancing distributed consensus storage, kernel-level networking datapaths, event-driven compute scaling, and declarative GitOps reconciliation. When control plane or worker node anomalies occur, senior SREs rapidly isolate whether the failure stems from storage I/O bottlenecks in etcd, iptables chain saturation in kube-proxy, cold start scheduling deadlocks, or mutating admission webhook timeouts.
+
+The architectural dependencies, performance bottlenecks, and diagnostic commands across core Kubernetes subsystems:
 
 | Kubernetes Subsystem | Primary Technology | Performance Bottleneck | Primary Failure Mode | Diagnostic Tooling |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1264,11 +1275,11 @@ if __name__ == "__main__":
 
 ---
 
-# 28. References & Further Reading
+# 11. References & Further Reading
 
-- [Kubernetes Documentation: Architecture & Internals](https://kubernetes.io/docs/concepts/architecture/) — Official architecture and controller reference.
-- [etcd Documentation & Operating Guide](https://etcd.io/docs/) — Distributed key-value storage and Raft consensus.
-- [Argo CD Official Guide & Best Practices](https://argo-cd.readthedocs.io/en/stable/) — GitOps workflow and progressive delivery.
-- [KEDA Documentation](https://keda.sh/) — Kubernetes event-driven autoscaling.
-- [Cilium eBPF Architecture Guide](https://docs.cilium.io/en/stable/overview/intro/) — Next-generation cloud native networking and security.
-- [Brendan Burns: Designing Distributed Systems](https://www.oreilly.com/) — Foundational patterns for containerized applications.
+1. **Kubernetes Documentation: Concepts & Architecture:** Official controller reference and cluster state reconciliation. [kubernetes.io/docs](https://kubernetes.io/docs/concepts/architecture/).
+2. **etcd Documentation & Operating Guide:** Distributed consensus, Raft log compaction, and BoltDB storage engine. [etcd.io/docs](https://etcd.io/docs/).
+3. **Argo CD Official Guide & Best Practices:** Declarative continuous delivery, drift healing, and sync wave orchestration. [argo-cd.readthedocs.io](https://argo-cd.readthedocs.io/en/stable/).
+4. **KEDA: Kubernetes Event-driven Autoscaling:** Architecture, custom metrics triggers, and scale-to-zero mechanics. [keda.sh](https://keda.sh/).
+5. **Cilium eBPF Architecture Guide:** eBPF-based container networking, observability, and service mesh. [docs.cilium.io](https://docs.cilium.io/en/stable/overview/intro/).
+6. **Designing Distributed Systems:** Burns, B. (2018). O'Reilly Media. Foundational containerized design patterns.

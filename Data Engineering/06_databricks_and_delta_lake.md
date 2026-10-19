@@ -267,8 +267,16 @@ Databricks Repos integrates the workspace directly with external Git providers (
 
 ### 1.5 DBFS (Databricks File System) & Mounts
 
-#### Definition
-DBFS is a distributed file system abstraction mounted over the Databricks workspace root storage. While historical architectures used `dbfs:/mnt/` to mount external storage accounts using shared keys, **modern Databricks best practices deprecate DBFS mounts in favor of Unity Catalog Volumes**.
+#### Storage Abstraction Evolution in Databricks
+In distributed lakehouse environments, applications require a standardized file system interface to read and write raw files (JSON, CSV, Parquet, images, audio) across cloud object stores (AWS S3, Azure Data Lake Gen2, Google Cloud Storage). Historically, Databricks utilized the **Databricks File System (DBFS)**, but modern enterprise deployments have migrated to **Unity Catalog Volumes**.
+
+1. **Legacy DBFS Mounts (`dbfs:/mnt/`):**
+   - **Operational Model:** DBFS creates a virtual file system layer overlaid on the workspace cloud root bucket. Administrators historically created mounts via `dbutils.fs.mount()` using service principals, access keys, or SAS tokens.
+   - **Severe Security Vulnerability:** DBFS mounts suffer from credential passthrough and privilege escalation hazards. Once an external bucket is mounted at `dbfs:/mnt/finance_bucket`, **any user or notebook running on standard compute in that workspace inherits full read/write access** to the underlying cloud bucket. File-level or folder-level access controls cannot be enforced natively.
+
+2. **Unity Catalog Volumes (`/Volumes/`):**
+   - **Operational Model:** Volumes provide governed, path-based access to non-tabular data files (machine learning models, raw unstructured files, checkpoint directories) governed directly under Unity Catalog's 3-level namespace: `/Volumes/<catalog>/<schema>/<volume_name>/`.
+   - **Unified Access Control:** Volumes enforce standard ANSI SQL grant mechanics (`GRANT READ VOLUME ON VOLUME catalog.schema.vol TO role_analyst`). Access is auditable, identities are authenticated per user session, and cloud storage credentials remain completely abstracted within Unity Catalog **Storage Credentials** and **External Locations**.
 
 #### DBFS Mounts vs. Unity Catalog Volumes
 | Characteristic | Legacy DBFS Mounts (`dbfs:/mnt/`) | Unity Catalog Volumes (`/Volumes/`) |
@@ -1114,6 +1122,20 @@ df_orders = spark.read \
 
 ### 10.1 SQL Warehouses (Classic, Pro, Serverless)
 
+#### SQL Warehouse Compute Architecture
+Databricks SQL Warehouses provide specialized compute resources purpose-built for SQL analytics, BI dashboards, and ad-hoc data exploration. Unlike general-purpose all-purpose clusters that run arbitrary Python, R, or Scala notebooks, SQL Warehouses run optimized ANSI SQL engines decoupled from user-managed infrastructure.
+
+Databricks categorizes SQL Warehouses into three distinct execution tiers:
+1. **Classic SQL Warehouse:**
+   - **Infrastructure Model:** Virtual machines are provisioned inside the customer's cloud virtual private network (customer data plane).
+   - **Characteristics:** Requires standard cloud VM boot and configuration cycles ($3 - 5$ minutes spin-up time). Uses standard Databricks Runtime (DBR) without Photon acceleration by default, lacking advanced caching optimizations.
+2. **Pro SQL Warehouse:**
+   - **Infrastructure Model:** Deployed within the customer data plane, but introduces deep performance optimizations.
+   - **Photon & Predictive I/O:** Powered by the **Photon engine** (a ground-up C++ vectorized query execution engine rewritten to exploit modern CPU SIMD registers) and **Predictive I/O Caching** (which learns query access patterns to prefetch and cache hot columnar data in NVMe SSD storage).
+3. **Serverless SQL Warehouse:**
+   - **Infrastructure Model:** Compute runs in a secure, multi-tenant fleet managed directly by Databricks in the Databricks cloud account.
+   - **Instant Spin-Up & Scale-to-Zero:** Rather than waiting for cloud VMs to provision, Serverless connects queries to warm running container pools within $10 - 15$ seconds. When queries cease, the warehouse scales down to zero instantly, eliminating costly idle VM overheads.
+
 #### Types of SQL Warehouses
 | Feature | Classic | Pro | Serverless |
 | :--- | :--- | :--- | :--- |
@@ -1751,6 +1773,19 @@ flowchart LR
 ---
 
 ### 14.5 Managed vs External Delta Tables
+
+#### Delta Lake Table Types & Lifecycle Management
+When registering a Delta table in Unity Catalog or Hive Metastore, engineers choose between two fundamental table types: **Managed Tables** and **External (Unmanaged) Tables**. This distinction governs file storage locations, credential access patterns, and data retention behavior during DDL operations.
+
+1. **Managed Delta Tables:**
+   - **Storage Placement:** Managed tables reside within the root storage location configured for the schema or catalog (e.g., `s3://tenant-root/unity-catalog/tables/<table-id>/`). The exact directory path is managed entirely by Unity Catalog; users do not specify a storage URI.
+   - **Lifecycle Binding:** Unity Catalog tightly binds the logical table metadata to the physical Parquet data files. Dropping a managed table (`DROP TABLE catalog.schema.orders`) drops the metadata definition **and permanently deletes the underlying Parquet files and `_delta_log` directories from cloud storage**.
+   - **Recommended Scope:** Default choice for internal enterprise pipelines (Bronze, Silver, Gold layers) where data governance and lifecycle should be fully automated.
+
+2. **External Delta Tables:**
+   - **Storage Placement:** Created by explicitly supplying a physical storage path via the `LOCATION` keyword: `CREATE TABLE catalog.schema.events LOCATION 's3://external-bucket/path/events/'`.
+   - **Decoupled Lifecycle:** Dropping an external table (`DROP TABLE catalog.schema.events`) removes the metadata entry from Unity Catalog, but **leaves the underlying Parquet files, transaction logs, and checkpoint data completely untouched on cloud storage**.
+   - **Recommended Scope:** Ideal when data is shared with external non-Databricks systems, when migrating existing data lakes in-place, or when storage buckets are owned by separate infrastructure teams.
 
 | Characteristic | Managed Delta Table | External Delta Table |
 | :--- | :--- | :--- |

@@ -58,6 +58,8 @@ flowchart TD
 
 ## Curriculum Coverage & Module Index
 
+The curriculum index below outlines the 8 core modules of the Data Structures & Algorithms track, detailing the structural mechanics, algorithmic patterns, and canonical interview problems covered in each guide:
+
 | Module Order | Guide File | Core Patterns & Concepts Covered | Canonical Problems Included |
 | :---: | :--- | :--- | :--- |
 | **01** | [`01_linear_structures_and_pointer_patterns.md`](01_linear_structures_and_pointer_patterns.md) | Arrays, CPU Cache Lines, Convergent Two Pointers, Fast & Slow Pointers, Sliding Window, Monotonic Deque, Cyclic Sort, Prefix Sums | Two Sum II, 3-Sum, Trapping Rain Water, Find Duplicate, Longest Substring with K Distinct, First Missing Positive |
@@ -73,6 +75,8 @@ flowchart TD
 
 ## Pattern-to-Problem Master Cross-Reference Matrix
 
+The matrix below cross-references canonical algorithmic patterns and hardware memory techniques to their specific implementations across the DSA modules:
+
 | Problem / Production Scenario | Primary Algorithmic Pattern | Module Reference |
 | :--- | :--- | :--- |
 | **$O(1)$ Memory Cache Eviction** | Doubly-Linked List + HashMap Pointer Index | [`02_linked_lists_stacks_and_monotonic_structures.md`](02_linked_lists_stacks_and_monotonic_structures.md#51-least-recently-used-lru-cache-implementation) |
@@ -80,12 +84,12 @@ flowchart TD
 | **Loose Median in $O(1)$ Space** | Stochastic Reservoir Approximator | [`05_heaps_intervals_and_greedy_algorithms.md`](05_heaps_intervals_and_greedy_algorithms.md#22-loose-median-in-constant-o1-time--space) |
 | **Exponential Graph Search Space** | Bidirectional BFS Expanding Alternating Frontiers | [`06_graphs_topological_sort_and_shortest_paths.md`](06_graphs_topological_sort_and_shortest_paths.md#22-bidirectional-bfs-word-ladder-leetcode-127) |
 | **Cycle Detection in Directed Graphs** | 3-Color DFS (White, Gray, Black) | [`06_graphs_topological_sort_and_shortest_paths.md`](06_graphs_topological_sort_and_shortest_paths.md#31-3-color-dfs-cycle-detection-directed-graphs) |
-| **Dynamic Lexicographical Ordering** | Topological Sort (Kahn's BFS In-Degree) | [`06_graphs_topological_sort_and_shortest_paths.md`](06_graphs_topological_sort_and_shortest_paths.md#42-alien-dictionary-lexicographical-character-ordering) |
-| **Bounded Capacity Resource Sizing** | Binary Search on Answer / Monotonic Feasibility | [`04_binary_search_and_divide_and_conquer.md`](04_binary_search_and_divide_and_conquer.md#22-capacity-to-ship-packages-within-d-days) |
-| **Unbounded Window Boundary Extrema** | Monotonic Deque Sliding Window | [`01_linear_structures_and_pointer_patterns.md`](01_linear_structures_and_pointer_patterns.md#43-monotonic-deque-window) |
+| **Dynamic Lexicographical Ordering** | Topological Sort (Kahn's BFS In-Degree) | [`06_graphs_topological_sort_and_shortest_paths.md`](06_graphs_topological_sort_and_shortest_paths.md#42-alien-dictionary-leetcode-269) |
+| **Bounded Capacity Resource Sizing** | Binary Search on Answer / Monotonic Feasibility | [`04_binary_search_and_divide_and_conquer.md`](04_binary_search_and_divide_and_conquer.md#22-capacity-to-ship-packages-within-d-days-leetcode-1011) |
+| **Unbounded Window Boundary Extrema** | Monotonic Deque Sliding Window | [`01_linear_structures_and_pointer_patterns.md`](01_linear_structures_and_pointer_patterns.md#43-monotonic-deque-window-longest-subarray-with-max-min-limit) |
 | **Circular Maximum Subarray Sum** | Dual Kadane: $\max(\text{maxKadane}, \text{total} - \text{minKadane})$ | [`07_dynamic_programming_and_state_transitions.md`](07_dynamic_programming_and_state_transitions.md#22-maximum-sum-circular-subarray-leetcode-918) |
 | **Fast Subsequence Search ($O(N \log N)$)**| Patience Sorting with Binary Search | [`07_dynamic_programming_and_state_transitions.md`](07_dynamic_programming_and_state_transitions.md#31-longest-increasing-subsequence-on2-to-on-log-n) |
-| **Prefix Matching & Autocomplete** | Multi-Way Prefix Trie | [`03_trees_binary_search_trees_and_tries.md`](03_trees_binary_search_trees_and_tries.md#41-core-trie-implementation) |
+| **Prefix Matching & Autocomplete** | Multi-Way Prefix Trie | [`03_trees_binary_search_trees_and_tries.md`](03_trees_binary_search_trees_and_tries.md#41-core-trie-implementation-leetcode-208) |
 | **$O(1)$ Single Bit Counter Operations** | Brian Kernighan's Algorithm (`n & (n - 1)`) | [`08_backtracking_and_bit_manipulation.md`](08_backtracking_and_bit_manipulation.md#43-brian-kernighans-algorithm-n--n---1) |
 
 ---

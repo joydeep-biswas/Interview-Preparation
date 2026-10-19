@@ -519,6 +519,23 @@ ENTRYPOINT ["java", \
 
 ### 1.5 Base Image Optimization: Distroless vs Alpine vs Chainguard
 
+#### Container Security Hardening & Runtime Attack Surface Reduction
+Containerizing Spring Boot applications requires balancing image pull speeds, security vulnerabilities (CVEs), and POSIX/C standard library (`libc`) compatibility. A common anti-pattern is using generic developer OS images (Ubuntu, Debian) that bundle package managers (`apt`), compilers, network tools (`curl`, `netcat`), and interactive shells (`/bin/bash`). If an attacker exploits an application vulnerability (such as a Remote Code Execution bug like Log4Shell), bundled system binaries provide an immediate platform for lateral network discovery and malware execution.
+
+Production container architectures standardize on minimal, hardened base images:
+
+1. **Standard Full OS Images (Ubuntu, Debian):**
+   - **Characteristics:** High storage footprint ($200 - 400\text{ MB}$), containing hundreds of unneeded OS packages and utilities.
+   - **Risk Profile:** High Common Vulnerabilities and Exposures (CVE) count, requiring continuous security patching.
+2. **Alpine Linux (`musl libc`):**
+   - **Characteristics:** Microscopic footprint ($5 - 20\text{ MB}$), built around `musl libc` and BusyBox.
+   - **Production Hazard:** Alpine uses `musl libc` rather than standard GNU C library (`glibc`). High-performance Java native extensions (Netty epoll transport, RocksDB JNI, jemalloc) and profiling agents may encounter subtle memory allocator incompatibilities or reduced thread throughput under `musl`.
+3. **Google Distroless (`gcr.io/distroless/java`):**
+   - **Zero-Shell Hardening:** Contains strictly the application and its minimal runtime dependencies (glibc, OpenJDK JRE, and timezone data). It contains **no package manager (`apt`, `apk`), no interactive shell (`sh`, `bash`), and no coreutils**.
+   - **Security Impact:** Eliminates arbitrary shell execution attacks. Even if an attacker gains code execution in the container, they cannot execute scripts or download external binaries.
+4. **Chainguard Hardened Images:**
+   - **Zero-CVE Guarantee:** Enterprise-focused minimalist container images built with `glibc`, updated daily to ensure a verified zero-known-CVE security posture.
+
 | Image Base | Typical Size | Package Manager | Shell Included | Vulnerability (CVE) Surface | Production Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Ubuntu / Debian** | 150 MB – 300 MB | `apt` | `/bin/bash` | High (hundreds of packages) | Development / Debugging only |
@@ -819,6 +836,25 @@ flowchart TD
 ---
 
 ### 6.3 Workload Primitives: Pod vs Deployment vs StatefulSet vs DaemonSet vs Job
+
+#### Kubernetes Controller Architecture & Pod Lifecycle Declarations
+In Kubernetes, applications are orchestrated through declarative state machines. The user declares the desired target state in YAML manifests, and dedicated controller reconciliation loops inside the `kube-controller-manager` continuously observe cluster state and drive reality toward the desired target:
+
+1. **Pod (Atomic Scheduling Unit):**
+   - **Characteristics:** The smallest deployable computing unit. Encapsulates one or more tightly-coupled containers sharing the same Linux network namespace (same IP address and localhost loopback) and storage volumes.
+   - **Production Rule:** Never deploy standalone bare Pods directly in production. Bare Pods lack self-healing capabilities—if the host worker node crashes, the Pod is lost forever.
+2. **Deployment (Stateless Microservices):**
+   - **Controller Mechanics:** Manages an underlying **ReplicaSet** that ensures $N$ identical Pod replicas are always running. Orchestrates zero-downtime rolling updates (`RollingUpdate`) and canary deployments, replacing old Pods with new versions while observing readiness probes.
+   - **Identity:** Pods are ephemeral, interchangeable, and assigned random hash suffixes (e.g., `order-service-7df8-4a1`).
+3. **StatefulSet (Stateful Distributed Datastores):**
+   - **Controller Mechanics:** Manages stateful distributed workloads (Kafka brokers, PostgreSQL, ZooKeeper). Enforces **deterministic, stable network identities** (`kafka-0`, `kafka-1`, `kafka-2`) and ordered sequential startup/shutdown.
+   - **Storage Binding:** Uses `volumeClaimTemplates` to allocate a dedicated, persistent cloud disk (`PersistentVolume`) to each specific ordinal index that persists even across Pod restarts.
+4. **DaemonSet (Node-Local Agents):**
+   - **Controller Mechanics:** Ensures that all (or selected) worker nodes run exactly one copy of a Pod. As new physical nodes join the cluster, the DaemonSet automatically schedules the Pod onto the new node.
+   - **Use Case:** Infrastructure log collectors (FluentBit, Vector), metrics exporters (Prometheus Node Exporter), and network proxies (kube-proxy, Cilium).
+5. **Job & CronJob (Run-to-Completion Batch Processing):**
+   - **Controller Mechanics:** Manages pods that execute until a successful exit code (`0`) and terminate, rather than restarting continuously.
+   - **Use Case:** Database schema migration scripts (Flyway/Liquibase) executed before a Deployment starts, or nightly batch report generation.
 
 | Workload Primitive | State Managed | Scaling & Naming Strategy | Storage Association | Best Production Use Case |
 | :--- | :--- | :--- | :--- | :--- |

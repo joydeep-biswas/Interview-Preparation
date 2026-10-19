@@ -1006,6 +1006,10 @@ public class SpotifyPlayerLLD {
 
 ## Summary & Low-Level Design Reference Matrix
 
+Low-level systems design bridges architectural abstractions with concrete runtime implementations. Building robust, production-grade concurrent systems requires orchestrating clean object-oriented structural patterns (e.g., State, Strategy, Composite, and Observer) with strict hardware-aware concurrency guarantees. Whether managing thread-safe bounded buffers, implementing fine-grained segment locking, or evaluating AST rules without stack overflow hazards, defensive engineering dictates explicit boundary validations, deadlock prevention protocols, and lock-free atomic transitions.
+
+The reference matrix below synthesizes the core concurrency primitives, architectural design patterns, and production hazards across the canonical low-level engineering implementations covered in this guide:
+
 | Problem Pattern | Concurrency Mechanism | Design Pattern | Critical Production Hazard |
 | :--- | :--- | :--- | :--- |
 | **Bounded Queue & ThreadPool** | Fair `ReentrantLock` + 2 `Condition` vars | Producer-Consumer | Deadlock on pool shutdown; memory leak from null array slots |

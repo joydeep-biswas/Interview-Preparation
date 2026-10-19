@@ -417,8 +417,19 @@ public class BuiltInFunctionalInterfacesDemo {
 
 ### Stream Architecture
 
-#### Definition
-A `Stream` represents a sequence of elements supporting sequential and parallel aggregate operations. Streams do **not** store elements in memory; they carry values from a source (collection, array, I/O channel) through a pipeline of computational steps.
+#### Definition & Core Concepts
+In Java 8+, the Streams API (`java.util.stream.Stream`) introduced a functional programming paradigm over sequences of data elements. Unlike a collection, a `Stream` does **not** store elements in physical heap memory structures; instead, it models an active computational pipeline that carries values from an underlying source (such as a `Collection`, an array, a generator function, or an I/O channel) through a declarative sequence of intermediate operations to a terminal operation.
+
+#### First-Principles Breakdown: Stream vs. Collection
+1. **Physical Storage vs. Computational Pipelines:**
+   - **Collections (`List`, `Set`, `Map`):** In-memory data structures. Every element must be fully computed and physically stored in RAM before the collection can exist. Adding 10 million records allocates heap space for 10 million node or wrapper instances.
+   - **Streams:** Fixed-memory computational pipelines. A stream holds zero data storage. Elements flow through operations on-demand, enabling infinite streams (`Stream.iterate()`) and constant-memory processing over massive datasets.
+2. **Evaluation Timing: Eager vs. Lazy Computation:**
+   - **Collections:** Eagerly evaluated. Constructing or mutating a collection executes immediately.
+   - **Streams:** Strictly **lazily evaluated**. Chaining intermediate operations (`filter()`, `map()`, `sorted()`) performs zero work and creates only pipeline descriptors. Data processing begins only when a **terminal operation** (`collect()`, `count()`, `forEach()`) is invoked, allowing the JVM to fuse multiple operations into a single pass over the data.
+3. **Traversal Lifecycle & Reusability:**
+   - **Collections:** Can be traversed, iterated, and inspected repeatedly over their application lifecycle.
+   - **Streams:** **Single-use consumable pipelines**. Like an I/O iterator or iterator over a network socket, once a stream's terminal operation executes, the stream is closed and consumed. Attempting to invoke another operation on a consumed stream throws `IllegalStateException: stream has already been operated upon or closed`.
 
 #### Stream vs Collection
 | Dimension | Collection | Stream |
@@ -897,6 +908,19 @@ Immutability makes sharing a `String` between threads safe; mutable shared state
 
 ### `StringBuilder` vs `StringBuffer`
 
+#### Memory Mechanics of Mutable String Sequences
+Strings in Java are immutable character sequences backed by contiguous byte arrays (compact Latin-1/UTF-16 encoding since Java 9). Performing repeated string concatenation inside loops (`s += "chunk"`) triggers catastrophic performance degradation: each iteration allocates a brand-new `String` heap object, copies all existing bytes, and discards the predecessor, resulting in quadratic $O(N^2)$ memory copying overhead and severe garbage collection pressure.
+
+To eliminate repeated heap allocation during string assembly, Java provides mutable character buffers:
+
+1. **`StringBuilder` (Introduced in Java 5):**
+   - **Internal Mechanics:** Maintains a dynamically resizable contiguous buffer (`byte[] value` in Java 9+). As characters are appended, the buffer expands via over-allocation (`newCapacity = (oldCapacity << 1) + 2`), achieving amortized $O(1)$ appends without creating intermediate objects.
+   - **Thread Model:** **Unsynchronized / Non-thread-safe**. Eliminates all synchronization locks, CPU memory barriers, and monitor contention. It is the absolute highest-performance choice for local method-scope string formatting and serialization.
+
+2. **`StringBuffer` (Legacy Java 1.0):**
+   - **Internal Mechanics:** Uses an identical expandable array buffer design to `StringBuilder`, but every public method (`synchronized append()`, `synchronized toString()`) acquires the object's intrinsic monitor lock.
+   - **Production Reality:** Thread-safe, but rarely appropriate in modern architectures. High-throughput server applications rarely share a single mutable string buffer across concurrent threads. If a thread-local buffer is used, `StringBuffer` incurs wasteful locking overhead, making `StringBuilder` the universal modern default.
+
 | Feature | `String` | `StringBuilder` (Java 5) | `StringBuffer` (Java 1.0) |
 | :--- | :--- | :--- | :--- |
 | **Immutability** | Immutable | Mutable | Mutable |
@@ -1050,6 +1074,21 @@ flowchart TD
 ---
 
 ### Checked vs Unchecked Exceptions
+
+#### Exception Handling Architecture & Compiler Contracts
+In Java, exceptions inherit from `java.lang.Throwable` and split into three architectural categories representing different severity levels and fault boundaries:
+
+1. **Checked Exceptions (`Exception` Subclasses excluding `RuntimeException`):**
+   - **Philosophical Intent:** Represent anticipated, recoverable environmental failures outside application control (e.g., file not found on disk, network socket closed by peer, database query deadlock).
+   - **Compiler Enforcement:** The Java compiler (`javac`) strictly enforces the **Catch or Declare rule**. Any method calling code that throws a checked exception must either handle it within a `try-catch` block or declare it explicitly in its method signature via `throws`.
+   - **Production Nuance:** While designed for fault tolerance, excessive checked exceptions clutter codebases with boilerplate and violate abstraction boundaries in modern functional and reactive frameworks (e.g., Lambdas and Streams cannot throw checked exceptions without cumbersome wrapping).
+
+2. **Unchecked Exceptions (`RuntimeException` and Subclasses):**
+   - **Philosophical Intent:** Represent programmer defects, logical bugs, and precondition contract violations (e.g., dereferencing a null pointer, array index out of bounds, invalid method argument).
+   - **Compiler Enforcement:** Not checked at compile-time. Methods are not required to catch or declare them. Modern enterprise frameworks (Spring Boot, Hibernate, Quarkus) convert low-level checked exceptions into unchecked domain exceptions (e.g., `DataAccessException`) to keep business logic clean.
+
+3. **System Errors (`Error` and Subclasses):**
+   - **Philosophical Intent:** Represent catastrophic system-level hardware or JVM failures (e.g., `OutOfMemoryError`, `StackOverflowError`, `InternalError`). Application code should **never** attempt to catch or recover from `Error`—the JVM environment itself is in an undefined or unrecoverable state.
 
 | Feature | Checked Exceptions | Unchecked Exceptions (`RuntimeException`) | `Error` |
 | :--- | :--- | :--- | :--- |

@@ -1053,6 +1053,22 @@ System.out.println(p.equals(q)); // ✅ TRUE! Compares actual primitive payload 
 
 ### 7.1 Static Nested Classes vs Inner Classes
 
+In Java, classes defined inside another class fall into two fundamentally distinct categories: **Static Nested Classes** and **Non-Static Inner Classes** (often called member inner classes). The presence or absence of the `static` modifier completely alters the memory layout, bytecode structure, and garbage collection lifecycle of the instances.
+
+#### JVM Memory Architecture & The Hidden Synthetic Pointer Hazard
+1. **Static Nested Classes (`static class Node<K, V>`):**
+   - **JVM Representation:** A static nested class is conceptually equivalent to an ordinary top-level class, merely packaged inside the outer class namespace for logical encapsulation.
+   - **Memory Layout:** Instances of a static nested class exist entirely independently on the Java heap. They hold **zero reference** to the enclosing outer class instance and can only access the outer class's `static` fields and methods.
+   - **Production Pattern:** Standard choice for internal data structures (e.g., `Node` in `HashMap`, `Entry` in `TreeMap`, or Builder patterns). Because they lack an outer reference, they can be created, cached, or transferred without preventing the enclosing class from being garbage collected.
+
+2. **Non-Static Inner Classes (`class InnerHelper`):**
+   - **Synthetic Field Injection (`this$0`):** When javac compiles a non-static inner class, the bytecode compiler automatically injects a hidden, synthetic final instance variable pointing to the enclosing class:
+     ```java
+     final OuterClass this$0; // Synthesized by javac
+     ```
+   - **Instantiation Dependency:** An inner class instance cannot exist without an active instance of the outer class (`outerInstance.new InnerClass()`). It can freely read and mutate private instance members of the enclosing object.
+   - **The Silent Memory Leak Anti-Pattern:** Because the inner class instance retains an implicit hard reference (`this$0`) to the outer class object, long-lived inner instances (such as background event listeners, asynchronous task handlers, or cached callbacks) will **prevent the entire outer object from being garbage collected**, leading to severe memory leaks in production servers.
+
 | Dimension | Static Nested Class (`static class Node`) | Non-Static Inner Class (`class Node`) |
 | :--- | :--- | :--- |
 | **Enclosing Reference** | Does **NOT** hold a reference to outer instance | Holds an **implicit synthetic pointer** (`OuterClass.this`) |

@@ -60,6 +60,9 @@ flowchart TD
 ## Foundations Coverage & Directory Overview
 
 ### 1. Behavioral & Engineering Leadership
+
+The behavioral guides below provide structured, production-grounded playbooks for demonstrating engineering maturity, incident command, and cross-functional leadership across backend and data disciplines:
+
 | Guide File | Target Role | Key Scenarios & Production Themes Covered |
 | :--- | :--- | :--- |
 | [`01_java_backend_behavioral.md`](Behavioral%20&%20Leadership/01_java_backend_behavioral.md) | Java / Backend Engineers | Sev-1 incident command, cascading microservice thread pool exhaustion, JVM memory leaks & GC pauses, database deadlocks & connection pool sizing, pushing back on premature microservices, resolving REST vs. event-driven stalemates, delivering under tight product launch deadlines, expand-contract breaking API changes, and code review conflict resolution. |
@@ -68,6 +71,9 @@ flowchart TD
 ---
 
 ### 2. System Design Track (HLD & LLD)
+
+The system design curriculum covers end-to-end architectures from large-scale distributed systems to low-level concurrent components, organized across Java Backend and Data Engineering:
+
 | Engineering Track | Design Level | Guide File | Key Architectures & Scenarios Covered |
 | :--- | :--- | :--- | :--- |
 | **Java Backend** | **High-Level Design** | [`01_high_level_design.md`](System%20Design/Java%20Backend%20Engineering/01_high_level_design.md) | Scalable URL Shortener (bit.ly), Multi-Region Active-Active URL Shortener, Distributed API Rate Limiter, Global CDN, 64-bit Snowflake ID Generator, Real-Time Chat (WhatsApp/Slack), Distributed Notification Engine, Video Streaming (YouTube/Netflix), Payments (Stripe), Flash Sale Checkout, Ride-Hailing (Uber), Uber Eats Homepage, Distributed Cache (Redis), File Storage (Dropbox), Autocomplete, Collaborative Docs, Job Scheduler, Generic Workflow Engine, Feed, and Billion-Scale Graph Search. |
@@ -78,6 +84,9 @@ flowchart TD
 ---
 
 ### 3. Data Structures & Algorithms (DSA Track)
+
+The Data Structures & Algorithms track covers core algorithmic paradigms, low-level memory mechanics, and invariant-driven problem solving across 8 progressive modules:
+
 | Module Order | Guide File | Conceptual Focus & Algorithmic Patterns Covered |
 | :---: | :--- | :--- |
 | **Index** | [`00_dsa_study_guide_and_index.md`](Data%20Structures%20&%20Algorithms/00_dsa_study_guide_and_index.md) | Master syllabus, 8-module progression roadmap, complexity cheat-sheet, and pattern-to-problem matrix. |
@@ -94,6 +103,8 @@ flowchart TD
 
 ## Production Problem & Architecture Master Cross-Reference Matrix
 
+The master reference matrix below maps critical real-world production challenges to their canonical algorithmic patterns, low-level concurrency mechanisms, and architectural solutions:
+
 | Real-World Production Scenario / Problem | Canonical Pattern / Engineering Solution | Guide Reference |
 | :--- | :--- | :--- |
 | **Sev-1 Microservice Thread Pool Exhaustion** | Bulkheading, short timeouts, circuit breaker fallback | [`01_java_backend_behavioral.md`](Behavioral%20&%20Leadership/01_java_backend_behavioral.md#q1-mitigating-cascading-microservice-failures--thread-pool-exhaustion) |
@@ -107,7 +118,7 @@ flowchart TD
 | **$O(1)$ Memory Cache Eviction** | Doubly-linked list with sentinels + HashMap pointer index | [`02_linked_lists_stacks_and_monotonic_structures.md`](Data%20Structures%20&%20Algorithms/02_linked_lists_stacks_and_monotonic_structures.md#51-least-recently-used-lru-cache-implementation) |
 | **Continuous Unbounded Stream Median** | Dual Heaps (Max-Heap lower half + Min-Heap upper half) | [`05_heaps_intervals_and_greedy_algorithms.md`](Data%20Structures%20&%20Algorithms/05_heaps_intervals_and_greedy_algorithms.md#21-find-median-from-data-stream-leetcode-295) |
 | **Exponential Graph Search Space** | Bidirectional BFS expanding alternating smaller frontiers | [`06_graphs_topological_sort_and_shortest_paths.md`](Data%20Structures%20&%20Algorithms/06_graphs_topological_sort_and_shortest_paths.md#22-bidirectional-bfs-word-ladder-leetcode-127) |
-| **Bounded Capacity Resource Sizing** | Binary Search on Answer with monotonic feasibility predicate | [`04_binary_search_and_divide_and_conquer.md`](Data%20Structures%20&%20Algorithms/04_binary_search_and_divide_and_conquer.md#22-capacity-to-ship-packages-within-d-days) |
+| **Bounded Capacity Resource Sizing** | Binary Search on Answer with monotonic feasibility predicate | [`04_binary_search_and_divide_and_conquer.md`](Data%20Structures%20&%20Algorithms/04_binary_search_and_divide_and_conquer.md#22-capacity-to-ship-packages-within-d-days-leetcode-1011) |
 
 ---
 

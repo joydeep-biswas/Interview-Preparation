@@ -533,9 +533,42 @@ SELECT level, path FROM OrgHierarchy ORDER BY path;
 
 ### 2.7 Analytical SQL Window Functions (`ROW_NUMBER`, `RANK`, `DENSE_RANK`, `NTILE`, `LAG`, `LEAD`, `FIRST_VALUE`)
 
-Unlike `GROUP BY`, which collapses multiple rows into a single summary row, **Window Functions** compute aggregate and ranking values across a defined window partition while **retaining individual row identities**:
+#### 1. Overview: Database Pushdown vs. JVM Heap Saturation
+In Java backend engineering, querying data for pagination, leaderboards, top-N categories, and historical deltas is standard. A widespread anti-pattern in microservices is pulling thousands of unindexed JPA entities into the JVM (`repository.findAll()`) to sort, filter, and calculate moving metrics using `java.util.stream.Stream`:
+```java
+// CRITICAL ANTI-PATTERN: Saturated heap, GC stop-the-world pauses, O(N) network transfer!
+List<SaleRecord> records = saleRepository.findAll();
+Map<String, List<SaleRecord>> topPerDept = records.stream()
+    .collect(Collectors.groupingBy(SaleRecord::getDepartment,
+        Collectors.collectingAndThen(
+            Collectors.toList(),
+            list -> list.stream()
+                .sorted(Comparator.comparing(SaleRecord::getAmount).reversed())
+                .limit(3)
+                .toList())));
+```
+This approach wastes network bandwidth, risks `OutOfMemoryError` under high traffic, and forces costly garbage collection cycles.
 
-#### Realistic Sample Dataset: `sales_records` Table
+**Analytical Window Functions** solve this problem by executing calculations directly inside the database engine. While standard `GROUP BY` collapses $N$ rows into $M$ summary rows, window functions evaluate analytical expressions across a partitioned subset of records (the "window frame") while **preserving the discrete identity and attributes of every single entity row**:
+
+$$\text{GROUP BY: } N \text{ rows} \longrightarrow M \text{ rows } (M \le N) \quad \text{vs.} \quad \text{Window Function: } N \text{ rows} \longrightarrow N \text{ enriched rows}$$
+
+#### 2. Detailed Breakdown of Analytical Function Families
+
+##### A. Ranking Functions
+- **`ROW_NUMBER()`**: Generates an unbroken sequential integer sequence ($1, 2, 3, \dots, N$) per partition. Ties in `ORDER BY` are broken non-deterministically unless secondary unique columns (e.g. primary keys) are supplied. Essential for deterministic keyset pagination and entity deduplication.
+- **`RANK()`**: Assigns standard competition ranking ($1, 2, 2, 4$). Tied records share the identical rank; subsequent ranks skip by the count of tied records.
+- **`DENSE_RANK()`**: Assigns consecutive tier ranking ($1, 2, 2, 3$). Tied records share the identical rank, but subsequent ranks increment strictly by 1 without gaps. This is mandatory for finding "the $N$-th highest distinct salary" or "top 3 revenue tiers".
+- **`NTILE(k)`**: Partitions sorted rows into $k$ balanced buckets ($1 \dots k$). Remainder rows $R = N \pmod k$ are distributed by adding 1 row each to the first $R$ buckets. Ideal for batch chunking and quantile segmentation.
+
+##### B. Value Navigation Functions
+- **`LAG(col [, offset [, default]])`**: Retrieves a column value from $N$ rows prior to the current row without an expensive self-join. Indispensable for computing Period-over-Period (PoP) revenue deltas.
+- **`LEAD(col [, offset [, default]])`**: Retrieves a column value from $N$ rows ahead of the current row. Ideal for event duration calculation and session expiration lookahead.
+- **`FIRST_VALUE(col)`**: Returns the evaluated value at the start of the window frame.
+
+#### 3. Practical Step-by-Step Implementation
+
+##### Realistic Sample Dataset: `sales_records` Table
 ```sql
 CREATE TABLE sales_records (
     sale_id INT PRIMARY KEY,
@@ -556,56 +589,158 @@ INSERT INTO sales_records VALUES
 (8, 'Hannah',  'Furniture',    950.00, '2026-03-04');
 ```
 
-#### Comprehensive Analytical Window Query
-
+##### Query 1: Department Ranking Analysis (`ROW_NUMBER`, `RANK`, `DENSE_RANK`, `NTILE`)
 ```sql
 SELECT 
     department,
     employee_name,
     amount,
-    -- 1. Number rows strictly 1..N within each department
-    ROW_NUMBER() OVER (PARTITION BY department ORDER BY amount DESC) AS row_num,
+    -- 1. Sequential integer sequence per department
+    ROW_NUMBER() OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC, sale_id ASC
+    ) AS row_num,
 
-    -- 2. Rank with gaps on ties (1, 2, 2, 4)
-    RANK() OVER (PARTITION BY department ORDER BY amount DESC) AS rnk,
+    -- 2. Competition ranking with gaps (1, 2, 2, 4)
+    RANK() OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC
+    ) AS rnk,
 
-    -- 3. Rank without gaps on ties (1, 2, 2, 3)
-    DENSE_RANK() OVER (PARTITION BY department ORDER BY amount DESC) AS dense_rnk,
+    -- 3. Consecutive ranking without gaps (1, 2, 2, 3)
+    DENSE_RANK() OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC
+    ) AS dense_rnk,
 
-    -- 4. Split department into 2 quartile buckets (1 = Top performers, 2 = Bottom)
-    NTILE(2) OVER (PARTITION BY department ORDER BY amount DESC) AS quartile,
-
-    -- 5. Value from previous row in partition (preceding colleague's amount)
-    LAG(amount, 1) OVER (PARTITION BY department ORDER BY amount DESC) AS prev_amount,
-
-    -- 6. Value from next row in partition
-    LEAD(amount, 1) OVER (PARTITION BY department ORDER BY amount DESC) AS next_amount,
-
-    -- 7. Best sale in this department
-    FIRST_VALUE(amount) OVER (PARTITION BY department ORDER BY amount DESC) AS dept_max_sale
+    -- 4. Divides each department into 2 performance tiers (Top half = 1, Bottom = 2)
+    NTILE(2) OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC
+    ) AS tier
 FROM sales_records;
 ```
 
-#### Exact Query Execution Output:
+##### Exact Ranking Query Output:
+| Department | Employee | Amount | `row_num` | `rnk` | `dense_rnk` | `tier` (`NTILE(2)`) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **Electronics** | Alice | \$1,500.00 | **1** | **1** | **1** | 1 |
+| **Electronics** | Bob | \$1,200.00 | **2** | **2** | **2** | 1 |
+| **Electronics** | Charlie | \$1,200.00 | **3** | **2** (Tie) | **2** (Tie) | 2 |
+| **Electronics** | David | \$800.00 | **4** | **4** (Skipped 3) | **3** (No Skip) | 2 |
+| **Furniture** | Emma | \$2,200.00 | **1** | **1** | **1** | 1 |
+| **Furniture** | Frank | \$1,800.00 | **2** | **2** | **2** | 1 |
+| **Furniture** | Grace | \$1,800.00 | **3** | **2** (Tie) | **2** (Tie) | 2 |
+| **Furniture** | Hannah | \$950.00 | **4** | **4** (Skipped 3) | **3** (No Skip) | 2 |
 
-| Department | Employee | Amount | `row_num` | `rnk` | `dense_rnk` | `quartile` | `prev_amount` (`LAG`) | `next_amount` (`LEAD`) | `dept_max_sale` (`FIRST_VALUE`) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Electronics** | Alice | \$1,500.00 | 1 | 1 | 1 | 1 | `NULL` | \$1,200.00 | \$1,500.00 |
-| **Electronics** | Bob | \$1,200.00 | 2 | 2 | 2 | 1 | \$1,500.00 | \$1,200.00 | \$1,500.00 |
-| **Electronics** | Charlie | \$1,200.00 | 3 | 2 | 2 | 2 | \$1,200.00 | \$800.00 | \$1,500.00 |
-| **Electronics** | David | \$800.00 | 4 | 4 | 3 | 2 | \$1,200.00 | `NULL` | \$1,500.00 |
-| **Furniture** | Emma | \$2,200.00 | 1 | 1 | 1 | 1 | `NULL` | \$1,800.00 | \$2,200.00 |
-| **Furniture** | Frank | \$1,800.00 | 2 | 2 | 2 | 1 | \$2,200.00 | \$1,800.00 | \$2,200.00 |
-| **Furniture** | Grace | \$1,800.00 | 3 | 2 | 2 | 2 | \$1,800.00 | \$950.00 | \$2,200.00 |
-| **Furniture** | Hannah | \$950.00 | 4 | 4 | 3 | 2 | \$1,800.00 | `NULL` | \$2,200.00 |
+##### Step-by-Step Resolution Trace:
+1. **Alice (\$1,500.00):** Highest earner in Electronics. `row_num = 1`, `rnk = 1`, `dense_rnk = 1`. Placed in top quartile `tier = 1`.
+2. **Bob & Charlie (\$1,200.00 each):** Tied in sales amount.
+   - `ROW_NUMBER`: Tie broken deterministically via `sale_id ASC` (Bob's id 2 < Charlie's id 3) $\implies$ Bob receives 2, Charlie receives 3.
+   - `RANK`: Both share rank 2.
+   - `DENSE_RANK`: Both share rank 2.
+3. **David (\$800.00):**
+   - `ROW_NUMBER`: Receives 4.
+   - `RANK`: Exactly 3 records precede David strictly $\implies 1 + 3 = \mathbf{4}$. Rank 3 is skipped!
+   - `DENSE_RANK`: Exactly 2 distinct values precede David (\$1500 and \$1200) $\implies 1 + 2 = \mathbf{3}$. Zero gap created!
 
-#### Detailed Behavior Comparison:
-- **`ROW_NUMBER()`**: Deterministic sequential integer sequence ($1, 2, 3, 4$). Ties in `amount` receive arbitrary order unless a tie-breaker column is provided in `ORDER BY`. Perfect for **Pagination** (`WHERE row_num BETWEEN 21 AND 30`).
-- **`RANK()`**: Tied values share the same rank ($2, 2$), but skips numbers for the next rank ($4$), reflecting the count of strictly preceding rows.
-- **`DENSE_RANK()`**: Tied values share the same rank ($2, 2$), with zero gap for the subsequent rank ($3$). Ideal for **Top-N per Category** (`WHERE dense_rnk <= 3`).
-- **`LAG(col, offset)`**: Accesses data from $N$ rows prior to the current row without a self-join. Ideal for calculating **Month-over-Month (MoM) revenue growth**:
-  $$\text{Growth} = \frac{\text{Current} - \text{LAG}(\text{Current}, 1)}{\text{LAG}(\text{Current}, 1)} \times 100$$
-- **`NTILE(B)`**: Divides ordered partition as evenly as possible into $B$ discrete buckets.
+##### Query 2: Navigational Lookbacks & Period Growth (`LAG`, `LEAD`, `FIRST_VALUE`)
+```sql
+SELECT 
+    department,
+    employee_name,
+    amount,
+    -- 1. Preceding employee's sales amount (default fallback 0.0)
+    LAG(amount, 1, 0.00) OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC
+    ) AS prev_amount,
+
+    -- 2. Next colleague's sales amount (lookahead)
+    LEAD(amount, 1) OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC
+    ) AS next_amount,
+
+    -- 3. Department champion's sale amount (benchmark)
+    FIRST_VALUE(amount) OVER (
+        PARTITION BY department 
+        ORDER BY amount DESC
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS dept_champion_amount
+FROM sales_records;
+```
+
+##### Exact Navigational Query Output:
+| Department | Employee | Amount | `prev_amount` (`LAG`) | `next_amount` (`LEAD`) | `dept_champion_amount` (`FIRST_VALUE`) |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Electronics** | Alice | \$1,500.00 | \$0.00 *(fallback)* | \$1,200.00 | \$1,500.00 |
+| **Electronics** | Bob | \$1,200.00 | \$1,500.00 | \$1,200.00 | \$1,500.00 |
+| **Electronics** | Charlie | \$1,200.00 | \$1,200.00 | \$800.00 | \$1,500.00 |
+| **Electronics** | David | \$800.00 | \$1,200.00 | `NULL` *(end)* | \$1,500.00 |
+| **Furniture** | Emma | \$2,200.00 | \$0.00 *(fallback)* | \$1,800.00 | \$2,200.00 |
+| **Furniture** | Frank | \$1,800.00 | \$2,200.00 | \$1,800.00 | \$2,200.00 |
+| **Furniture** | Grace | \$1,800.00 | \$1,800.00 | \$950.00 | \$2,200.00 |
+| **Furniture** | Hannah | \$950.00 | \$1,800.00 | `NULL` *(end)* | \$2,200.00 |
+
+#### 4. Comparisons & Engineering Trade-Off Matrix
+
+| Analytical Function | Category | Tie Handling Semantics | Gap Generation | Memory Complexity | Enterprise Backend Use Case |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **`ROW_NUMBER()`** | Ranking | Sequential integer ($1, 2, 3$). Non-deterministic without secondary key. | **No** | $O(N \log N)$ sort | **Database-level pagination (`WHERE rn BETWEEN 21 AND 30`), deduplication.** |
+| **`RANK()`** | Ranking | Tied values share rank; subsequent rank skips ($1, 2, 2, 4$). | **Yes** (Gap = tie count) | $O(N \log N)$ sort | **Competitive standings, official quota rankings.** |
+| **`DENSE_RANK()`** | Ranking | Tied values share rank; subsequent rank increments consecutively ($1, 2, 2, 3$). | **No** (Zero gaps) | $O(N \log N)$ sort | **Top-N salary tiers, leaderboard tiers without skipped positions.** |
+| **`NTILE(k)`** | Bucketing | Assigns bucket index ($1 \dots k$); breaks partitions into $k$ chunks. | **No** | $O(N \log N)$ sort | **Chunking large batch jobs, customer tier segmentations.** |
+| **`LAG(col, n)`** | Navigation | Accesses $n$-th preceding row in partition stream. | N/A | $O(1)$ streaming | **Day-over-Day / Month-over-Month metrics, detecting state transitions.** |
+| **`LEAD(col, n)`** | Navigation | Accesses $n$-th trailing row in partition stream. | N/A | $O(1)$ streaming | **Calculating elapsed time between events, lookahead validations.** |
+
+#### 5. Advanced Production Insights for Spring Boot & Hibernate Developers
+
+##### 1. Spring Data JPA Native Query with Java 21 DTO Records
+Because window functions return computed scalar columns rather than managed entity state, map them directly to immutable Java records via Spring Data native projection:
+```java
+public record DepartmentPerformanceDto(
+    String department,
+    String employeeName,
+    BigDecimal amount,
+    int departmentRank,
+    BigDecimal previousColleagueAmount
+) {}
+
+@Repository
+public interface SalesRecordRepository extends JpaRepository<SalesRecord, Long> {
+
+    @Query(value = """
+        SELECT 
+            department,
+            employee_name AS employeeName,
+            amount,
+            DENSE_RANK() OVER (PARTITION BY department ORDER BY amount DESC) AS departmentRank,
+            LAG(amount, 1, 0.00) OVER (PARTITION BY department ORDER BY amount DESC) AS previousColleagueAmount
+        FROM sales_records
+        """, nativeQuery = true)
+    List<DepartmentPerformanceDto> fetchDepartmentPerformance();
+}
+```
+
+##### 2. Hibernate 6+ Native Window Function Support
+Starting in **Hibernate 6**, window functions are officially first-class citizens in HQL (Hibernate Query Language). You no longer need native SQL strings to invoke ranking functions in modern Spring Boot 3 applications:
+```java
+// Supported in Hibernate 6+ / Spring Boot 3+
+@Query("""
+    SELECT s.department, s.employeeName, s.amount,
+           dense_rank() OVER (PARTITION BY s.department ORDER BY s.amount DESC)
+    FROM SalesRecord s
+""")
+List<Object[]> fetchRankedHql();
+```
+
+##### 3. Composite Indexing for Window Optimization
+To evaluate `OVER (PARTITION BY department ORDER BY amount DESC)` without spilling to disk or performing an expensive $O(N \log N)$ sort step at query time, create a **composite B-Tree index**:
+```sql
+CREATE INDEX idx_sales_dept_amount ON sales_records (department, amount DESC);
+```
+With this composite index, the database engine uses an **Index Scan** to stream pre-sorted records directly through the window operator in $O(N)$ linear time!
 
 ---
 
@@ -725,12 +860,54 @@ sequenceDiagram
 
 ### 3.4 The 4 SQL-92 Transaction Isolation Levels & Concurrency Anomalies
 
-| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read | Write Skew |
-| :--- | :---: | :---: | :---: | :---: |
-| **Read Uncommitted** | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed |
-| **Read Committed** (PostgreSQL / Oracle Default) | ❌ Prevented | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed |
-| **Repeatable Read** (MySQL InnoDB Default) | ❌ Prevented | ❌ Prevented | ❌ Prevented (in MVCC) | ⚠️ Allowed |
-| **Serializable** | ❌ Prevented | ❌ Prevented | ❌ Prevented | ❌ Prevented |
+#### 1. Overview: Concurrency Throughput vs. Consistency Guarantees
+In high-throughput enterprise backends, thousands of concurrent threads read and modify shared database records simultaneously. While executing every transaction strictly one after another (serial execution) guarantees 100% mathematical consistency, it destroys database throughput, yielding intolerable latency and thread starvation.
+
+Database engines therefore implement **Transaction Isolation Levels**—tunable contracts defined by the ANSI/ISO SQL-92 standard that allow backend engineers to balance transactional consistency against concurrency throughput.
+
+#### 2. Detailed Breakdown of the 4 Concurrency Anomalies
+
+##### 1. Dirty Read ($G_1$ / Dirty Read Anomaly)
+- **Mechanism:** Transaction $A$ reads uncommitted modifications made by Transaction $B$. If Transaction $B$ subsequently issues a `ROLLBACK`, Transaction $A$ has processed "ghost data" that never legitimately existed on persistent storage.
+- **Enterprise Impact:** An account balance check approves a \$10,000 credit withdrawal based on a temporary deposit that subsequently aborts due to fraud checks.
+
+##### 2. Non-Repeatable Read ($G_{2a}$ / Fuzzy Read Anomaly)
+- **Mechanism:** Transaction $A$ reads a specific row at time $T_1$. Transaction $B$ subsequently modifies or deletes that row and issues a `COMMIT`. When Transaction $A$ re-reads the identical row at time $T_2$, it finds modified values or discovers the row has vanished.
+- **Enterprise Impact:** A billing job calculates invoice tax on an item, but when applying payment seconds later within the same transaction, finds the item price was mutated by an administrator.
+
+##### 3. Phantom Read ($P_3$ / Phantom Range Anomaly)
+- **Mechanism:** Transaction $A$ executes a range query (e.g. `SELECT COUNT(*) WHERE age >= 21`). Transaction $B$ inserts a new row matching that predicate and successfully commits. When Transaction $A$ re-executes the exact same range query, it discovers new "phantom" rows that were absent in the first execution.
+- **Enterprise Impact:** Financial audit reports calculating category sums find mismatching row counts between audit pass 1 and audit pass 2.
+
+##### 4. Serialization Anomaly / Write Skew
+- **Mechanism:** Two concurrent transactions read overlapping datasets, verify a shared business constraint (e.g. "at least one doctor on call"), execute disjoint writes (Transaction $A$ updates Doctor 1; Transaction $B$ updates Doctor 2), and commit. While both individual updates were valid against their local snapshots, their simultaneous execution violates the global business invariant.
+
+#### 3. Detailed Breakdown of the 4 ANSI SQL Isolation Levels
+
+##### 1. `READ UNCOMMITTED` (Lowest Isolation)
+- **Working Principle:** Queries execute without acquiring read locks or respecting MVCC snapshot boundaries. Sessions read uncommitted dirty pages directly from buffer cache.
+- **Guarantees:** Zero protection. Permitted for coarse analytics (e.g., approximate table row estimates).
+
+##### 2. `READ COMMITTED` (PostgreSQL, Oracle, SQL Server Default)
+- **Working Principle:** Enforces **statement-level MVCC snapshots**. Every individual SQL statement within a transaction obtains a fresh read snapshot at the instant the statement begins. Uncommitted writes of other sessions are strictly invisible.
+- **Guarantees:** Eliminates Dirty Reads. However, Non-Repeatable Reads and Phantom Reads can occur because subsequent statements within the transaction see newly committed changes.
+
+##### 3. `REPEATABLE READ` (MySQL InnoDB Default)
+- **Working Principle:** Enforces **transaction-level MVCC snapshots**. The transaction captures a single immutable read snapshot at the exact moment the transaction begins (or upon its first read). All subsequent queries within that transaction observe the identical point-in-time state.
+- **Guarantees:** Eliminates Dirty Reads and Non-Repeatable Reads. In MySQL InnoDB, Next-Key Locks (Index Record Lock + Gap Lock) also eliminate Phantom Reads for locking reads. Write Skew is still possible without explicit locking.
+
+##### 4. `SERIALIZABLE` (Highest Isolation)
+- **Working Principle:** Guarantees that the concurrent execution of multiple transactions produces the exact same outcome as some purely serial (one-by-one) execution order. Implemented via **Two-Phase Locking (2PL)** or **Serializable Snapshot Isolation (SSI)** with dependency graph tracking.
+- **Guarantees:** Eliminates all anomalies (Dirty Read, Non-Repeatable Read, Phantom Read, Write Skew). Any transaction that causes a cyclic dependency aborts with a serialization failure (`SQLState: 40001`), requiring application-level retries.
+
+#### 4. The ANSI Isolation Level Support Matrix
+
+| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read | Write Skew | Default Database Engine |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Read Uncommitted** | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed | Rare in production. |
+| **Read Committed** | ❌ Prevented | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed | **PostgreSQL, Oracle, SQL Server** |
+| **Repeatable Read** | ❌ Prevented | ❌ Prevented | ❌ Prevented *(InnoDB MVCC)* | ⚠️ Allowed | **MySQL (InnoDB)** |
+| **Serializable** | ❌ Prevented | ❌ Prevented | ❌ Prevented | ❌ Prevented | High-integrity financial ledgers. |
 
 #### Step-by-Step Concurrent Execution Timelines
 
@@ -1536,7 +1713,7 @@ WHERE idx_scan = 0;
 * **Root Cause**:
   PostgreSQL utilizes a 32-bit unsigned integer for Transaction IDs (XIDs), providing $\approx 4.29 \text{ billion}$ unique transactions. To handle infinite time, PostgreSQL treats XIDs circularly modulo $2^{31}$ ($\approx 2.14 \text{ billion}$). Any XID within the past $2.14 \text{ billion}$ transactions is in the "past" (visible); anything ahead is in the "future" (invisible).
   
-  ```mermaid
+```mermaid
 flowchart LR
     subgraph XIDSpace ["Circular 32-bit Modulo 2^31 Transaction Horizon"]
         direction LR
@@ -1724,14 +1901,41 @@ The database parser evaluates `'1'='1'` to `TRUE` for every row in the table, re
 
 ### 12.3 `Statement` vs `PreparedStatement` vs `CallableStatement`
 
-| Dimension | `Statement` | `PreparedStatement` | `CallableStatement` |
-| :--- | :--- | :--- | :--- |
-| **SQL Parsing** | Sent as raw text; database parses, checks syntax, and compiles an execution plan on **every single execution**. | Precompiled by the database. The query execution plan is **cached** and reused. | Calls stored procedures and functions compiled inside the database engine. |
-| **Parameters** | Inlined via string concatenation. | Bound via indexed or named parameter placeholders (`?`). | Supports `IN`, `OUT`, and `INOUT` parameters. |
-| **Security** | **Extremely vulnerable to SQL Injection**. | **Completely immune to SQL Injection**. | Immune to SQL Injection when using placeholders. |
-| **Binary Protocol** | Uses text-based SQL protocol. | Passes parameters as typed binary data over wire protocol. | Uses database vendor procedure wire protocol. |
+#### 1. Overview: The JDBC Statement Abstraction Hierarchy
+In the Java Database Connectivity (JDBC) API, all database interaction is mediated through the `java.sql.Statement` interface hierarchy:
 
-#### Production `PreparedStatement` Implementation:
+$$\texttt{Statement} \longleftarrow \texttt{PreparedStatement} \longleftarrow \texttt{CallableStatement}$$
+
+Choosing the correct statement type directly impacts two mission-critical pillars of enterprise backends: **application security** (immunity against SQL Injection) and **throughput performance** (amortizing query compilation overhead across millions of database calls).
+
+#### 2. Detailed Breakdown of Statement Types
+
+##### 1. `java.sql.Statement`: Static Raw SQL Execution
+- **Working Principle:** Sends an unparameterized SQL string as plain text across the network.
+- **Engine Processing Lifecycle:** For every single execution, the database query processor must:
+  1. Lexically tokenize and parse the SQL string.
+  2. Perform semantic verification against system catalogs.
+  3. Cost-based optimizer computes multiple candidate execution trees.
+  4. Generate and compile a new physical execution plan.
+- **Security Vulnerability:** Because values are concatenated directly into the SQL string (`"WHERE user = '" + input + "'"`), attacker input escapes the string literal and alters the Abstract Syntax Tree (AST), creating fatal SQL injection vulnerabilities.
+- **Enterprise Use Case:** Strictly restricted to one-off administrative DDL executions (`CREATE TABLE`, `ALTER TABLE`, `VACUUM`) where user-supplied runtime parameters do not exist.
+
+##### 2. `java.sql.PreparedStatement`: Precompiled & Parameterized Execution
+- **Working Principle:** Precompiles a parameterized SQL template containing question mark placeholders (`?`). The template is transmitted to the database engine and parsed once.
+- **Binary Wire Protocol & SQL Injection Immunity:**
+  - When parameters are assigned via `ps.setString(1, input)` or `ps.setInt(2, val)`, the JDBC driver transmits the parameters separately across the wire using the database's typed binary protocol.
+  - The database executor treats parameter data strictly as literal scalar values, never as executable SQL tokens. Even if an attacker passes `' OR '1'='1`, the engine searches literally for that exact string value in the column, rendering SQL injection mathematically impossible.
+- **Execution Plan Caching:** The compiled execution plan is cached in the database engine's prepared statement cache (and optionally in driver-level caches like HikariCP / pgJDBC). Subsequent executions with different parameters reuse the cached plan, bypassing parsing and optimization overhead.
+- **Enterprise Use Case:** The mandatory gold standard for all operational DML (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) across enterprise microservices.
+
+##### 3. `java.sql.CallableStatement`: Stored Procedure & Function Invocation
+- **Working Principle:** Extends `PreparedStatement` to invoke pre-compiled procedural routines (functions and stored procedures) defined inside the database catalog using standard JDBC escape syntax: `{call procedure_name(?, ?)}`.
+- **Parameter Support:** In addition to standard `IN` parameters, `CallableStatement` supports `OUT` and `INOUT` parameters registered using `registerOutParameter(index, java.sql.Types)`.
+- **Enterprise Use Case:** Legacy mainframe/enterprise database integration and batch banking settlement procedures encapsulated in PL/SQL or T-SQL.
+
+#### 3. Practical Implementations & Code Walkthroughs
+
+##### Example 1: Production-Grade `PreparedStatement` with Try-With-Resources
 ```java
 public Optional<Account> findAccountById(String accountId) {
     String sql = "SELECT id, owner_name, balance, status FROM accounts WHERE id = ? AND status = ?";
@@ -1761,6 +1965,55 @@ public Optional<Account> findAccountById(String accountId) {
     return Optional.empty();
 }
 ```
+
+##### Example 2: Calling Database Stored Procedures via `CallableStatement`
+```java
+public BigDecimal processMonthlyInterest(String accountId) {
+    String procedureCall = "{call calculate_and_apply_interest(?, ?)}";
+
+    try (Connection conn = dataSource.getConnection();
+         CallableStatement cs = conn.prepareCall(procedureCall)) {
+
+        // 1. Bind IN parameter
+        cs.setString(1, accountId);
+
+        // 2. Register OUT parameter type
+        cs.registerOutParameter(2, java.sql.Types.DECIMAL);
+
+        // 3. Execute remote procedure
+        cs.execute();
+
+        // 4. Retrieve computed OUT parameter value
+        BigDecimal updatedBalance = cs.getBigDecimal(2);
+        return updatedBalance;
+    } catch (SQLException ex) {
+        log.error("Failed executing interest procedure for accountId: {}", accountId, ex);
+        throw new DatabaseOperationException("Stored procedure execution failed", ex);
+    }
+}
+```
+
+#### 4. Comparisons & Architectural Decision Matrix
+
+| Dimension | `Statement` | `PreparedStatement` | `CallableStatement` |
+| :--- | :--- | :--- | :--- |
+| **SQL Parsing & Plan** | Sent as raw text; database parses, checks syntax, and compiles an execution plan on **every single execution**. | Precompiled by the database. The query execution plan is **cached** and reused. | Calls stored procedures and functions compiled inside the database engine. |
+| **Parameters** | Inlined via string concatenation. | Bound via indexed or named parameter placeholders (`?`). | Supports `IN`, `OUT`, and `INOUT` parameters via JDBC escape syntax. |
+| **Security** | **Extremely vulnerable to SQL Injection**. | **Completely immune to SQL Injection**. | Completely immune to SQL Injection when using placeholders. |
+| **Protocol** | Text-based SQL protocol. | Passes parameters as typed binary data over database wire protocol. | Uses database vendor procedure wire protocol. |
+#### 5. Advanced Production Insights & Connection Pool Statement Caching
+1. **Prepared Statement Pooling with HikariCP & pgJDBC:**
+   - Precompiling queries inside the database engine incurs CPU memory and handle allocation. If every HTTP request opens and closes a `PreparedStatement`, the precompilation advantage is lost.
+   - **Production Remedy:** Enable server-side prepared statement pooling in the database driver:
+     ```properties
+     # application.properties (PostgreSQL Driver)
+     spring.datasource.hikari.data-source-properties.prepStmtCacheSize=250
+     spring.datasource.hikari.data-source-properties.prepStmtCacheSqlLimit=2048
+     spring.datasource.hikari.data-source-properties.cachePrepStmts=true
+     ```
+2. **Preventing Plan Invalidation in Dynamic Filters:**
+   - If an application constructs SQL with dynamic WHERE clauses via string appending (`sql += " AND age > " + age`), every combination generates a distinct SQL hash, polluting the database query plan cache (plan cache thrashing).
+   - **Production Remedy:** Use JPA Criteria API, QueryDSL, or Spring Data Specifications to bind parameters dynamically while preserving parameter placeholders.
 
 ---
 
@@ -2540,15 +2793,70 @@ public class BillingService {
 
 ### 17.4 Transaction Propagation Levels Deep-Dive (With Scenario Traces)
 
-| Propagation | Behavior | Production Scenario |
-| :--- | :--- | :--- |
-| **`REQUIRED`** (Default) | Joins existing transaction if present; creates new transaction if none exists. | Standard default for 95% of business services. |
-| **`REQUIRES_NEW`** | **Suspends** current transaction, opens a **completely new physical connection & transaction**. | Audit logging or payment authorization that must commit even if main transaction rolls back. |
-| **`MANDATORY`** | Requires an existing transaction; throws `IllegalTransactionStateException` if called without one. | Low-level internal repository routines that must never run standalone. |
-| **`SUPPORTS`** | Executes within transaction if present; executes non-transactionally if none exists. | Read-only queries. |
-| **`NOT_SUPPORTED`** | Suspends current transaction and executes non-transactionally. | Slow external REST API calls or file uploads. |
-| **`NEVER`** | Throws exception if active transaction exists. | Enforcing non-transactional execution. |
-| **`NESTED`** | Creates a JDBC Savepoint within the current transaction. Can roll back child savepoint without rolling back parent. | Batch processing loops where individual item failures shouldn't abort the entire batch. |
+#### 1. Overview: Physical vs. Logical Transaction Boundaries in Spring
+In Spring enterprise architectures, business workflows often compose multiple services—for instance, an `OrderService` calling an `InventoryService`, a `PaymentService`, and an `AuditLoggingService`. When each method is annotated with `@Transactional`, Spring's transaction infrastructure must decide how these method boundaries interact with the underlying database connection:
+
+- **Physical Transaction:** An actual JDBC transaction managed on an active database socket connection via `connection.setAutoCommit(false)`, `connection.commit()`, and `connection.rollback()`.
+- **Logical Transaction:** A `@Transactional` method boundary defined in Java code. Multiple nested logical transactions can participate in a single shared physical transaction.
+
+Spring's **Transaction Propagation** settings (defined in `org.springframework.transaction.annotation.Propagation`) control whether a child method participates in an existing physical transaction, opens a new physical connection, or runs non-transactionally.
+
+#### 2. Detailed Breakdown of the 7 Propagation Behaviors
+
+##### 1. `REQUIRED` (Spring Default)
+- **Mechanism:** If a physical transaction already exists on the current thread, the method participates in it. If no transaction exists, Spring starts a new physical transaction.
+- **Rollback Contract:** If an inner `@Transactional(REQUIRED)` method throws an unhandled `RuntimeException`, it marks the physical transaction as **Rollback-Only** (`setRollbackOnly()`). Even if the outer caller catches the exception with a `try-catch` block, the outer transaction *cannot* commit and will throw an `UnexpectedRollbackException` on completion!
+- **Primary Use Case:** Standard business services (accounts, inventory, checkout) where all coordinated mutations must succeed or fail together.
+
+##### 2. `REQUIRES_NEW`
+- **Mechanism:** Always creates a brand-new, independent physical transaction. If an existing transaction is active, Spring **suspends** it, detaches the connection from the current thread, borrows a **second connection** from HikariCP, and begins a new transaction.
+- **Independence:** The inner transaction commits or rolls back independently of the outer transaction. If the inner transaction commits and returns, the outer transaction can later roll back without affecting the inner committed data.
+- **Primary Use Case:** Security audit logs, payment authorization attempts, or notifications that must remain permanently committed in the database even if the parent business transaction fails.
+
+##### 3. `MANDATORY`
+- **Mechanism:** Demands that an active physical transaction already exists when called.
+- **Exception:** If invoked without an active transaction, Spring immediately throws `IllegalTransactionStateException`.
+- **Primary Use Case:** Internal repository helper methods or financial accounting operations that must never execute in isolation without a parent transactional envelope.
+
+##### 4. `SUPPORTS`
+- **Mechanism:** If an active transaction exists, the method runs within it. If no transaction exists, it executes non-transactionally without opening a database transaction.
+- **Primary Use Case:** Read-only queries or validation checks that can safely participate in an existing caller's read-view, but do not require transactional overhead when called standalone.
+
+##### 5. `NOT_SUPPORTED`
+- **Mechanism:** Suspends any active physical transaction and executes non-transactionally. Once complete, resumes the suspended transaction.
+- **Primary Use Case:** Long-running operations, such as making external REST API calls or generating large PDF documents, where holding an open database transaction would exhaust connection pool resources.
+
+##### 6. `NEVER`
+- **Mechanism:** Demands that **no** active transaction exists.
+- **Exception:** If an active transaction is detected on the thread, Spring immediately throws `IllegalTransactionStateException`.
+- **Primary Use Case:** Batch jobs or maintenance scripts that perform internal manual commit chunking and would fail if wrapped inside a container-managed transaction.
+
+##### 7. `NESTED`
+- **Mechanism:** Executes within a nested transaction using **JDBC Savepoints** on the *same physical connection*. No second connection is borrowed.
+- **Rollback Isolation:** If the child method throws an exception, Spring rolls back strictly to the created savepoint, leaving the parent transaction active and capable of continuing.
+- **Requirement:** Requires JDBC 3.0+ driver savepoint support and a compatible transaction manager (e.g. `DataSourceTransactionManager`). Note that Hibernate JPA does not natively support `NESTED` without vendor-specific dialect configuration.
+
+#### 3. Comparisons & Architectural Reference Matrix
+
+| Propagation Level | Existing Transaction Behavior | No Existing Transaction Behavior | Physical Connections Used | Rollback Impact |
+| :--- | :--- | :--- | :---: | :--- |
+| **`REQUIRED`** (Default) | Joins existing transaction. | Creates new transaction. | 1 | Exception marks entire transaction rollback-only. |
+| **`REQUIRES_NEW`** | **Suspends** existing; creates new independent transaction. | Creates new transaction. | **2 (Simultaneous)** | Inner commits independently; does not roll back parent. |
+| **`MANDATORY`** | Joins existing transaction. | **Throws `IllegalTransactionStateException`**. | 1 | Fails immediately if unmanaged. |
+| **`SUPPORTS`** | Joins existing transaction. | Executes non-transactionally. | 0 or 1 | Depends on caller state. |
+| **`NOT_SUPPORTED`** | **Suspends** existing; executes non-transactionally. | Executes non-transactionally. | 0 | Unaffected by transaction rollbacks. |
+| **`NEVER`** | **Throws `IllegalTransactionStateException`**. | Executes non-transactionally. | 0 | Enforces non-transactional execution. |
+| **`NESTED`** | Creates a JDBC Savepoint within current transaction. | Creates new transaction. | 1 | Rolls back to savepoint without aborting parent. |
+
+#### 4. Advanced Production Pitfall: The `REQUIRES_NEW` Connection Pool Starvation Deadlock
+A lethal hazard in high-concurrency Spring backends occurs when `REQUIRES_NEW` is combined with small connection pools:
+1. Thread $T_1$ starts an outer `@Transactional(REQUIRED)` method, borrowing Connection $C_1$ from HikariCP.
+2. Under heavy load, 10 concurrent requests arrive. All 10 threads borrow connections $C_1 \dots C_{10}$ from a pool sized at `maximumPoolSize = 10`.
+3. Each thread reaches an inner method annotated with `@Transactional(REQUIRES_NEW)`.
+4. To execute the inner method, each thread attempts to borrow a **second connection** from HikariCP.
+5. But the pool is 100% exhausted! All 10 threads block waiting for a connection to become free (`connectionTimeout`).
+6. Because no thread can proceed to commit and release its first connection, the application enters an **irrecoverable pool deadlock**, crashing all incoming traffic until timeout!
+- **Rule of Thumb:** Ensure `maximumPoolSize > concurrent_threads * 2` if employing `REQUIRES_NEW` under load.
 
 #### Propagation Scenario Traces:
 

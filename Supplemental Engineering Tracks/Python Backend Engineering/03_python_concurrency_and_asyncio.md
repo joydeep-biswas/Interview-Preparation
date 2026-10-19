@@ -118,6 +118,21 @@ To understand the three concurrency models in Python, consider three different r
 
 ### 1.2 The Concurrency Trilemma: Memory Footprint, Context Switching, and GIL Impact
 
+#### Trade-Off Analysis: Memory Overhead vs. Scheduling Cost
+Designing resilient high-concurrency microservices in Python requires navigating three conflicting mechanical trade-offs governed by the underlying operating system kernel:
+
+1. **Process-Level Isolation (`multiprocessing`):**
+   - **Kernel Abstraction:** Each worker is a distinct operating system process created via `fork()` or `spawn()`.
+   - **Cost Profile:** Highest memory overhead ($\approx 25 - 60\text{ MB}$ per process due to duplicate Python runtime memory structures) and highest context-switching overhead (flushing the CPU's Translation Lookaside Buffer). However, each process owns an independent CPython interpreter and heap, delivering true 100% linear multicore CPU scaling.
+
+2. **Kernel Threading (`threading`):**
+   - **Kernel Abstraction:** Native OS kernel threads (`pthread` on Linux/macOS) scheduled preemptively by the OS kernel scheduler.
+   - **Cost Profile:** Moderate memory cost ($\approx 8\text{ MB}$ default virtual stack allocation per thread, though typically $\approx 64 - 128\text{ KB}$ physical resident memory). Threads share process heap space. While preemptive scheduling avoids starvation, execution of Python bytecode is strictly serialized by the Global Interpreter Lock, yielding zero speedup for CPU-bound loops.
+
+3. **User-Space Cooperative Coroutines (`asyncio`):**
+   - **Kernel Abstraction:** Single-threaded user-space cooperative multitasking running over an OS event notification loop (`epoll` on Linux, `kqueue` on macOS).
+   - **Cost Profile:** Microscopic memory footprint ($\approx 2 - 4\text{ KB}$ per coroutine frame stored in heap RAM). Context switches occur entirely within Python user space without kernel mode transitions or CPU register swaps, allowing a single server process to manage $50,000+$ concurrent network sockets with minimal CPU utilization.
+
 | Concurrency Architecture | Operating System Entity | Memory per Unit | Context Switching Cost | Multicore CPU Speedup? | Typical Production Use Case |
 | :--- | :--- | :--- | :--- | :---: | :--- |
 | **`multiprocessing`** | Isolated OS Processes | $\approx 25\text{--}60\text{ MB}$ | Heavy OS context switch + TLB flush | **Yes (100% per core)** | CPU-bound math, ML batch inference, image encoding |

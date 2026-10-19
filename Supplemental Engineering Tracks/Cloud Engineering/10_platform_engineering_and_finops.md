@@ -74,64 +74,66 @@ flowchart TD
    - [2.1 Core Subsystems: Software Catalog, TechDocs, and Software Templates (Scaffolder)](#21-core-subsystems-software-catalog-techdocs-and-software-templates-scaffolder)
    - [2.2 The Golden Path (Paved Road) Philosophy: Magnetic vs. Coercive Adoption](#22-the-golden-path-paved-road-philosophy-magnetic-vs-coercive-adoption)
    - [2.3 Production Backstage Scaffolder Template Definition](#23-production-backstage-scaffolder-template-definition)
-3. [Infrastructure Control Planes with Crossplane](#6-infrastructure-control-planes-with-crossplane)
-   - [6.1 Moving Beyond Static IaC: Continuous Reconciliation Loops vs. Pipeline Runs](#61-moving-beyond-static-iac-continuous-reconciliation-loops-vs-pipeline-runs)
-   - [6.2 Crossplane Building Blocks: Providers, Managed Resources (MRs), and Composite Resource Definitions (XRDs)](#62-crossplane-building-blocks-providers-managed-resources-mrs-and-composite-resource-definitions-xrds)
-   - [6.3 Production Composition: Abstracting Cloud Relational Databases](#63-production-composition-abstracting-cloud-relational-databases)
-4. [Kubernetes Multi-Tenancy & Platform Abstractions](#7-kubernetes-multi-tenancy--platform-abstractions)
-   - [7.1 Soft Multi-Tenancy: Namespaces, ResourceQuotas, and LimitRanges](#71-soft-multi-tenancy-namespaces-resourcequotas-and-limitranges)
-   - [7.2 Hard Multi-Tenancy: Virtual Clusters (vCluster) vs. Physical Isolation](#72-hard-multi-tenancy-virtual-clusters-vcluster-vs-physical-isolation)
-5. [Automated Policy Guardrails with Kyverno](#8-automated-policy-guardrails-with-kyverno)
-   - [8.1 Kyverno vs. OPA Gatekeeper: Declarative YAML vs. Imperative Rego](#81-kyverno-vs-opa-gatekeeper-declarative-yaml-vs-imperative-rego)
-   - [8.2 Admission Webhooks: Validate, Mutate, and Generate Rules](#82-admission-webhooks-validate-mutate-and-generate-rules)
-6. [Platform Secret Management: External Secrets Operator (ESO)](#9-platform-secret-management-external-secrets-operator-eso)
-   - [9.1 The Security Hazard of Storing Secrets in Git and etcd](#91-the-security-hazard-of-storing-secrets-in-git-and-etcd)
-   - [9.2 ESO Architecture: ClusterSecretStore, ExternalSecret, and Workload Identity](#92-eso-architecture-clustersecretstore-externalsecret-and-workload-identity)
-7. [Ephemeral Development Environments & Preview Stacks](#10-ephemeral-development-environments--preview-stacks)
-   - [10.1 Pull-Request-Driven Preview Lifecycle Orchestration](#101-pull-request-driven-preview-lifecycle-orchestration)
-   - [10.2 Automated Garbage Collection, Resource TTLs, and Cloud Cost Containment](#102-automated-garbage-collection-resource-ttls-and-cloud-cost-containment)
-8. [Developer Experience (DevEx) & Engineering Effectiveness Metrics](#11-developer-experience-devex--engineering-effectiveness-metrics)
-   - [11.1 DORA Metrics: Deployment Frequency, Lead Time, CFR, and MTTR](#111-dora-metrics-deployment-frequency-lead-time-cfr-and-mttr)
-   - [11.2 The SPACE Framework for Developer Productivity](#112-the-space-framework-for-developer-productivity)
-9. [Production Code Implementation: Automated Golden Path Repository Auditor](#12-production-code-implementation-automated-golden-path-repository-auditor)
-   - [12.1 Production Python Platform Catalog & Golden Path Compliance Auditor](#121-production-python-platform-catalog--golden-path-compliance-auditor)
-10. [Senior Platform Architect Troubleshooting Runbooks: Platform Failures](#13-senior-platform-architect-troubleshooting-runbooks-platform-failures)
-   - [13.1 Scenario 1: Crossplane Cloud API Rate-Limit Throttling Storm](#131-scenario-1-crossplane-cloud-api-rate-limit-throttling-storm)
-   - [13.2 Scenario 2: External Secrets Operator Token Desynchronization](#132-scenario-2-external-secrets-operator-token-desynchronization)
-   - [13.3 Scenario 3: Zombie Ephemeral Pull-Request Environments Leaking Cloud Spend](#133-scenario-3-zombie-ephemeral-pull-request-environments-leaking-cloud-spend)
-11. [The FinOps Framework: The Smart Metered Electric Grid Analogy](#14-the-finops-framework-the-smart-metered-electric-grid-analogy)
-   - [14.1 Real-World Analogy: Buying a Power Plant (CapEx) vs. The Metered Electric Grid (OpEx)](#141-real-world-analogy-buying-a-power-plant-capex-vs-the-metered-electric-grid-opex)
-   - [14.2 The Three FinOps Phases: Inform, Optimize, Operate](#142-the-three-finops-phases-inform-optimize-operate)
-   - [14.3 Unit Economics: Shifting from Raw Spend to Business Efficiency Metrics](#143-unit-economics-shifting-from-raw-spend-to-business-efficiency-metrics)
-12. [Enterprise Resource Hierarchy & Landing Zone Governance](#15-enterprise-resource-hierarchy--landing-zone-governance)
-   - [15.1 Enterprise Cloud Landing Zones: Azure CAF vs. AWS Control Tower](#151-enterprise-cloud-landing-zones-azure-caf-vs-aws-control-tower)
-   - [15.2 Mandatory Cost-Allocation Tagging Governance via Policy-as-Code](#152-mandatory-cost-allocation-tagging-governance-via-policy-as-code)
-   - [15.3 Preventive Guardrails: Service Control Policies (SCPs) and Azure Policy](#153-preventive-guardrails-service-control-policies-scps-and-azure-policy)
-13. [Cost Visibility, Showback vs. Chargeback, and ML Anomaly Detection](#16-cost-visibility-showback-vs-chargeback-and-ml-anomaly-detection)
-   - [16.1 Showback vs. Chargeback Accounting Models](#161-showback-vs-chargeback-accounting-models)
-   - [16.2 Statistical Anomaly Detection: Holt-Winters and Z-Scores](#162-statistical-anomaly-detection-holt-winters-and-z-scores)
-14. [Compute and Storage Cost Optimization: Rate vs. Usage Levers](#17-compute-and-storage-cost-optimization-rate-vs-usage-levers)
-   - [17.1 Compute Rightsizing Analytics and Elastic Scaling](#171-compute-rightsizing-analytics-and-elastic-scaling)
-   - [17.2 Commitment Discounts: Reserved Instances vs. Savings Plans](#172-commitment-discounts-reserved-instances-vs-savings-plans)
-   - [17.3 Spot Instances / Spot VMs: Auction Physics & Graceful IMDS Drain Handling](#173-spot-instances--spot-vms-auction-physics--graceful-imds-drain-handling)
-   - [17.4 Storage Lifecycle Policies: Hot, Cool, Cold, Archive and the Retrieval Fee Trap](#174-storage-lifecycle-policies-hot-cool-cold-archive-and-the-retrieval-fee-trap)
-15. [Network Egress and Data Transfer Economics](#18-network-egress-and-data-transfer-economics)
-   - [18.1 The Hidden Tax of Cloud Networking: Inter-AZ, Inter-Region, and Egress](#181-the-hidden-tax-of-cloud-networking-inter-az-inter-region-and-egress)
-   - [18.2 Mitigating NAT Gateway Data Processing Surcharges](#182-mitigating-nat-gateway-data-processing-surcharges)
-16. [Kubernetes Workload Cost Attribution (Kubecost & OpenCost)](#19-kubernetes-workload-cost-attribution-kubecost--opencost)
-   - [19.1 The Shared Multi-Tenant Cluster Allocation Problem](#191-the-shared-multi-tenant-cluster-allocation-problem)
-   - [19.2 Kubecost Allocation Mathematics: Requests vs. Usage vs. Idle Overhead](#192-kubecost-allocation-mathematics-requests-vs-usage-vs-idle-overhead)
-17. [Enterprise Architecture Governance and ADRs](#20-enterprise-architecture-governance-and-adrs)
-   - [20.1 Architecture Decision Records (ADRs) Framework](#201-architecture-decision-records-adrs-framework)
-   - [23.2 Cloud Center of Excellence (CCoE) Operating Model](#232-cloud-center-of-excellence-ccoe-operating-model)
-18. [Production Code Implementation: Automated Cloud Waste & Zombie Asset Auditor](#24-production-code-implementation-automated-cloud-waste--zombie-asset-auditor)
-   - [24.1 Production Python Cloud FinOps Waste Auditor](#241-production-python-cloud-finops-waste-auditor)
-19. [Senior FinOps Troubleshooting Runbooks: Outage & Bill Shock Scenarios](#25-senior-finops-troubleshooting-runbooks-outage--bill-shock-scenarios)
-   - [25.1 Scenario 1: Overnight Cloud Cost Explosion from an Unthrottled Distributed Loop](#251-scenario-1-overnight-cloud-cost-explosion-from-an-unthrottled-distributed-loop)
-   - [25.2 Scenario 2: Massive Unexpected NAT Gateway Data Processing Surcharge](#252-scenario-2-massive-unexpected-nat-gateway-data-processing-surcharge)
-   - [25.3 Scenario 3: Glacier Deep Archive Emergency Retrieval Fee Shock](#253-scenario-3-glacier-deep-archive-emergency-retrieval-fee-shock)
-20. [Summary Comparison & Production Engineering Reference Matrix](#26-summary-comparison--production-engineering-reference-matrix)
-21. [References & Further Reading](#27-references--further-reading)
+3. [Infrastructure Control Planes with Crossplane](#3-infrastructure-control-planes-with-crossplane)
+   - [3.1 Moving Beyond Static IaC: Continuous Reconciliation Loops vs. Pipeline Runs](#31-moving-beyond-static-iac-continuous-reconciliation-loops-vs-pipeline-runs)
+   - [3.2 Crossplane Building Blocks: Providers, Managed Resources (MRs), and Composite Resource Definitions (XRDs)](#32-crossplane-building-blocks-providers-managed-resources-mrs-and-composite-resource-definitions-xrds)
+   - [3.3 Production Composition: Abstracting Cloud Relational Databases](#33-production-composition-abstracting-cloud-relational-databases)
+4. [Kubernetes Multi-Tenancy & Platform Abstractions](#4-kubernetes-multi-tenancy--platform-abstractions)
+   - [4.1 Soft Multi-Tenancy: Namespaces, ResourceQuotas, and LimitRanges](#41-soft-multi-tenancy-namespaces-resourcequotas-and-limitranges)
+   - [4.2 Hard Multi-Tenancy: Virtual Clusters (vCluster) vs. Physical Isolation](#42-hard-multi-tenancy-virtual-clusters-vcluster-vs-physical-isolation)
+5. [Automated Policy Guardrails with Kyverno](#5-automated-policy-guardrails-with-kyverno)
+   - [5.1 Kyverno vs. OPA Gatekeeper: Declarative YAML vs. Imperative Rego](#51-kyverno-vs-opa-gatekeeper-declarative-yaml-vs-imperative-rego)
+   - [5.2 Admission Webhooks: Validate, Mutate, and Generate Rules](#52-admission-webhooks-validate-mutate-and-generate-rules)
+6. [Platform Secret Management: External Secrets Operator (ESO)](#6-platform-secret-management-external-secrets-operator-eso)
+   - [6.1 The Security Hazard of Storing Secrets in Git and etcd](#61-the-security-hazard-of-storing-secrets-in-git-and-etcd)
+   - [6.2 ESO Architecture: ClusterSecretStore, ExternalSecret, and Workload Identity](#62-eso-architecture-clustersecretstore-externalsecret-and-workload-identity)
+7. [Ephemeral Development Environments & Preview Stacks](#7-ephemeral-development-environments--preview-stacks)
+   - [7.1 Pull-Request-Driven Preview Lifecycle Orchestration](#71-pull-request-driven-preview-lifecycle-orchestration)
+   - [7.2 Automated Garbage Collection, Resource TTLs, and Cloud Cost Containment](#72-automated-garbage-collection-resource-ttls-and-cloud-cost-containment)
+8. [Developer Experience (DevEx) & Engineering Effectiveness Metrics](#8-developer-experience-devex--engineering-effectiveness-metrics)
+   - [8.1 DORA Metrics: Deployment Frequency, Lead Time, CFR, and MTTR](#81-dora-metrics-deployment-frequency-lead-time-cfr-and-mttr)
+   - [8.2 The SPACE Framework for Developer Productivity](#82-the-space-framework-for-developer-productivity)
+9. [Production Code Implementation: Automated Golden Path Repository Auditor](#9-production-code-implementation-automated-golden-path-repository-auditor)
+   - [9.1 Production Python Platform Catalog & Golden Path Compliance Auditor](#91-production-python-platform-catalog--golden-path-compliance-auditor)
+10. [Senior Platform Architect Troubleshooting Runbooks: Platform Failures](#10-senior-platform-architect-troubleshooting-runbooks-platform-failures)
+    - [10.1 Scenario 1: Crossplane Cloud API Rate-Limit Throttling Storm](#101-scenario-1-crossplane-cloud-api-rate-limit-throttling-storm)
+    - [10.2 Scenario 2: External Secrets Operator Token Desynchronization](#102-scenario-2-external-secrets-operator-token-desynchronization)
+    - [10.3 Scenario 3: Zombie Ephemeral Pull-Request Environments Leaking Cloud Spend](#103-scenario-3-zombie-ephemeral-pull-request-environments-leaking-cloud-spend)
+11. [The FinOps Framework: The Smart Metered Electric Grid Analogy](#11-the-finops-framework-the-smart-metered-electric-grid-analogy)
+    - [11.1 Real-World Analogy: Buying a Power Plant (CapEx) vs. The Metered Electric Grid (OpEx)](#111-real-world-analogy-buying-a-power-plant-capex-vs-the-metered-electric-grid-opex)
+    - [11.2 The Three FinOps Phases: Inform, Optimize, Operate](#112-the-three-finops-phases-inform-optimize-operate)
+    - [11.3 Unit Economics: Shifting from Raw Spend to Business Efficiency Metrics](#113-unit-economics-shifting-from-raw-spend-to-business-efficiency-metrics)
+12. [Enterprise Resource Hierarchy & Landing Zone Governance](#12-enterprise-resource-hierarchy--landing-zone-governance)
+    - [12.1 Enterprise Cloud Landing Zones: Azure CAF vs. AWS Control Tower](#121-enterprise-cloud-landing-zones-azure-caf-vs-aws-control-tower)
+    - [12.2 Mandatory Cost-Allocation Tagging Governance via Policy-as-Code](#122-mandatory-cost-allocation-tagging-governance-via-policy-as-code)
+    - [12.3 Preventive Guardrails: Service Control Policies (SCPs) and Azure Policy](#123-preventive-guardrails-service-control-policies-scps-and-azure-policy)
+13. [Cost Visibility, Showback vs. Chargeback, and ML Anomaly Detection](#13-cost-visibility-showback-vs-chargeback-and-ml-anomaly-detection)
+    - [13.1 Showback vs. Chargeback Accounting Models](#131-showback-vs-chargeback-accounting-models)
+    - [13.2 Statistical Anomaly Detection: Holt-Winters and Z-Scores](#132-statistical-anomaly-detection-holt-winters-and-z-scores)
+14. [Compute and Storage Cost Optimization: Rate vs. Usage Levers](#14-compute-and-storage-cost-optimization-rate-vs-usage-levers)
+    - [14.1 Compute Rightsizing Analytics and Elastic Scaling](#141-compute-rightsizing-analytics-and-elastic-scaling)
+    - [14.2 Commitment Discounts: Reserved Instances vs. Savings Plans](#142-commitment-discounts-reserved-instances-vs-savings-plans)
+    - [14.3 Spot Instances / Spot VMs: Auction Physics & Graceful IMDS Drain Handling](#143-spot-instances--spot-vms-auction-physics--graceful-imds-drain-handling)
+    - [14.4 Storage Lifecycle Policies: Hot, Cool, Cold, Archive and the Retrieval Fee Trap](#144-storage-lifecycle-policies-hot-cool-cold-archive-and-the-retrieval-fee-trap)
+15. [Network Egress and Data Transfer Economics](#15-network-egress-and-data-transfer-economics)
+    - [15.1 The Hidden Tax of Cloud Networking: Inter-AZ, Inter-Region, and Egress](#151-the-hidden-tax-of-cloud-networking-inter-az-inter-region-and-egress)
+    - [15.2 Mitigating NAT Gateway Data Processing Surcharges](#152-mitigating-nat-gateway-data-processing-surcharges)
+16. [Kubernetes Workload Cost Attribution (Kubecost & OpenCost)](#16-kubernetes-workload-cost-attribution-kubecost--opencost)
+    - [16.1 The Shared Multi-Tenant Cluster Allocation Problem](#161-the-shared-multi-tenant-cluster-allocation-problem)
+    - [16.2 Kubecost Allocation Mathematics: Requests vs. Usage vs. Idle Overhead](#162-kubecost-allocation-mathematics-requests-vs-usage-vs-idle-overhead)
+17. [Enterprise Architecture Governance and ADRs](#17-enterprise-architecture-governance-and-adrs)
+    - [17.1 Architecture Decision Records (ADRs) Framework](#171-architecture-decision-records-adrs-framework)
+    - [17.2 Cloud Center of Excellence (CCoE) Operating Model](#172-cloud-center-of-excellence-ccoe-operating-model)
+18. [Production Code Implementation: Automated Cloud Waste & Zombie Asset Auditor](#18-production-code-implementation-automated-cloud-waste--zombie-asset-auditor)
+    - [18.1 Production Python Cloud FinOps Waste Auditor](#181-production-python-cloud-finops-waste-auditor)
+19. [Senior FinOps Troubleshooting Runbooks: Outage & Bill Shock Scenarios](#19-senior-finops-troubleshooting-runbooks-outage--bill-shock-scenarios)
+    - [19.1 Scenario 1: Overnight Cloud Cost Explosion from an Unthrottled Distributed Loop](#191-scenario-1-overnight-cloud-cost-explosion-from-an-unthrottled-distributed-loop)
+    - [19.2 Scenario 2: Massive Unexpected NAT Gateway Data Processing Surcharge](#192-scenario-2-massive-unexpected-nat-gateway-data-processing-surcharge)
+    - [19.3 Scenario 3: Glacier Deep Archive Emergency Retrieval Fee Shock](#193-scenario-3-glacier-deep-archive-emergency-retrieval-fee-shock)
+20. [Summary Comparison & Production Engineering Reference Matrix](#20-summary-comparison--production-engineering-reference-matrix)
+    - [20.1 Platform Engineering Evolution & Operating Model Reference Matrix](#201-platform-engineering-evolution--operating-model-reference-matrix)
+    - [20.2 Enterprise FinOps Maturity & Cost Optimization Framework](#202-enterprise-finops-maturity--cost-optimization-framework)
+21. [References & Further Reading](#21-references--further-reading)
 ---
 
 # 1. The Platform Engineering Paradigm: Municipal Highway Analogy
@@ -223,6 +225,10 @@ A fatal failure mode for platform engineering teams is operating like a legacy c
 **Spotify Backstage** (donated to the CNCF) has emerged as the industry-standard framework for building Internal Developer Portals.
 
 ### 2.1 Core Subsystems: Software Catalog, TechDocs, and Software Templates (Scaffolder)
+
+Spotify Backstage unifies fragmented developer toolchains by serving as an extensible internal developer portal. Rather than forcing product engineers to navigate dozens of disparate cloud consoles, build pipelines, documentation wikis, and monitoring dashboards, Backstage organizes enterprise software around four tightly integrated foundational subsystems: a centralized Software Catalog, Docs-like-Code documentation, automated Scaffolder project generation, and a pluggable micro-frontend ecosystem.
+
+The architectural responsibilities, file manifests, and developer experience outcomes across Backstage subsystems:
 
 #### Spotify Backstage Core Subsystems Reference Matrix
 
@@ -374,7 +380,7 @@ spec:
 
   steps:
 
-# 3. Fetch cookiecutter skeleton template from Git
+    # Fetch cookiecutter skeleton template from Git
 
 - id: fetch-template
       name: Rendering Golden Skeleton
@@ -387,7 +393,7 @@ spec:
           description: ${{ parameters.description }}
           needs_database: ${{ parameters.needs_database }}
 
-# 4. Publish repository to corporate GitHub organization
+    # Publish repository to corporate GitHub organization
 
 - id: publish-github
       name: Creating Remote GitHub Repository
@@ -400,7 +406,7 @@ spec:
         protectDefaultBranch: true
         repoVisibility: internal
 
-# 5. Register service in Backstage Software Catalog
+    # Register service in Backstage Software Catalog
 
 - id: register-catalog
       name: Registering Component in Backstage Catalog
@@ -420,9 +426,9 @@ spec:
 
 ---
 
-# 6. Infrastructure Control Planes with Crossplane
+# 3. Infrastructure Control Planes with Crossplane
 
-### 6.1 Moving Beyond Static IaC: Continuous Reconciliation Loops vs. Pipeline Runs
+### 3.1 Moving Beyond Static IaC: Continuous Reconciliation Loops vs. Pipeline Runs
 
 ```mermaid
 flowchart TD
@@ -445,7 +451,7 @@ flowchart TD
 
 ---
 
-### 6.2 Crossplane Building Blocks: Providers, Managed Resources (MRs), and Composite Resource Definitions (XRDs)
+### 3.2 Crossplane Building Blocks: Providers, Managed Resources (MRs), and Composite Resource Definitions (XRDs)
 
 Crossplane extends the Kubernetes API with four core primitives:
 1. **Providers (e.g. `provider-azure`, `provider-aws`):** Kubernetes operators that package CRDs mapping 1:1 with cloud primitives.
@@ -455,7 +461,7 @@ Crossplane extends the Kubernetes API with four core primitives:
 
 ---
 
-### 6.3 Production Composition: Abstracting Cloud Relational Databases
+### 3.3 Production Composition: Abstracting Cloud Relational Databases
 
 Below is a production Crossplane Composition provisioning an enterprise Azure Database for PostgreSQL Flexible Server, generating an Azure Key Vault secret, and binding network security rules:
 
@@ -530,11 +536,11 @@ spec:
 
 ---
 
-# 7. Kubernetes Multi-Tenancy & Platform Abstractions
+# 4. Kubernetes Multi-Tenancy & Platform Abstractions
 
 Platform engineers must balance multi-tenant resource density against security isolation.
 
-### 7.1 Soft Multi-Tenancy: Namespaces, ResourceQuotas, and LimitRanges
+### 4.1 Soft Multi-Tenancy: Namespaces, ResourceQuotas, and LimitRanges
 
 In soft multi-tenancy, multiple teams share a single large Kubernetes cluster. Tenants are partitioned via Namespaces with hard compute boundaries:
 
@@ -575,7 +581,7 @@ spec:
 
 ---
 
-### 7.2 Hard Multi-Tenancy: Virtual Clusters (vCluster) vs. Physical Isolation
+### 4.2 Hard Multi-Tenancy: Virtual Clusters (vCluster) vs. Physical Isolation
 
 ```mermaid
 flowchart TD
@@ -609,9 +615,13 @@ flowchart TD
 
 ---
 
-# 8. Automated Policy Guardrails with Kyverno
+# 5. Automated Policy Guardrails with Kyverno
 
-### 8.1 Kyverno vs. OPA Gatekeeper: Declarative YAML vs. Imperative Rego
+### 5.1 Kyverno vs. OPA Gatekeeper: Declarative YAML vs. Imperative Rego
+
+Enforcing security, governance, and organizational standards across multi-tenant Kubernetes clusters requires automated admission control. While static linters catch violations in CI pipelines, admission webhooks act as the final defensive gate in the API server before manifests are committed to etcd. The cloud-native ecosystem features two dominant policy engines—Kyverno and Open Policy Agent (OPA) Gatekeeper—each embodying a distinct architectural philosophy for rule definition, mutation, and resource generation.
+
+The architectural, language, and operational differences between Kyverno and OPA Gatekeeper:
 
 | Policy Engine Dimension | Kyverno (Kubernetes Native) | OPA Gatekeeper (General Purpose) |
 | :--- | :--- | :--- |
@@ -650,7 +660,7 @@ flowchart LR
 
 ---
 
-### 8.2 Admission Webhooks: Validate, Mutate, and Generate Rules
+### 5.2 Admission Webhooks: Validate, Mutate, and Generate Rules
 
 #### Production Kyverno Policy: Auto-Generating Default-Deny NetworkPolicies
 Whenever a developer creates a new namespace, Kyverno **automatically generates** a zero-trust default-deny NetworkPolicy:
@@ -690,16 +700,16 @@ spec:
 
 ---
 
-# 9. Platform Secret Management: External Secrets Operator (ESO)
+# 6. Platform Secret Management: External Secrets Operator (ESO)
 
-### 9.1 The Security Hazard of Storing Secrets in Git and etcd
+### 6.1 The Security Hazard of Storing Secrets in Git and etcd
 
 1. **Base64 is NOT Encryption:** Kubernetes `Secret` objects store data in unencrypted base64 strings in etcd. Anyone with read access to the namespace or etcd backups can trivially decode credentials.
 2. **GitOps Anti-Pattern:** Committing raw secrets to Git repositories exposes credentials to all repository viewers and Git history clones.
 
 ---
 
-### 9.2 ESO Architecture: ClusterSecretStore, ExternalSecret, and Workload Identity
+### 6.2 ESO Architecture: ClusterSecretStore, ExternalSecret, and Workload Identity
 
 **External Secrets Operator (ESO)** continuously reads credentials from external enterprise vaults (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) and materializes them as ephemeral native Kubernetes Secrets:
 
@@ -731,9 +741,9 @@ flowchart LR
 
 ---
 
-# 10. Ephemeral Development Environments & Preview Stacks
+# 7. Ephemeral Development Environments & Preview Stacks
 
-### 10.1 Pull-Request-Driven Preview Lifecycle Orchestration
+### 7.1 Pull-Request-Driven Preview Lifecycle Orchestration
 
 Preview environments allow developers and QA engineers to test pull requests against real cloud infrastructure before merging to main:
 
@@ -761,7 +771,7 @@ sequenceDiagram
 
 ---
 
-### 10.2 Automated Garbage Collection, Resource TTLs, and Cloud Cost Containment
+### 7.2 Automated Garbage Collection, Resource TTLs, and Cloud Cost Containment
 
 Without automated garbage collection, developers abandon PRs, leaving hundreds of orphan databases and load balancers running, accumulating massive cloud waste:
 - **Namespace TTL Annotations:** Annotate preview namespaces with `platform.corp/ttl: "72h"`.
@@ -769,9 +779,9 @@ Without automated garbage collection, developers abandon PRs, leaving hundreds o
 
 ---
 
-# 11. Developer Experience (DevEx) & Engineering Effectiveness Metrics
+# 8. Developer Experience (DevEx) & Engineering Effectiveness Metrics
 
-### 11.1 DORA Metrics: Deployment Frequency, Lead Time, CFR, and MTTR
+### 8.1 DORA Metrics: Deployment Frequency, Lead Time, CFR, and MTTR
 
 The DevOps Research and Assessment (DORA) metrics measure engineering velocity and platform stability:
 
@@ -784,7 +794,7 @@ The DevOps Research and Assessment (DORA) metrics measure engineering velocity a
 
 ---
 
-### 11.2 The SPACE Framework for Developer Productivity
+### 8.2 The SPACE Framework for Developer Productivity
 
 DORA measures delivery pipeline throughput; GitHub and Microsoft's **SPACE Framework** measures the holistic human experience:
 - **S - Satisfaction and Well-Being:** How healthy and happy are developers? (Measured via quarterly DevEx surveys).
@@ -795,9 +805,9 @@ DORA measures delivery pipeline throughput; GitHub and Microsoft's **SPACE Frame
 
 ---
 
-# 12. Production Code Implementation: Automated Golden Path Repository Auditor
+# 9. Production Code Implementation: Automated Golden Path Repository Auditor
 
-### 12.1 Production Python Platform Catalog & Golden Path Compliance Auditor
+### 9.1 Production Python Platform Catalog & Golden Path Compliance Auditor
 
 Below is a production-grade Python tool that audits git repositories for **Golden Path compliance**, verifies `catalog-info.yaml` syntax, checks for security scanning workflows, and outputs structured JSON reports for Backstage:
 
@@ -1025,9 +1035,9 @@ if __name__ == "__main__":
 
 ---
 
-# 13. Senior Platform Architect Troubleshooting Runbooks: Platform Failures
+# 10. Senior Platform Architect Troubleshooting Runbooks: Platform Failures
 
-### 13.1 Scenario 1: Crossplane Cloud API Rate-Limit Throttling Storm
+### 10.1 Scenario 1: Crossplane Cloud API Rate-Limit Throttling Storm
 - **Symptom:** Crossplane logs are inundated with `HTTP 429 Too Many Requests` from Azure Resource Manager (ARM) or AWS Cloud Control API. Cloud resource creation stalls; developer claims remain stuck in `Syncing` status indefinitely.
 - **Root Cause:** 2,000 Managed Resources (MRs) in Crossplane are operating on default **1-minute poll intervals**. The cumulative reconciliation queries exhaust the cloud provider's regional subscription API rate limits.
 - **Immediate Mitigation Runbook:**
@@ -1042,7 +1052,7 @@ if __name__ == "__main__":
 
 ---
 
-### 13.2 Scenario 2: External Secrets Operator Token Desynchronization
+### 10.2 Scenario 2: External Secrets Operator Token Desynchronization
 - **Symptom:** Kubernetes pods fail to start with `CreateContainerConfigError`. The target Kubernetes Secret is missing or contains stale credentials.
 - **Root Cause Isolation:**
   1. Inspect the `ExternalSecret` custom resource:
@@ -1057,7 +1067,7 @@ if __name__ == "__main__":
 
 ---
 
-### 13.3 Scenario 3: Zombie Ephemeral Pull-Request Environments Leaking Cloud Spend
+### 10.3 Scenario 3: Zombie Ephemeral Pull-Request Environments Leaking Cloud Spend
 - **Symptom:** Monthly AWS / Azure bill spikes unexpectedly by \$18,000. Finance alerts the platform team that 350 preview databases and load balancers are active in non-production accounts.
 - **Root Cause:** Developers regularly close pull requests using GitHub UI without triggering the GitHub Actions webhook (or the cleanup job failed silently due to an expired PAT token).
 - **Remediation Runbook:**
@@ -1069,9 +1079,9 @@ if __name__ == "__main__":
 
 ---
 
-# 14. The FinOps Framework: The Smart Metered Electric Grid Analogy
+# 11. The FinOps Framework: The Smart Metered Electric Grid Analogy
 
-### 14.1 Real-World Analogy: Buying a Power Plant (CapEx) vs. The Metered Electric Grid (OpEx)
+### 11.1 Real-World Analogy: Buying a Power Plant (CapEx) vs. The Metered Electric Grid (OpEx)
 
 To understand why enterprise organizations experience catastrophic cloud billing shocks without a mature FinOps practice, consider the structural difference between **building your own power plant** and **plugging into a smart municipal electric grid**:
 
@@ -1102,7 +1112,7 @@ flowchart TD
 
 ---
 
-### 14.2 The Three FinOps Phases: Inform, Optimize, Operate
+### 11.2 The Three FinOps Phases: Inform, Optimize, Operate
 
 The FinOps Foundation defines an iterative, continuous three-phase lifecycle:
 
@@ -1125,7 +1135,7 @@ flowchart LR
 
 ---
 
-### 14.3 Unit Economics: Shifting from Raw Spend to Business Efficiency Metrics
+### 11.3 Unit Economics: Shifting from Raw Spend to Business Efficiency Metrics
 
 A common anti-pattern in cloud governance is celebrating raw cost cuts when the business is booming, or panicking when the cloud bill increases because revenue doubled. Mature FinOps measures **Unit Economics**:
 
@@ -1159,11 +1169,11 @@ flowchart TD
 
 ---
 
-# 15. Enterprise Resource Hierarchy & Landing Zone Governance
+# 12. Enterprise Resource Hierarchy & Landing Zone Governance
 
 Enterprise landing zones establish organizational hierarchies, security boundaries, and billing ownership before application workloads deploy.
 
-### 15.1 Enterprise Cloud Landing Zones: Azure CAF vs. AWS Control Tower
+### 12.1 Enterprise Cloud Landing Zones: Azure CAF vs. AWS Control Tower
 
 ```mermaid
 flowchart TD
@@ -1205,7 +1215,7 @@ flowchart TD
 
 ---
 
-### 15.2 Mandatory Cost-Allocation Tagging Governance via Policy-as-Code
+### 12.2 Mandatory Cost-Allocation Tagging Governance via Policy-as-Code
 
 Untagged cloud resources represent financial black holes that cannot be attributed to specific departments or products. Enterprises enforce **Policy-as-Code** gates at the management root, causing cloud APIs to **reject non-compliant provisioning requests**:
 
@@ -1239,7 +1249,7 @@ Untagged cloud resources represent financial black holes that cannot be attribut
 
 ---
 
-### 15.3 Preventive Guardrails: Service Control Policies (SCPs) and Azure Policy
+### 12.3 Preventive Guardrails: Service Control Policies (SCPs) and Azure Policy
 
 Preventive policies establish non-negotiable financial and regional guardrails:
 1. **Restricting Deployment Regions:** Prevent developers from launching resources in expensive or non-compliant regions:
@@ -1268,9 +1278,13 @@ Preventive policies establish non-negotiable financial and regional guardrails:
 
 ---
 
-# 16. Cost Visibility, Showback vs. Chargeback, and ML Anomaly Detection
+# 13. Cost Visibility, Showback vs. Chargeback, and ML Anomaly Detection
 
-### 16.1 Showback vs. Chargeback Accounting Models
+### 13.1 Showback vs. Chargeback Accounting Models
+
+Driving accountability for decentralized cloud spending requires selecting an organizational financial attribution mechanism. While centralized IT budgets historically absorbed all technology infrastructure costs, modern FinOps shifts financial responsibility to individual engineering squads through two primary governance models: Showback (informational transparency) and Chargeback (direct ledger transfers).
+
+The financial, structural, and cultural trade-offs between Showback and Chargeback models:
 
 | Governance Dimension | Showback Model (Inform / Crawl Phase) | Chargeback Model (Operate / Run Phase) |
 | :--- | :--- | :--- |
@@ -1283,7 +1297,7 @@ Preventive policies establish non-negotiable financial and regional guardrails:
 
 ---
 
-### 16.2 Statistical Anomaly Detection: Holt-Winters and Z-Scores
+### 13.2 Statistical Anomaly Detection: Holt-Winters and Z-Scores
 
 Static dollar thresholds fail to catch cloud waste because spend naturally grows as the business expands. Modern FinOps platforms use statistical time-series algorithms:
 - **Z-Score Detection:** Calculates standard deviations from a rolling 14-day moving mean:
@@ -1293,20 +1307,20 @@ Static dollar thresholds fail to catch cloud waste because spend naturally grows
 
 ---
 
-# 17. Compute and Storage Cost Optimization: Rate vs. Usage Levers
+# 14. Compute and Storage Cost Optimization: Rate vs. Usage Levers
 
 FinOps divides optimization into two distinct levers:
 1. **Usage Optimization (Engineering):** Using fewer resources (downsizing VMs, terminating idle disks, cleaning preview stacks).
 2. **Rate Optimization (Finance/Architecture):** Paying less per resource unit for the exact same infrastructure (Savings Plans, Spot instances).
 
-### 17.1 Compute Rightsizing Analytics and Elastic Scaling
+### 14.1 Compute Rightsizing Analytics and Elastic Scaling
 
 Over $40\%$ of cloud virtual machines operate at **$< 10\%$ average CPU and memory utilization**:
 - **The Rightsizing Rule:** If an instance exhibits **P95 CPU $\le 20\%$** and **P95 RAM $\le 30\%$** over a rolling 14-day observation window, immediately downsize the instance by one size tier (e.g. `Standard_D8s_v5` $\rightarrow$ `Standard_D4s_v5`), slashing compute spend by **$50\%$**.
 
 ---
 
-### 17.2 Commitment Discounts: Reserved Instances vs. Savings Plans
+### 14.2 Commitment Discounts: Reserved Instances vs. Savings Plans
 
 | Commitment Discount Model | Geographic & Regional Scope | Instance Family & OS Flexibility | Maximum Discount | Cross-Service Coverage | Marketplace Resale | Best Production Use Case |
 | :--- | :--- | :--- | :---: | :--- | :---: | :--- |
@@ -1319,7 +1333,7 @@ Over $40\%$ of cloud virtual machines operate at **$< 10\%$ average CPU and memo
 
 ---
 
-### 17.3 Spot Instances / Spot VMs: Auction Physics & Graceful IMDS Drain Handling
+### 14.3 Spot Instances / Spot VMs: Auction Physics & Graceful IMDS Drain Handling
 
 Cloud providers sell surplus, unallocated hypervisor capacity at a **$60\% - 90\%$ discount** as **Spot Instances (AWS) / Spot VMs (Azure)**:
 - **The Catch:** The cloud provider can evict the instance at any time with minimal warning (**2-minute notice in AWS** via EventBridge/IMDS; **30-second notice in Azure** via Scheduled Events API).
@@ -1339,7 +1353,7 @@ fi
 
 ---
 
-### 17.4 Storage Lifecycle Policies: Hot, Cool, Cold, Archive and the Retrieval Fee Trap
+### 14.4 Storage Lifecycle Policies: Hot, Cool, Cold, Archive and the Retrieval Fee Trap
 
 ```mermaid
 stateDiagram-v2
@@ -1374,9 +1388,9 @@ stateDiagram-v2
 
 ---
 
-# 18. Network Egress and Data Transfer Economics
+# 15. Network Egress and Data Transfer Economics
 
-### 18.1 The Hidden Tax of Cloud Networking: Inter-AZ, Inter-Region, and Egress
+### 15.1 The Hidden Tax of Cloud Networking: Inter-AZ, Inter-Region, and Egress
 
 Inbound data transfer into public clouds is almost universally **free** (the "Hotel California" model). Cloud providers charge aggressively for outbound movement:
 
@@ -1389,7 +1403,7 @@ Inbound data transfer into public clouds is almost universally **free** (the "Ho
 
 ---
 
-### 18.2 Mitigating NAT Gateway Data Processing Surcharges
+### 15.2 Mitigating NAT Gateway Data Processing Surcharges
 
 Managed NAT Gateways (AWS NAT Gateway / Azure NAT Gateway) are silent cost exploders:
 - **Fixed Fee:** ~\$0.045 per hour per gateway (~$32/mo).
@@ -1427,15 +1441,15 @@ flowchart TD
 
 ---
 
-# 19. Kubernetes Workload Cost Attribution (Kubecost & OpenCost)
+# 16. Kubernetes Workload Cost Attribution (Kubecost & OpenCost)
 
-### 19.1 The Shared Multi-Tenant Cluster Allocation Problem
+### 16.1 The Shared Multi-Tenant Cluster Allocation Problem
 
 When 40 teams deploy microservices to a single 200-node shared Kubernetes cluster, the cloud bill arrives as a monolithic itemized charge for "200 Virtual Machines". Infrastructure leaders cannot determine which team is responsible for which portion of the bill.
 
 ---
 
-### 19.2 Kubecost Allocation Mathematics: Requests vs. Usage vs. Idle Overhead
+### 16.2 Kubecost Allocation Mathematics: Requests vs. Usage vs. Idle Overhead
 
 **OpenCost (CNCF)** and **Kubecost** resolve this by calculating cost allocation per container pod:
 
@@ -1460,9 +1474,9 @@ flowchart TD
 
 ---
 
-# 20. Enterprise Architecture Governance and ADRs
+# 17. Enterprise Architecture Governance and ADRs
 
-### 20.1 Architecture Decision Records (ADRs) Framework
+### 17.1 Architecture Decision Records (ADRs) Framework
 
 An **Architecture Decision Record (ADR)** documents significant technical decisions, architectural trade-offs, and financial implications in an immutable, version-controlled markdown file:
 
@@ -1473,15 +1487,15 @@ An **Architecture Decision Record (ADR)** documents significant technical decisi
 **Status:** Approved  
 **Deciders:** Principal Architect, Staff SRE, FinOps Lead  
 
-# 21. Context & Business Problem
+## 1. Context & Business Problem
 
 Our checkout platform is expanding to Europe. We require active-active write capability across `eastus` and `westeurope` with sub-10ms write latency and automated regional failover. Operating cross-region PostgreSQL clusters requires complex replication proxies and manual split-brain reconciliation.
 
-# 22. Decision
+## 2. Decision
 
 We will adopt **Azure Cosmos DB** with the NoSQL (Core) API, Session Consistency, and Multi-Region Writes enabled.
 
-# 23. Financial & Operational Consequences
+## 3. Financial & Operational Consequences
 
 ### Positive Consequences:
 - Multi-Region Writes guarantee a 99.999% availability SLA.
@@ -1493,7 +1507,7 @@ We will adopt **Azure Cosmos DB** with the NoSQL (Core) API, Session Consistency
 
 ---
 
-### 23.2 Cloud Center of Excellence (CCoE) Operating Model
+### 17.2 Cloud Center of Excellence (CCoE) Operating Model
 
 The **Cloud Center of Excellence (CCoE)** is a cross-functional governing council:
 - **Composition:** Lead Enterprise Architect, Head of Information Security, Lead SRE, FinOps Director, and Product Engineering VP.
@@ -1501,9 +1515,9 @@ The **Cloud Center of Excellence (CCoE)** is a cross-functional governing counci
 
 ---
 
-# 24. Production Code Implementation: Automated Cloud Waste & Zombie Asset Auditor
+# 18. Production Code Implementation: Automated Cloud Waste & Zombie Asset Auditor
 
-### 24.1 Production Python Cloud FinOps Waste Auditor
+### 18.1 Production Python Cloud FinOps Waste Auditor
 
 Below is a production-grade Python utility that interrogates cloud inventory data, detects orphaned block storage disks, unassociated public IPs, idle load balancers, and calculates exact monthly financial waste:
 
@@ -1648,9 +1662,9 @@ if __name__ == "__main__":
 
 ---
 
-# 25. Senior FinOps Troubleshooting Runbooks: Outage & Bill Shock Scenarios
+# 19. Senior FinOps Troubleshooting Runbooks: Outage & Bill Shock Scenarios
 
-### 25.1 Scenario 1: Overnight Cloud Cost Explosion from an Unthrottled Distributed Loop
+### 19.1 Scenario 1: Overnight Cloud Cost Explosion from an Unthrottled Distributed Loop
 - **Symptom:** Engineering VP receives an urgent Monday morning call from Finance. The cloud bill spiked by **\$48,000 over the weekend**.
 - **Root Cause Isolation:**
   1. Open Cost Management $\rightarrow$ Group by Service & Resource.
@@ -1666,7 +1680,7 @@ if __name__ == "__main__":
 
 ---
 
-### 25.2 Scenario 2: Massive Unexpected NAT Gateway Data Processing Surcharge
+### 19.2 Scenario 2: Massive Unexpected NAT Gateway Data Processing Surcharge
 - **Symptom:** Monthly AWS invoice shows a line item for `EC2: NATGateway-Bytes` totaling **\$14,500** ($320\text{TB}$ processed).
 - **Root Cause:** A newly deployed machine learning training pipeline in a private subnet was downloading terabytes of training images from S3 through the NAT Gateway rather than through a free VPC Gateway Endpoint.
 - **Remediation Runbook:**
@@ -1682,7 +1696,7 @@ if __name__ == "__main__":
 
 ---
 
-### 25.3 Scenario 3: Glacier Deep Archive Emergency Retrieval Fee Shock
+### 19.3 Scenario 3: Glacier Deep Archive Emergency Retrieval Fee Shock
 - **Symptom:** A security audit required analyzing 80TB of historical raw security logs stored in Glacier Deep Archive. An engineer submitted an bulk retrieval request. The following month's bill included a surprise **\$18,000 data retrieval fee**.
 - **Root Cause:** The engineer selected **Expedited / Standard Retrieval** on 80TB of deep cold data instead of evaluating whether the data could be filtered before retrieval or querying metadata logs.
 - **Remediation Policy:**
@@ -1691,7 +1705,13 @@ if __name__ == "__main__":
 
 ---
 
-# 26. Summary Comparison & Production Engineering Reference Matrix
+# 20. Summary Comparison & Production Engineering Reference Matrix
+
+### 20.1 Platform Engineering Evolution & Operating Model Reference Matrix
+
+Platform engineering shifts internal infrastructure delivery from ticket-based central operations to self-service Internal Developer Platforms (IDPs). By providing paved paths, automated Golden Path templates, and declarative infrastructure control planes, platform teams dramatically reduce developer cognitive load while enforcing non-negotiable security and architectural guardrails across all deployed microservices.
+
+The evolution of delivery interfaces, cognitive burdens, and operational models across IT eras:
 
 | Platform Dimension | Legacy Central IT Model | Early DevOps Movement | Modern Platform Engineering Standard |
 | :--- | :--- | :--- | :--- |
@@ -1704,6 +1724,12 @@ if __name__ == "__main__":
 
 ---
 
+### 20.2 Enterprise FinOps Maturity & Cost Optimization Framework
+
+Enterprise Cloud Financial Management (FinOps) operationalizes continuous cost governance across the Inform, Optimize, and Operate lifecycle. Rather than relying on retroactive invoice accounting, mature organizations employ automated rate optimization levers (Commitment Discounts, Spot fleets), usage optimization levers (storage lifecycles, rightsizing, egress minimization), and real-time policy guardrails to enforce predictable unit economics.
+
+Comparative capabilities and financial dividends across FinOps maturity tiers:
+
 | FinOps Dimension | Reactive Tactical Approach | Mature Proactive Enterprise Standard | Primary Financial Benefit |
 | :--- | :--- | :--- | :--- |
 | **Billing Visibility** | Reviewing monthly PDF invoice | Real-time Datadog / Kubecost dashboards | Eliminates surprise bill shock; detects anomalies in hours |
@@ -1715,17 +1741,16 @@ if __name__ == "__main__":
 
 ---
 
-# 27. References & Further Reading
+# 21. References & Further Reading
 
-- [Team Topologies: Organizing Business and Technology Teams for Fast Flow (Skelton & Pais)](https://teamtopologies.com/) — Foundational organizational model for platform teams.
-- [Platform Engineering Community Guide](https://platformengineering.org/) — Definitions, patterns, and reference architectures for IDPs.
-- [Spotify Backstage Architecture Documentation](https://backstage.io/docs/overview/what-is-backstage) — Software Catalog, Scaffolder, and TechDocs internals.
-- [Crossplane Documentation](https://docs.crossplane.io/) — Composable infrastructure control planes on Kubernetes.
-- [Kyverno: Kubernetes Native Policy Management](https://kyverno.io/docs/) — Declarative validation, mutation, and resource generation.
-- [Accelerate: The Science of Lean Software and DevOps (Forsgren, Humble, Kim)](https://itrevolution.com/book/accelerate/) — Empirical research behind the DORA metrics.
-
-- [FinOps Foundation: Framework & Principles](https://www.finops.org/framework/) — Official standards body for Cloud Financial Management.
-- [Cloud FinOps: Collaborative, Real-Time Cloud Value Decision Making (Storment & Fuller)](https://www.oreilly.com/library/view/cloud-finops/9781492054610/) — The definitive FinOps reference manual.
-- [Microsoft Cloud Adoption Framework for Azure](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/) — Landing zone architectures and governance.
-- [OpenCost Specification (CNCF)](https://www.opencost.io/) — Open-source Kubernetes cost attribution model.
-- [Architecture Decision Records (Michael Nygard)](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions) — Documenting architectural trade-offs.
+1. **Team Topologies: Organizing Business and Technology Teams for Fast Flow:** Skelton, M., & Pais, M. (2019). IT Revolution Press. [teamtopologies.com](https://teamtopologies.com/).
+2. **Platform Engineering Community Guide & Core Tenets:** [platformengineering.org](https://platformengineering.org/).
+3. **Spotify Backstage Architecture Documentation:** CNCF Incubating Project. [backstage.io/docs](https://backstage.io/docs/overview/what-is-backstage).
+4. **Crossplane Composable Infrastructure Control Planes:** CNCF Project. [docs.crossplane.io](https://docs.crossplane.io/).
+5. **Kyverno: Kubernetes Native Policy Management:** CNCF Incubating Project. [kyverno.io/docs](https://kyverno.io/docs/).
+6. **Accelerate: The Science of Lean Software and DevOps:** Forsgren, N., Humble, J., & Kim, G. (2018). IT Revolution Press.
+7. **FinOps Foundation Framework & Operating Principles:** [finops.org/framework](https://www.finops.org/framework/).
+8. **Cloud FinOps: Collaborative, Real-Time Cloud Value Decision Making (2nd Edition):** Storment, J. R., & Fuller, M. (2023). O'Reilly Media.
+9. **Microsoft Cloud Adoption Framework (CAF) for Azure:** Landing zone architectures and governance. [learn.microsoft.com/azure/cloud-adoption-framework](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/).
+10. **OpenCost Specification & Architecture:** CNCF Project for Kubernetes cost allocation. [opencost.io](https://www.opencost.io/).
+11. **Documenting Architecture Decisions (ADR Framework):** Nygard, M. (2011). Cognitect Blog. [cognitect.com/blog](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions).

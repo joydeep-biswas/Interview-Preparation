@@ -77,78 +77,76 @@ flowchart TD
    - [3.2 The Golden Rule of Mocking: Patch Where Looked Up, Not Where Defined](#32-the-golden-rule-of-mocking-patch-where-looked-up-not-where-defined)
    - [3.3 Auto-Specing (`autospec=True`) to Prevent Stale Mock Drift](#33-auto-specing-autospectrue-to-prevent-stale-mock-drift)
    - [3.4 Transport-Layer HTTP Mocking with `respx`](#34-transport-layer-http-mocking-with-respx)
-4. [Hermetic Database Testing with PostgreSQL SAVEPOINTs](#7-hermetic-database-testing-with-postgresql-savepoints)
-   - [7.1 Why Mocking Database Queries is a Catastrophic Anti-Pattern](#71-why-mocking-database-queries-is-a-catastrophic-anti-pattern)
-   - [7.2 Disposable Ephemeral Databases with Testcontainers](#72-disposable-ephemeral-databases-with-testcontainers)
-   - [7.3 Sub-5ms Test Isolation: Nested Transactions (`SAVEPOINT`) with Automatic Rollback](#73-sub-5ms-test-isolation-nested-transactions-savepoint-with-automatic-rollback)
-5. [Asynchronous Testing for FastAPI Applications](#8-asynchronous-testing-for-fastapi-applications)
-   - [8.1 Zero-Network In-Process ASGI Testing with `httpx.AsyncClient`](#81-zero-network-in-process-asgi-testing-with-httpxasyncclient)
-   - [8.2 Fast Dependency Overrides (`app.dependency_overrides`)](#82-fast-dependency-overrides-appdependency_overrides)
-   - [8.3 Testing Concurrent Requests & Race Conditions](#83-testing-concurrent-requests--race-conditions)
-6. [Property-Based Fuzz Testing with Hypothesis](#9-property-based-fuzz-testing-with-hypothesis)
-   - [9.1 The Fallacy of Example-Based Testing](#91-the-fallacy-of-example-based-testing)
-   - [9.2 Hypothesis Strategies & Invariant Verification](#92-hypothesis-strategies--invariant-verification)
-   - [9.3 The Shrinking Engine: Isolating Minimal Reproducible Boundary Bugs](#93-the-shrinking-engine-isolating-minimal-reproducible-boundary-bugs)
-   - [9.4 Stateful Model Fuzzing with `RuleBasedStateMachine`](#94-stateful-model-fuzzing-with-rulebasedstatemachine)
-7. [Application Metrics with Prometheus & The RED Method](#10-application-metrics-with-prometheus--the-red-method)
-   - [10.1 The RED Architecture: Rate, Errors, and Duration](#101-the-red-architecture-rate-errors-and-duration)
-   - [10.2 Metric Primitives: Counters, Gauges, Histograms, and Summaries](#102-metric-primitives-counters-gauges-histograms-and-summaries)
-   - [10.3 The Multi-Worker Gunicorn Dilemma: `PROMETHEUS_MULTIPROC_DIR`](#103-the-multi-worker-gunicorn-dilemma-prometheus_multiproc_dir)
-   - [10.4 Prometheus Middleware for FastAPI](#104-prometheus-middleware-for-fastapi)
-   - [13.5 PromQL Golden Signals & Alertmanager Production Rules](#135-promql-golden-signals--alertmanager-production-rules)
-8. [Distributed Tracing with OpenTelemetry (OTel)](#16-distributed-tracing-with-opentelemetry-otel)
-   - [16.1 Core Concepts: Tracers, Spans, Span Context, and Baggage](#161-core-concepts-tracers-spans-span-context-and-baggage)
-   - [16.2 W3C `traceparent` Context Propagation Across Microservices](#162-w3c-traceparent-context-propagation-across-microservices)
-   - [16.3 Automated & Manual Instrumentations (FastAPI, HTTPX, SQLAlchemy)](#163-automated--manual-instrumentations-fastapi-httpx-sqlalchemy)
-   - [19.4 Exporting Traces to Jaeger / Tempo via OTLP](#194-exporting-traces-to-jaeger--tempo-via-otlp)
-   - [19.5 Trace Baggage Propagation & Sampling Strategies](#195-trace-baggage-propagation--sampling-strategies)
-9. [Production Performance Profiling & Memory Diagnostics](#20-production-performance-profiling--memory-diagnostics)
-   - [20.1 Sampling CPU Profiling with `py-spy` and Flame Graphs](#201-sampling-cpu-profiling-with-py-spy-and-flame-graphs)
-   - [23.2 Memory Leak Diagnosis with `tracemalloc` and `objgraph`](#232-memory-leak-diagnosis-with-tracemalloc-and-objgraph)
-   - [23.3 Deterministic Profiling with `cProfile` and `pstats`](#233-deterministic-profiling-with-cprofile-and-pstats)
-10. [Containerization Fundamentals & Linux Kernel Mechanics](#24-containerization-fundamentals--linux-kernel-mechanics)
-   - [24.1 Why Containers Are Not Virtual Machines](#241-why-containers-are-not-virtual-machines)
-   - [24.2 Linux Namespaces: Isolating the Process View](#242-linux-namespaces-isolating-the-process-view)
-   - [24.3 Control Groups (cgroups v2): Resource Caps and OOM Scenarios](#243-control-groups-cgroups-v2-resource-caps-and-oom-scenarios)
-   - [24.4 Layered Union Filesystems: OverlayFS Internals](#244-layered-union-filesystems-overlayfs-internals)
-11. [Production Multi-Stage Docker Builds with `uv`](#25-production-multi-stage-docker-builds-with-uv)
-   - [25.1 The Bloat Problem: Why Naive Python Containers Reach 1.5 GB](#251-the-bloat-problem-why-naive-python-containers-reach-15-gb)
-   - [25.2 Two-Stage Build Architecture with `uv`: Compilers vs. Runtime](#252-two-stage-build-architecture-with-uv-compilers-vs-runtime)
-   - [25.3 Container Security Hardening: The Non-Root User Mandate](#253-container-security-hardening-the-non-root-user-mandate)
-   - [25.4 Vulnerability Scanning & SBOM Generation with Trivy](#254-vulnerability-scanning--sbom-generation-with-trivy)
-12. [Kubernetes Core Architecture & Abstractions](#29-kubernetes-core-architecture--abstractions)
-   - [29.1 Pods, Deployments, and ReplicaSets](#291-pods-deployments-and-replicasets)
-   - [29.2 Service Networking: ClusterIP, NodePort, and Ingress Controllers](#292-service-networking-clusterip-nodeport-and-ingress-controllers)
-   - [29.3 Declarative Production Deployment Manifest Blueprint](#293-declarative-production-deployment-manifest-blueprint)
-13. [Decoupling Health Probes: Startup, Liveness, and Readiness](#33-decoupling-health-probes-startup-liveness-and-readiness)
-   - [33.1 The Cascading Failure Disaster: Conflating Liveness with Readiness](#331-the-cascading-failure-disaster-conflating-liveness-with-readiness)
-   - [33.2 `startupProbe`: Protecting Slow Application Warmups](#332-startupprobe-protecting-slow-application-warmups)
-   - [33.3 `livenessProbe`: Deadlock Detection and Process Restarts](#333-livenessprobe-deadlock-detection-and-process-restarts)
-   - [33.4 `readinessProbe`: Traffic Routing and Dependency Health](#334-readinessprobe-traffic-routing-and-dependency-health)
-14. [Process Lifecycle, Signals & Zero-Downtime Deployments](#34-process-lifecycle-signals--zero-downtime-deployments)
-   - [34.1 The Kubernetes Pod Termination Sequence](#341-the-kubernetes-pod-termination-sequence)
-   - [34.2 The PreStop Hook: Allowing `kube-proxy` Network Convergence](#342-the-prestop-hook-allowing-kube-proxy-network-convergence)
-   - [34.3 Catching `SIGTERM` in Python & Draining In-Flight Requests](#343-catching-sigterm-in-python--draining-in-flight-requests)
-   - [34.4 Zero-Downtime Rolling Updates (`maxUnavailable: 0`)](#344-zero-downtime-rolling-updates-maxunavailable-0)
-15. [Autoscaling Strategies: HPA & KEDA](#35-autoscaling-strategies-hpa--keda)
-   - [35.1 Horizontal Pod Autoscaler (HPA) for CPU/Memory Bottlenecks](#351-horizontal-pod-autoscaler-hpa-for-cpumemory-bottlenecks)
-   - [35.2 The Worker Scaling Dilemma: Why HPA Fails for Background Queues](#352-the-worker-scaling-dilemma-why-hpa-fails-for-background-queues)
-   - [35.3 Event-Driven Autoscaling with KEDA (Kafka Lag & RabbitMQ Depth)](#353-event-driven-autoscaling-with-keda-kafka-lag--rabbitmq-depth)
-16. [Enterprise Secrets & Configuration Management](#36-enterprise-secrets--configuration-management)
-   - [36.1 ConfigMaps vs. Kubernetes Secrets](#361-configmaps-vs-kubernetes-secrets)
-   - [36.2 External Secrets Operator (ESO) Syncing with AWS Secrets Manager](#362-external-secrets-operator-eso-syncing-with-aws-secrets-manager)
-17. [End-to-End CI/CD Pipeline with GitHub Actions](#37-end-to-end-cicd-pipeline-with-github-actions)
-   - [37.1 High-Velocity Pipeline Architecture](#371-high-velocity-pipeline-architecture)
-   - [37.2 Complete Production `.github/workflows/ci-cd.yaml` Manifest](#372-complete-production-githubworkflowsci-cdyaml-manifest)
-18. [Cloud Deployment Topologies: AWS vs. GCP](#38-cloud-deployment-topologies-aws-vs-gcp)
-   - [38.1 AWS Architecture: ECS Fargate vs. EKS vs. Aurora vs. ElastiCache](#381-aws-architecture-ecs-fargate-vs-eks-vs-aurora-vs-elasticache)
-   - [38.2 GCP Architecture: Cloud Run vs. GKE vs. Cloud SQL](#382-gcp-architecture-cloud-run-vs-gke-vs-cloud-sql)
-   - [38.3 Cloud Identity Federation: AWS IRSA vs. GCP Workload Identity](#383-cloud-identity-federation-aws-irsa-vs-gcp-workload-identity)
-   - [38.4 Infrastructure as Code: Turnkey Terraform for Production Microservices](#384-infrastructure-as-code-turnkey-terraform-for-production-microservices)
-19. [Summary Comparison & Production Engineering Reference Matrix](#39-summary-comparison--production-engineering-reference-matrix)
-20. [References & Further Reading](#40-references--further-reading)
-
----
+4. [Hermetic Database Testing with PostgreSQL SAVEPOINTs](#4-hermetic-database-testing-with-postgresql-savepoints)
+   - [4.1 Why Mocking Database Queries is a Catastrophic Anti-Pattern](#41-why-mocking-database-queries-is-a-catastrophic-anti-pattern)
+   - [4.2 Disposable Ephemeral Databases with Testcontainers](#42-disposable-ephemeral-databases-with-testcontainers)
+   - [4.3 Sub-5ms Test Isolation: Nested Transactions (`SAVEPOINT`) with Automatic Rollback](#43-sub-5ms-test-isolation-nested-transactions-savepoint-with-automatic-rollback)
+5. [Asynchronous Testing for FastAPI Applications](#5-asynchronous-testing-for-fastapi-applications)
+   - [5.1 Zero-Network In-Process ASGI Testing with `httpx.AsyncClient`](#51-zero-network-in-process-asgi-testing-with-httpxasyncclient)
+   - [5.2 Fast Dependency Overrides (`app.dependency_overrides`)](#52-fast-dependency-overrides-appdependency_overrides)
+   - [5.3 Testing Concurrent Requests & Race Conditions](#53-testing-concurrent-requests--race-conditions)
+6. [Property-Based Fuzz Testing with Hypothesis](#6-property-based-fuzz-testing-with-hypothesis)
+   - [6.1 The Fallacy of Example-Based Testing](#61-the-fallacy-of-example-based-testing)
+   - [6.2 Hypothesis Strategies & Invariant Verification](#62-hypothesis-strategies--invariant-verification)
+   - [6.3 The Shrinking Engine: Isolating Minimal Reproducible Boundary Bugs](#63-the-shrinking-engine-isolating-minimal-reproducible-boundary-bugs)
+   - [6.4 Stateful Model Fuzzing with `RuleBasedStateMachine`](#64-stateful-model-fuzzing-with-rulebasedstatemachine)
+7. [Application Metrics with Prometheus & The RED Method](#7-application-metrics-with-prometheus--the-red-method)
+   - [7.1 The RED Architecture: Rate, Errors, and Duration](#71-the-red-architecture-rate-errors-and-duration)
+   - [7.2 Metric Primitives: Counters, Gauges, Histograms, and Summaries](#72-metric-primitives-counters-gauges-histograms-and-summaries)
+   - [7.3 The Multi-Worker Gunicorn Dilemma: `PROMETHEUS_MULTIPROC_DIR`](#73-the-multi-worker-gunicorn-dilemma-prometheus_multiproc_dir)
+   - [7.4 Prometheus Middleware for FastAPI](#74-prometheus-middleware-for-fastapi)
+   - [7.5 PromQL Golden Signals & Alertmanager Production Rules](#75-promql-golden-signals--alertmanager-production-rules)
+8. [Distributed Tracing with OpenTelemetry (OTel)](#8-distributed-tracing-with-opentelemetry-otel)
+   - [8.1 Core Concepts: Tracers, Spans, Span Context, and Baggage](#81-core-concepts-tracers-spans-span-context-and-baggage)
+   - [8.2 W3C `traceparent` Context Propagation Across Microservices](#82-w3c-traceparent-context-propagation-across-microservices)
+   - [8.3 Automated & Manual Instrumentations (FastAPI, HTTPX, SQLAlchemy)](#83-automated--manual-instrumentations-fastapi-httpx-sqlalchemy)
+   - [8.4 Exporting Traces to Jaeger / Tempo via OTLP](#84-exporting-traces-to-jaeger--tempo-via-otlp)
+   - [8.5 Trace Baggage Propagation & Sampling Strategies](#85-trace-baggage-propagation--sampling-strategies)
+9. [Production Performance Profiling & Memory Diagnostics](#9-production-performance-profiling--memory-diagnostics)
+   - [9.1 Sampling CPU Profiling with `py-spy` and Flame Graphs](#91-sampling-cpu-profiling-with-py-spy-and-flame-graphs)
+   - [9.2 Memory Leak Diagnosis with `tracemalloc` and `objgraph`](#92-memory-leak-diagnosis-with-tracemalloc-and-objgraph)
+   - [9.3 Deterministic Profiling with `cProfile` and `pstats`](#93-deterministic-profiling-with-cprofile-and-pstats)
+10. [Containerization Fundamentals & Linux Kernel Mechanics](#10-containerization-fundamentals--linux-kernel-mechanics)
+    - [10.1 Why Containers Are Not Virtual Machines](#101-why-containers-are-not-virtual-machines)
+    - [10.2 Linux Namespaces: Isolating the Process View](#102-linux-namespaces-isolating-the-process-view)
+    - [10.3 Control Groups (cgroups v2): Resource Caps and OOM Scenarios](#103-control-groups-cgroups-v2-resource-caps-and-oom-scenarios)
+    - [10.4 Layered Union Filesystems: OverlayFS Internals](#104-layered-union-filesystems-overlayfs-internals)
+11. [Production Multi-Stage Docker Builds with `uv`](#11-production-multi-stage-docker-builds-with-uv)
+    - [11.1 The Bloat Problem: Why Naive Python Containers Reach 1.5 GB](#111-the-bloat-problem-why-naive-python-containers-reach-15-gb)
+    - [11.2 Two-Stage Build Architecture with `uv`: Compilers vs. Runtime](#112-two-stage-build-architecture-with-uv-compilers-vs-runtime)
+    - [11.3 Container Security Hardening: The Non-Root User Mandate](#113-container-security-hardening-the-non-root-user-mandate)
+    - [11.4 Vulnerability Scanning & SBOM Generation with Trivy](#114-vulnerability-scanning--sbom-generation-with-trivy)
+12. [Kubernetes Core Architecture & Abstractions](#12-kubernetes-core-architecture--abstractions)
+    - [12.1 Pods, Deployments, and ReplicaSets](#121-pods-deployments-and-replicasets)
+    - [12.2 Service Networking: ClusterIP, NodePort, and Ingress Controllers](#122-service-networking-clusterip-nodeport-and-ingress-controllers)
+    - [12.3 Declarative Production Deployment Manifest Blueprint](#123-declarative-production-deployment-manifest-blueprint)
+13. [Decoupling Health Probes: Startup, Liveness, and Readiness](#13-decoupling-health-probes-startup-liveness-and-readiness)
+    - [13.1 The Cascading Failure Disaster: Conflating Liveness with Readiness](#131-the-cascading-failure-disaster-conflating-liveness-with-readiness)
+    - [13.2 `startupProbe`: Protecting Slow Application Warmups](#132-startupprobe-protecting-slow-application-warmups)
+    - [13.3 `livenessProbe`: Deadlock Detection and Process Restarts](#133-livenessprobe-deadlock-detection-and-process-restarts)
+    - [13.4 `readinessProbe`: Traffic Routing and Dependency Health](#134-readinessprobe-traffic-routing-and-dependency-health)
+14. [Process Lifecycle, Signals & Zero-Downtime Deployments](#14-process-lifecycle-signals--zero-downtime-deployments)
+    - [14.1 The Kubernetes Pod Termination Sequence](#141-the-kubernetes-pod-termination-sequence)
+    - [14.2 The PreStop Hook: Allowing `kube-proxy` Network Convergence](#142-the-prestop-hook-allowing-kube-proxy-network-convergence)
+    - [14.3 Catching `SIGTERM` in Python & Draining In-Flight Requests](#143-catching-sigterm-in-python--draining-in-flight-requests)
+    - [14.4 Zero-Downtime Rolling Updates (`maxUnavailable: 0`)](#144-zero-downtime-rolling-updates-maxunavailable-0)
+15. [Autoscaling Strategies: HPA & KEDA](#15-autoscaling-strategies-hpa--keda)
+    - [15.1 Horizontal Pod Autoscaler (HPA) for CPU/Memory Bottlenecks](#151-horizontal-pod-autoscaler-hpa-for-cpumemory-bottlenecks)
+    - [15.2 The Worker Scaling Dilemma: Why HPA Fails for Background Queues](#152-the-worker-scaling-dilemma-why-hpa-fails-for-background-queues)
+    - [15.3 Event-Driven Autoscaling with KEDA (Kafka Lag & RabbitMQ Depth)](#153-event-driven-autoscaling-with-keda-kafka-lag--rabbitmq-depth)
+16. [Enterprise Secrets & Configuration Management](#16-enterprise-secrets--configuration-management)
+    - [16.1 ConfigMaps vs. Kubernetes Secrets](#161-configmaps-vs-kubernetes-secrets)
+    - [16.2 External Secrets Operator (ESO) Syncing with AWS Secrets Manager](#162-external-secrets-operator-eso-syncing-with-aws-secrets-manager)
+17. [End-to-End CI/CD Pipeline with GitHub Actions](#17-end-to-end-cicd-pipeline-with-github-actions)
+    - [17.1 High-Velocity Pipeline Architecture](#171-high-velocity-pipeline-architecture)
+    - [17.2 Complete Production `.github/workflows/ci-cd.yaml` Manifest](#172-complete-production-githubworkflowsci-cdyaml-manifest)
+18. [Cloud Deployment Topologies: AWS vs. GCP](#18-cloud-deployment-topologies-aws-vs-gcp)
+    - [18.1 AWS Production Cloud Architecture: ECS Fargate vs. EKS vs. Aurora vs. ElastiCache](#181-aws-production-cloud-architecture-ecs-fargate-vs-eks-vs-aurora-vs-elasticache)
+    - [18.2 GCP Production Cloud Architecture: Cloud Run vs. GKE vs. Cloud SQL](#182-gcp-production-cloud-architecture-cloud-run-vs-gke-vs-cloud-sql)
+    - [18.3 Cloud Identity Federation: AWS IRSA vs. GCP Workload Identity](#183-cloud-identity-federation-aws-irsa-vs-gcp-workload-identity)
+    - [18.4 Infrastructure as Code: Turnkey Terraform for Production Microservices](#184-infrastructure-as-code-turnkey-terraform-for-production-microservices)
+19. [Summary Comparison & Production Engineering Reference Matrix](#19-summary-comparison--production-engineering-reference-matrix)
+20. [References & Further Reading](#20-references--further-reading)
 
 # 1. The Modern Enterprise Testing Pyramid
 
@@ -332,18 +330,18 @@ import respx
 @pytest.mark.asyncio
 async def test_outbound_payment_gateway_mock():
 
-# 4. Intercept HTTPX network calls to external payment gateway URL
+    # Intercept HTTPX network calls to external payment gateway URL
 
 route = respx.post("https://api.stripe.com/v1/charges").mock(
         return_value=httpx.Response(200, json={"id": "ch_99214", "status": "succeeded"})
     )
 
-# 5. Execute application code that uses real httpx.AsyncClient
+    # Execute application code that uses real httpx.AsyncClient
 
 async with httpx.AsyncClient() as client:
         response = await client.post("https://api.stripe.com/v1/charges", data={"amount": 1000})
 
-# 6. Assert HTTP status and verify call assertions
+    # Assert HTTP status and verify call assertions
 
 assert response.status_code == 200
     assert response.json()["id"] == "ch_99214"
@@ -353,9 +351,9 @@ assert response.status_code == 200
 
 ---
 
-# 7. Hermetic Database Testing with PostgreSQL SAVEPOINTs
+# 4. Hermetic Database Testing with PostgreSQL SAVEPOINTs
 
-### 7.1 Why Mocking Database Queries is a Catastrophic Anti-Pattern
+### 4.1 Why Mocking Database Queries is a Catastrophic Anti-Pattern
 
 Mocking database sessions with `mock_session.execute.return_value = ...` gives developers a false sense of security:
 * Mocks cannot detect SQL syntax errors.
@@ -367,7 +365,7 @@ Mocking database sessions with `mock_session.execute.return_value = ...` gives d
 
 ---
 
-### 7.2 Disposable Ephemeral Databases with Testcontainers
+### 4.2 Disposable Ephemeral Databases with Testcontainers
 
 Using **Testcontainers**, pytest automatically spins up a clean, isolated PostgreSQL Docker container on test session startup, runs all Alembic migrations, and tears it down on completion:
 
@@ -393,7 +391,7 @@ def async_db_engine(postgres_container):
 
 ---
 
-### 7.3 Sub-5ms Test Isolation: Nested Transactions (`SAVEPOINT`) with Automatic Rollback
+### 4.3 Sub-5ms Test Isolation: Nested Transactions (`SAVEPOINT`) with Automatic Rollback
 
 Recreating tables or truncating rows between tests is painfully slow (taking 500ms per test).
 The high-performance industry pattern is to **wrap every test in an outer transaction and an inner `SAVEPOINT`**, rolling back the transaction at the end of the test.
@@ -439,9 +437,9 @@ async def db_session(async_db_engine) -> AsyncSession:
 
 ---
 
-# 8. Asynchronous Testing for FastAPI Applications
+# 5. Asynchronous Testing for FastAPI Applications
 
-### 8.1 Zero-Network In-Process ASGI Testing with `httpx.AsyncClient`
+### 5.1 Zero-Network In-Process ASGI Testing with `httpx.AsyncClient`
 
 Never spin up a physical HTTP server on `localhost:8000` to test FastAPI APIs!
 Use HTTPX's **`ASGITransport`** to pass requests directly to the application's ASGI callable in memory:
@@ -473,7 +471,7 @@ async def test_create_order_endpoint(db_session):
 
 ---
 
-### 8.2 Fast Dependency Overrides (`app.dependency_overrides`)
+### 5.2 Fast Dependency Overrides (`app.dependency_overrides`)
 
 ```python
 from enterprise_service.presentation.api.dependencies import get_current_user
@@ -488,7 +486,7 @@ def override_auth_dependency():
 
 ---
 
-### 8.3 Testing Concurrent Requests & Race Conditions
+### 5.3 Testing Concurrent Requests & Race Conditions
 
 To verify that your database row locking (`SELECT FOR UPDATE`) or Redis locks prevent overselling in flash sales, launch concurrent async requests using `asyncio.gather()`:
 
@@ -513,9 +511,9 @@ async def test_flash_sale_concurrency_race_condition(async_client):
 
 ---
 
-# 9. Property-Based Fuzz Testing with Hypothesis
+# 6. Property-Based Fuzz Testing with Hypothesis
 
-### 9.1 The Fallacy of Example-Based Testing
+### 6.1 The Fallacy of Example-Based Testing
 
 When engineers write unit tests, they write tests for the happy path and a few obvious edge cases (`0`, `""`, `None`).
 We inherently test what we *expect* to happen. We miss subtle boundary bugs:
@@ -525,7 +523,7 @@ We inherently test what we *expect* to happen. We miss subtle boundary bugs:
 
 ---
 
-### 9.2 Hypothesis Strategies & Invariant Verification
+### 6.2 Hypothesis Strategies & Invariant Verification
 
 **Hypothesis** generates hundreds of randomized, adversarial test inputs against mathematical properties (invariants) that must *always* hold true:
 
@@ -552,14 +550,14 @@ def test_compound_interest_invariant(principal: Decimal, rate: Decimal, years: i
 
 ---
 
-### 9.3 The Shrinking Engine: Isolating Minimal Reproducible Boundary Bugs
+### 6.3 The Shrinking Engine: Isolating Minimal Reproducible Boundary Bugs
 
 When Hypothesis finds a failing input (e.g. `principal = 98124.12, rate = 0.4124, years = 37`), it does not simply dump the complex input on you.
 Its **Shrinking Engine** iteratively reduces the test case until it finds the **absolute simplest, minimal failing input** (e.g., `principal = 1, rate = 0.01, years = 1`), making root cause debugging instantaneous!
 
 ---
 
-### 9.4 Stateful Model Fuzzing with `RuleBasedStateMachine`
+### 6.4 Stateful Model Fuzzing with `RuleBasedStateMachine`
 
 Real production systems are not stateless pure functions. They maintain internal state (shopping carts, user sessions, ledger accounts) that can transition through complex sequences of operations.
 Hypothesis provides **`RuleBasedStateMachine`** to automatically generate, interleave, and shrink random sequences of state mutations to discover race conditions and invariant violations:
@@ -636,9 +634,9 @@ TestBankAccount = BankAccountStateMachine.TestCase
 
 ---
 
-# 10. Application Metrics with Prometheus & The RED Method
+# 7. Application Metrics with Prometheus & The RED Method
 
-### 10.1 The RED Architecture: Rate, Errors, and Duration
+### 7.1 The RED Architecture: Rate, Errors, and Duration
 
 Popularized by Tom Wilkie, the **RED Method** defines the three essential metrics for monitoring request-driven microservices:
 
@@ -648,7 +646,7 @@ Popularized by Tom Wilkie, the **RED Method** defines the three essential metric
 
 ---
 
-### 10.2 Metric Primitives: Counters, Gauges, Histograms, and Summaries
+### 7.2 Metric Primitives: Counters, Gauges, Histograms, and Summaries
 
 * **`Counter`**: Monotonically increasing number. Never decreases (resets only on process restart). Used for total requests served, exceptions thrown.
 * **`Gauge`**: Value that can go up and down. Used for active concurrent connections, current memory usage, thread count.
@@ -657,7 +655,7 @@ Popularized by Tom Wilkie, the **RED Method** defines the three essential metric
 
 ---
 
-### 10.3 The Multi-Worker Gunicorn Dilemma: `PROMETHEUS_MULTIPROC_DIR`
+### 7.3 The Multi-Worker Gunicorn Dilemma: `PROMETHEUS_MULTIPROC_DIR`
 
 > [!CAUTION]
 > ### The Multi-Process Prometheus Metric Corruption Trap
@@ -676,7 +674,7 @@ rm -rf /tmp/prometheus_multiproc/*
 
 ---
 
-### 10.4 Prometheus Middleware for FastAPI
+### 7.4 Prometheus Middleware for FastAPI
 
 ```python
 import time
@@ -686,7 +684,7 @@ from starlette.responses import Response
 
 app = FastAPI()
 
-# 11. Define Prometheus RED Metrics
+    # Define Prometheus RED Metrics
 
 HTTP_REQUESTS_TOTAL = Counter(
     "http_requests_total",
@@ -701,7 +699,7 @@ HTTP_REQUEST_DURATION_SECONDS = Histogram(
     buckets=(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0),
 )
 
-# 12. Measure latency and record metrics via Middleware
+    # Measure latency and record metrics via Middleware
 
 @app.middleware("http")
 async def prometheus_metrics_middleware(request: Request, call_next):
@@ -723,7 +721,7 @@ async def prometheus_metrics_middleware(request: Request, call_next):
 
     return response
 
-# 13. Expose scrape endpoint for Prometheus server
+    # Expose scrape endpoint for Prometheus server
 
 @app.get("/metrics")
 def metrics():
@@ -732,7 +730,7 @@ def metrics():
 
 ---
 
-### 13.5 PromQL Golden Signals & Alertmanager Production Rules
+### 7.5 PromQL Golden Signals & Alertmanager Production Rules
 
 Collecting metrics is useless without actionable alerting. Here are the standardized **PromQL queries and Alertmanager YAML rules** implementing Google SRE Golden Signals for your Python services:
 
@@ -742,7 +740,7 @@ groups:
   - name: enterprise_backend_alerts
     rules:
 
-# 14. Error Rate Alert: Triggers if 5xx errors exceed 2% of total traffic over a 5m window
+    # Error Rate Alert: Triggers if 5xx errors exceed 2% of total traffic over a 5m window
 
 - alert: HighHttpErrorRate
         expr: |
@@ -759,7 +757,7 @@ groups:
           summary: "High HTTP 5xx error rate on {{ $labels.instance }}"
           description: "Service HTTP 5xx error rate is {{ $value | printf \"%.2f\" }}% (> 2% threshold)."
 
-# 15. P99 Latency SLA Violation Alert: Triggers if P99 latency exceeds 750ms
+    # P99 Latency SLA Violation Alert: Triggers if P99 latency exceeds 750ms
 
 - alert: HighP99Latency
         expr: |
@@ -778,9 +776,9 @@ groups:
 
 ---
 
-# 16. Distributed Tracing with OpenTelemetry (OTel)
+# 8. Distributed Tracing with OpenTelemetry (OTel)
 
-### 16.1 Core Concepts: Tracers, Spans, Span Context, and Baggage
+### 8.1 Core Concepts: Tracers, Spans, Span Context, and Baggage
 
 In microservices, a single client click can trigger 15 internal RPC calls across 6 services.
 **OpenTelemetry (OTel)** tracks the end-to-end journey of that request through a directed acyclic graph of **Spans**:
@@ -791,7 +789,7 @@ In microservices, a single client click can trigger 15 internal RPC calls across
 
 ---
 
-### 16.2 W3C `traceparent` Context Propagation Across Microservices
+### 8.2 W3C `traceparent` Context Propagation Across Microservices
 
 To correlate spans across microservices, OpenTelemetry injects the standardized **W3C `traceparent`** HTTP header:
 
@@ -833,7 +831,7 @@ flowchart LR
 
 ---
 
-### 16.3 Automated & Manual Instrumentations (FastAPI, HTTPX, SQLAlchemy)
+### 8.3 Automated & Manual Instrumentations (FastAPI, HTTPX, SQLAlchemy)
 
 ```python
 from opentelemetry import trace
@@ -847,24 +845,24 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 def setup_opentelemetry(app, service_name: str = "order-service"):
 
-# 17. Define Service Resource
+    # Define Service Resource
 
 resource = Resource.create({"service.name": service_name, "service.version": "1.0.0"})
     provider = TracerProvider(resource=resource)
 
-# 18. Configure OTLP gRPC Exporter pointing to Jaeger / Tempo collector
+    # Configure OTLP gRPC Exporter pointing to Jaeger / Tempo collector
 
 otlp_exporter = OTLPSpanExporter(endpoint="http://otel-collector:4317", insecure=True)
     provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
     trace.set_tracer_provider(provider)
 
-# 19. Auto-instrument Libraries
+    # Auto-instrument Libraries
 
 FastAPIInstrumentor.instrument_app(app)
     HTTPXClientInstrumentor().instrument()
     SQLAlchemyInstrumentor().instrument()
 
-# Manual Span Instrumentation for Custom Business Logic:
+    # Manual Span Instrumentation for Custom Business Logic:
 tracer = trace.get_tracer("order.service")
 
 async def process_fraud_analysis(order_id: str):
@@ -879,13 +877,13 @@ async def process_fraud_analysis(order_id: str):
 
 ---
 
-### 19.4 Exporting Traces to Jaeger / Tempo via OTLP
+### 8.4 Exporting Traces to Jaeger / Tempo via OTLP
 
 Traces captured by `BatchSpanProcessor` are serialized using Protocol Buffers over gRPC and batched asynchronously to the central OpenTelemetry Collector (or directly into Jaeger / Grafana Tempo), guaranteeing that tracing never introduces latency to application worker threads.
 
 ---
 
-### 19.5 Trace Baggage Propagation & Sampling Strategies
+### 8.5 Trace Baggage Propagation & Sampling Strategies
 
 #### 1. OpenTelemetry Baggage: Cross-Service Business Context
 While Span Attributes are local to a single span, **Baggage** propagates contextual key-value pairs across network boundaries (e.g., forwarding `tenant_id` or `user_tier` across 10 downstream microservices):
@@ -893,7 +891,7 @@ While Span Attributes are local to a single span, **Baggage** propagates context
 ```python
 from opentelemetry import baggage, context
 
-# Ingress Service: Inject Baggage into context
+    # Ingress Service: Inject Baggage into context
 ctx = baggage.set_baggage("tenant.id", "enterprise_acme_corp")
 token = context.attach(ctx)
 
@@ -903,7 +901,7 @@ try:
 finally:
     context.detach(token)
 
-# Downstream Service: Retrieve baggage anywhere in call chain
+    # Downstream Service: Retrieve baggage anywhere in call chain
 tenant_id = baggage.get_baggage("tenant.id")
 ```
 
@@ -913,9 +911,9 @@ tenant_id = baggage.get_baggage("tenant.id")
 
 ---
 
-# 20. Production Performance Profiling & Memory Diagnostics
+# 9. Production Performance Profiling & Memory Diagnostics
 
-### 20.1 Sampling CPU Profiling with `py-spy` and Flame Graphs
+### 9.1 Sampling CPU Profiling with `py-spy` and Flame Graphs
 
 In live production environments, you cannot attach deterministic profilers like `cProfile` because they slow down application execution by 2x to 5x.
 **`py-spy`** is a sampling profiler written in **Rust** that inspects the memory space of a running CPython process from outside using OS kernel system calls (`process_vm_readv` on Linux, `mach_vm_read` on macOS):
@@ -925,22 +923,22 @@ In live production environments, you cannot attach deterministic profilers like 
 
 ```bash
 
-# 21. Live top-like interactive view of CPU hotspots by PID:
+# Live top-like interactive view of CPU hotspots by PID:
 
 py-spy top --pid 4102
 
-# 22. Record a 60-second SVG Flame Graph of a live production pod:
+# Record a 60-second SVG Flame Graph of a live production pod:
 
 py-spy record --pid 4102 --duration 60 --rate 100 --output profile_flamegraph.svg
 
-# 23. Dump active threads and stack traces of a hung / deadlocked Python process:
+# Dump active threads and stack traces of a hung / deadlocked Python process:
 
 py-spy dump --pid 4102
 ```
 
 ---
 
-### 23.2 Memory Leak Diagnosis with `tracemalloc` and `objgraph`
+### 9.2 Memory Leak Diagnosis with `tracemalloc` and `objgraph`
 
 CPython memory leaks typically occur when objects remain referenced by global registries, unbounded caches, or cyclic references with custom `__del__` methods.
 
@@ -982,7 +980,7 @@ if leaking_orders:
 
 ---
 
-### 23.3 Deterministic Profiling with `cProfile` and `pstats`
+### 9.3 Deterministic Profiling with `cProfile` and `pstats`
 
 For local optimization and algorithmic benchmarking, use `cProfile`:
 
@@ -1008,7 +1006,7 @@ def benchmark_critical_path(fn, *args, **kwargs):
 
 ---
 
-# 24. Containerization Fundamentals & Linux Kernel Mechanics
+# 10. Containerization Fundamentals & Linux Kernel Mechanics
 
 > [!NOTE]
 > **Domain Framing: Application Packaging vs. Enterprise Cloud Platform Architecture:**
@@ -1018,7 +1016,7 @@ def benchmark_critical_path(fn, *args, **kwargs):
 > - [Cloud Engineering: 08. Containers, Kubernetes & GitOps](../Cloud%20Engineering/06_containers_kubernetes_and_gitops.md)
 > - [Cloud Engineering: 07. CI/CD & Release Engineering](../Cloud%20Engineering/05_cicd_and_release_engineering.md)
 
-### 24.1 Why Containers Are Not Virtual Machines
+### 10.1 Why Containers Are Not Virtual Machines
 
 #### Intuitive Analogy: An Apartment Building vs. A Suburb of Houses
 * **Virtual Machine (A Suburb of Detached Houses)**: Each house has its own private plumbing, electrical generator, foundation, roof, and front lawn (Hypervisor, Guest OS Kernel, virtual BIOS, virtual device drivers). It takes 15 minutes to turn on the utilities, and you must maintain 10 separate houses.
@@ -1065,7 +1063,7 @@ flowchart TD
 
 ---
 
-### 24.2 Linux Namespaces: Isolating the Process View
+### 10.2 Linux Namespaces: Isolating the Process View
 
 A container is not a tangible physical boundary; it is simply a **standard Linux host process** running with restricted visibility via **Namespaces**:
 
@@ -1078,7 +1076,7 @@ A container is not a tangible physical boundary; it is simply a **standard Linux
 
 ---
 
-### 24.3 Control Groups (cgroups v2): Resource Caps and OOM Scenarios
+### 10.3 Control Groups (cgroups v2): Resource Caps and OOM Scenarios
 
 While namespaces govern *what a process can see*, **Control Groups (cgroups)** govern *how much resources a process can consume*:
 
@@ -1090,7 +1088,7 @@ While namespaces govern *what a process can see*, **Control Groups (cgroups)** g
 
 ---
 
-### 24.4 Layered Union Filesystems: OverlayFS Internals
+### 10.4 Layered Union Filesystems: OverlayFS Internals
 
 Docker images are composed of immutable, read-only layers stacked via **OverlayFS**:
 
@@ -1126,9 +1124,9 @@ flowchart TD
 
 ---
 
-# 25. Production Multi-Stage Docker Builds with `uv`
+# 11. Production Multi-Stage Docker Builds with `uv`
 
-### 25.1 The Bloat Problem: Why Naive Python Containers Reach 1.5 GB
+### 11.1 The Bloat Problem: Why Naive Python Containers Reach 1.5 GB
 
 A naive Dockerfile typically:
 1. Uses `FROM python:3.12` (based on full Debian, including GCC, build headers, and audio drivers).
@@ -1138,7 +1136,7 @@ A naive Dockerfile typically:
 
 ---
 
-### 25.2 Two-Stage Build Architecture with `uv`: Compilers vs. Runtime
+### 11.2 Two-Stage Build Architecture with `uv`: Compilers vs. Runtime
 
 Using **Astral `uv`** inside a **Multi-Stage Dockerfile**:
 1. **Builder Stage**: Installs C compilers and compiles dependencies into a clean `.venv` using `uv sync --frozen --no-dev`.
@@ -1201,7 +1199,7 @@ ENTRYPOINT ["gunicorn", "src.main:app", "-w", "4", "-k", "uvicorn.workers.Uvicor
 
 ---
 
-### 25.3 Container Security Hardening: The Non-Root User Mandate
+### 11.3 Container Security Hardening: The Non-Root User Mandate
 
 > [!CAUTION]
 > ### The Root Container Exploit Hazard
@@ -1211,30 +1209,30 @@ ENTRYPOINT ["gunicorn", "src.main:app", "-w", "4", "-k", "uvicorn.workers.Uvicor
 
 ---
 
-### 25.4 Vulnerability Scanning & SBOM Generation with Trivy
+### 11.4 Vulnerability Scanning & SBOM Generation with Trivy
 
 Incorporate **Trivy** into your build pipeline to reject images containing High or Critical CVEs:
 
 ```bash
 
-# 26. Build Docker image
+# Build Docker image
 
 docker build -t enterprise-payment-api:1.0.0 .
 
-# 27. Scan image for CVE vulnerabilities
+# Scan image for CVE vulnerabilities
 
 trivy image --severity HIGH,CRITICAL --exit-code 1 enterprise-payment-api:1.0.0
 
-# 28. Generate CycloneDX Software Bill of Materials (SBOM)
+# Generate CycloneDX Software Bill of Materials (SBOM)
 
 trivy image --format cyclonedx --output sbom.json enterprise-payment-api:1.0.0
 ```
 
 ---
 
-# 29. Kubernetes Core Architecture & Abstractions
+# 12. Kubernetes Core Architecture & Abstractions
 
-### 29.1 Pods, Deployments, and ReplicaSets
+### 12.1 Pods, Deployments, and ReplicaSets
 
 * **Pod**: The smallest deployable unit in Kubernetes. Represents a group of one or more co-located containers sharing the exact same Network Namespace (IP address and port space) and storage volumes.
 * **ReplicaSet**: Guarantees that a specified number of identical pod replicas are running at any given moment.
@@ -1242,7 +1240,7 @@ trivy image --format cyclonedx --output sbom.json enterprise-payment-api:1.0.0
 
 ---
 
-### 29.2 Service Networking: ClusterIP, NodePort, and Ingress Controllers
+### 12.2 Service Networking: ClusterIP, NodePort, and Ingress Controllers
 
 * **ClusterIP (Default)**: Assigns an internal, stable virtual IP address accessible only from within the Kubernetes cluster.
 * **NodePort**: Exposes the service on a static high port ($30000\text{--}32767$) across every Kubernetes node.
@@ -1250,7 +1248,7 @@ trivy image --format cyclonedx --output sbom.json enterprise-payment-api:1.0.0
 
 ---
 
-### 29.3 Declarative Production Deployment Manifest Blueprint
+### 12.3 Declarative Production Deployment Manifest Blueprint
 
 Here is the standardized, production-hardened Kubernetes manifest for an enterprise Python microservice:
 
@@ -1314,7 +1312,7 @@ spec:
 
           # ==================== DECOUPLED HEALTH PROBES ====================
 
-# 30. Startup Probe: Allows up to 60s for slow DB connection warmups
+      # Startup Probe: Allows up to 60s for slow DB connection warmups
 
 startupProbe:
             httpGet:
@@ -1323,7 +1321,7 @@ startupProbe:
             failureThreshold: 30
             periodSeconds: 2
 
-# 31. Liveness Probe: Detects event loop deadlocks (Triggers Pod Restart)
+      # Liveness Probe: Detects event loop deadlocks (Triggers Pod Restart)
 
 livenessProbe:
             httpGet:
@@ -1334,7 +1332,7 @@ livenessProbe:
             timeoutSeconds: 2
             failureThreshold: 3
 
-# 32. Readiness Probe: Checks DB/Redis reachability (Controls Traffic Ingress)
+      # Readiness Probe: Checks DB/Redis reachability (Controls Traffic Ingress)
 
 readinessProbe:
             httpGet:
@@ -1369,9 +1367,9 @@ spec:
 
 ---
 
-# 33. Decoupling Health Probes: Startup, Liveness, and Readiness
+# 13. Decoupling Health Probes: Startup, Liveness, and Readiness
 
-### 33.1 The Cascading Failure Disaster: Conflating Liveness with Readiness
+### 13.1 The Cascading Failure Disaster: Conflating Liveness with Readiness
 
 > [!CAUTION]
 > ### The Most Common Kubernetes Outage Pattern
@@ -1388,7 +1386,7 @@ spec:
 
 ---
 
-### 33.2 `startupProbe`: Protecting Slow Application Warmups
+### 13.2 `startupProbe`: Protecting Slow Application Warmups
 
 When Python microservices load large PyTorch models or compile Cython modules on startup, boot times can take 20 to 60 seconds.
 Without a `startupProbe`, a standard `livenessProbe` with a 10-second timeout will kill the pod repeatedly in an infinite **`CrashLoopBackOff`**!
@@ -1396,7 +1394,7 @@ The `startupProbe` disables liveness and readiness checks until the startup chec
 
 ---
 
-### 33.3 `livenessProbe`: Deadlock Detection and Process Restarts
+### 13.3 `livenessProbe`: Deadlock Detection and Process Restarts
 
 * **Purpose**: Verifies that the internal Python runtime is alive and responsive.
 * **Implementation**: A simple, fast endpoint that does **not** check external databases or Redis:
@@ -1410,7 +1408,7 @@ The `startupProbe` disables liveness and readiness checks until the startup chec
 
 ---
 
-### 33.4 `readinessProbe`: Traffic Routing and Dependency Health
+### 13.4 `readinessProbe`: Traffic Routing and Dependency Health
 
 * **Purpose**: Verifies whether the pod is currently capable of serving user traffic.
 * **Implementation**: Checks local connection pool capacity and primary dependency availability:
@@ -1425,9 +1423,9 @@ The `startupProbe` disables liveness and readiness checks until the startup chec
 
 ---
 
-# 34. Process Lifecycle, Signals & Zero-Downtime Deployments
+# 14. Process Lifecycle, Signals & Zero-Downtime Deployments
 
-### 34.1 The Kubernetes Pod Termination Sequence
+### 14.1 The Kubernetes Pod Termination Sequence
 
 When Kubernetes terminates a pod during a rolling update or autoscaling scale-down:
 
@@ -1471,7 +1469,7 @@ flowchart TD
 
 ---
 
-### 34.2 The PreStop Hook: Allowing `kube-proxy` Network Convergence
+### 14.2 The PreStop Hook: Allowing `kube-proxy` Network Convergence
 
 Notice that Step 2 (removing pod IP from load balancers) and Step 3 (stopping container) happen **asynchronously and in parallel**.
 If your application stops immediately upon receiving the termination signal, **there is a 2 to 5 second window where the AWS Load Balancer or kube-proxy still forwards new requests to the dying pod**, causing HTTP 502 Bad Gateway errors for active users!
@@ -1479,7 +1477,7 @@ Adding a `preStop: exec: command: ["sleep", "10"]` pauses shutdown just long eno
 
 ---
 
-### 34.3 Catching `SIGTERM` in Python & Draining In-Flight Requests
+### 14.3 Catching `SIGTERM` in Python & Draining In-Flight Requests
 
 When using Uvicorn or Gunicorn with `--graceful-timeout 30`, the server natively intercepts `SIGTERM`, stops listening on the socket, and gives active requests 30 seconds to finish:
 
@@ -1504,7 +1502,7 @@ def register_graceful_shutdown_handlers(app):
 
 ---
 
-### 34.4 Zero-Downtime Rolling Updates (`maxUnavailable: 0`)
+### 14.4 Zero-Downtime Rolling Updates (`maxUnavailable: 0`)
 
 By configuring `maxUnavailable: 0` and `maxSurge: 25%` in your Deployment manifest:
 * Kubernetes will **never** terminate an existing pod until the replacement pod has passed both its `startupProbe` and `readinessProbe`!
@@ -1512,9 +1510,9 @@ By configuring `maxUnavailable: 0` and `maxSurge: 25%` in your Deployment manife
 
 ---
 
-# 35. Autoscaling Strategies: HPA & KEDA
+# 15. Autoscaling Strategies: HPA & KEDA
 
-### 35.1 Horizontal Pod Autoscaler (HPA) for CPU/Memory Bottlenecks
+### 15.1 Horizontal Pod Autoscaler (HPA) for CPU/Memory Bottlenecks
 
 The **Horizontal Pod Autoscaler (HPA)** scales the number of pods based on observed CPU and memory metrics collected by the Kubernetes Metrics Server:
 
@@ -1543,7 +1541,7 @@ spec:
 
 ---
 
-### 35.2 The Worker Scaling Dilemma: Why HPA Fails for Background Queues
+### 15.2 The Worker Scaling Dilemma: Why HPA Fails for Background Queues
 
 > [!CAUTION]
 > ### Why HPA Fails on Celery and Kafka Workers
@@ -1553,7 +1551,7 @@ spec:
 
 ---
 
-### 35.3 Event-Driven Autoscaling with KEDA (Kafka Lag & RabbitMQ Depth)
+### 15.3 Event-Driven Autoscaling with KEDA (Kafka Lag & RabbitMQ Depth)
 
 **KEDA (Kubernetes Event-driven Autoscaling)** scales pods based on external message queue metrics:
 
@@ -1581,16 +1579,16 @@ spec:
 
 ---
 
-# 36. Enterprise Secrets & Configuration Management
+# 16. Enterprise Secrets & Configuration Management
 
-### 36.1 ConfigMaps vs. Kubernetes Secrets
+### 16.1 ConfigMaps vs. Kubernetes Secrets
 
 * **ConfigMap**: Plaintext key-value pairs for non-sensitive configurations (log levels, external service endpoints).
 * **Kubernetes Secret**: Base64-encoded strings stored in `etcd`. (Note: Base64 is **not encryption**; ensure `etcd` encryption-at-rest is enabled on the cluster!).
 
 ---
 
-### 36.2 External Secrets Operator (ESO) Syncing with AWS Secrets Manager
+### 16.2 External Secrets Operator (ESO) Syncing with AWS Secrets Manager
 
 Hardcoding secrets in Git or manually creating Kubernetes secrets via `kubectl create secret` violates SOC 2 compliance.
 The **External Secrets Operator (ESO)** automatically synchronizes secrets directly from AWS Secrets Manager or HashiCorp Vault into Kubernetes secrets:
@@ -1618,9 +1616,9 @@ spec:
 
 ---
 
-# 37. End-to-End CI/CD Pipeline with GitHub Actions
+# 17. End-to-End CI/CD Pipeline with GitHub Actions
 
-### 37.1 High-Velocity Pipeline Architecture
+### 17.1 High-Velocity Pipeline Architecture
 
 An enterprise CI/CD pipeline must execute within **$< 3\text{ minutes}$**, using aggressive caching and parallel job execution:
 
@@ -1653,7 +1651,7 @@ flowchart TD
 
 ---
 
-### 37.2 Complete Production `.github/workflows/ci-cd.yaml` Manifest
+### 17.2 Complete Production `.github/workflows/ci-cd.yaml` Manifest
 
 ```yaml
 name: Production CI/CD Pipeline
@@ -1776,9 +1774,19 @@ jobs:
 
 ---
 
-# 38. Cloud Deployment Topologies: AWS vs. GCP
+# 18. Cloud Deployment Topologies: AWS vs. GCP
 
-### 38.1 AWS Architecture: ECS Fargate vs. EKS vs. Aurora vs. ElastiCache
+### 18.1 AWS Production Cloud Architecture: ECS Fargate vs. EKS vs. Aurora vs. ElastiCache
+
+Deploying Python backend microservices on Amazon Web Services requires careful alignment between operational complexity and architectural scalability. AWS provides two primary container compute paradigms and enterprise managed datastores:
+
+#### 1. Compute Layer: Serverless Fargate vs. Kubernetes Orchestration (EKS)
+- **AWS ECS with AWS Fargate:** Operates as a serverless container orchestration platform. Developers define Task Definitions (container images, CPU/RAM reservations, environment variables) and Services without provisioning, configuring, or patching underlying EC2 virtual machines. Tasks run inside isolated microVMs powered by AWS Firecracker hypervisor technology. This eliminates operational maintenance overhead (AMI updates, OS kernel vulnerabilities) but restricts advanced networking capabilities such as DaemonSets or custom eBPF sidecars.
+- **Amazon Elastic Kubernetes Service (EKS):** Provides a managed upstream Kubernetes control plane spread across three Availability Zones. EKS pairs with modern just-in-time node provisioners such as Karpenter to dynamically provision heterogeneous EC2 instances based on pending pod requirements. EKS is the enterprise standard for complex distributed architectures requiring service meshes (Istio/Linkerd), OpenTelemetry collector daemonsets, and GitOps workflows (ArgoCD).
+
+#### 2. Persistence Layer: Distributed Storage and Caching Mechanics
+- **Amazon Aurora PostgreSQL:** Decouples database compute from distributed storage. Aurora replicates write logs 6 ways across 3 Availability Zones, persisting changes independently of database checkpoint flushes. It supports sub-10ms asynchronous read replica replication lag, automatic storage autoscaling up to 128 TiB, and automated failover in under 30 seconds.
+- **Amazon ElastiCache for Redis:** Provides in-memory data caching, distributed token-bucket rate limiting, and session persistence. In Cluster Mode Enabled, keys are distributed across up to 500 shards using consistent CRC16 hashing, providing multi-terabyte memory scale with sub-millisecond p99 latencies.
 
 | AWS Component | Best Production Fit | Tradeoffs / Operational Overhead |
 | :--- | :--- | :--- |
@@ -1789,7 +1797,17 @@ jobs:
 
 ---
 
-### 38.2 GCP Architecture: Cloud Run vs. GKE vs. Cloud SQL
+### 18.2 GCP Production Cloud Architecture: Cloud Run vs. GKE vs. Cloud SQL
+
+Google Cloud Platform offers highly specialized developer ergonomics centered on Google-native container primitives:
+
+#### 1. Compute Layer: Serverless Cloud Run vs. GKE Autopilot
+- **Google Cloud Run:** A fully managed serverless platform built on Knative and gVisor container virtualization. Cloud Run automatically terminates TLS, provides built-in HTTP/2 and WebSocket support, and scales container instances up and down instantaneously based on incoming HTTP request concurrency (up to 1,000 requests per instance). Because Cloud Run scales to zero during idle periods, development and staging environments incur negligible infrastructure cost.
+- **Google Kubernetes Engine (GKE) Autopilot:** A fully managed Kubernetes experience where Google provisions, configures, and hardens worker nodes according to industry best practices and CIS benchmarks. GKE Autopilot bills strictly per pod resource request (CPU, memory, storage) rather than provisioned EC2 node capacity, eliminating unutilized node waste while preserving full Kubernetes API access.
+
+#### 2. Persistence Layer: Cloud SQL and In-Memory Memorystore
+- **Google Cloud SQL PostgreSQL:** Delivers automated backups, point-in-time recovery (PITR) to within seconds, automatic storage increase without downtime, and private service access via VPC peering.
+- **Google Cloud Memorystore for Redis:** Fully managed Redis service providing low-latency distributed caching with zero downtime patching and private IP integration.
 
 | GCP Component | Best Production Fit | Tradeoffs / Operational Overhead |
 | :--- | :--- | :--- |
@@ -1800,7 +1818,7 @@ jobs:
 
 ---
 
-### 38.3 Cloud Identity Federation: AWS IRSA vs. GCP Workload Identity
+### 18.3 Cloud Identity Federation: AWS IRSA vs. GCP Workload Identity
 
 In legacy architectures, developers injected long-lived cloud credentials (`AWS_ACCESS_KEY_ID` or GCP service account `.json` key files) into Kubernetes Secrets. If a container was compromised, attackers extracted the private keys and pivoted to the entire cloud infrastructure!
 
@@ -1825,7 +1843,7 @@ metadata:
 
 ---
 
-### 38.4 Infrastructure as Code: Turnkey Terraform for Production Microservices
+### 18.4 Infrastructure as Code: Turnkey Terraform for Production Microservices
 
 Here is the declarative Terraform HCL provisioning an AWS ECS Fargate cluster with an Application Load Balancer and secure networking:
 
@@ -1909,7 +1927,7 @@ resource "aws_ecs_service" "payment_service" {
 
 ---
 
-# 39. Summary Comparison & Production Engineering Reference Matrix
+# 19. Summary Comparison & Production Engineering Reference Matrix
 
 | Tool / Framework | Primary Purpose | Layer / Scope | Overhead / Impact | Enterprise Best Practice |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1935,7 +1953,7 @@ resource "aws_ecs_service" "payment_service" {
 
 ---
 
-# 40. References & Further Reading
+# 20. References & Further Reading
 
 1. **Pytest Official Documentation**: [https://docs.pytest.org/en/stable/](https://docs.pytest.org/en/stable/)
 2. **Hypothesis: Property-Based Testing for Python**: [https://hypothesis.readthedocs.io/](https://hypothesis.readthedocs.io/)

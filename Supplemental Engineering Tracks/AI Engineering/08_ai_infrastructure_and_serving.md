@@ -113,10 +113,11 @@ flowchart TD
 8. [Production Implementation: Enterprise Capacity Planning & Sizing Engine](#8-production-implementation-enterprise-capacity-planning--sizing-engine)
    - [8.1 Systems Architecture of the Planner](#81-systems-architecture-of-the-planner)
    - [8.2 Complete Production-Grade Python Implementation](#82-complete-production-grade-python-implementation)
-   - [18.3 Operational Sizing Playbook & Benchmark Validation](#183-operational-sizing-playbook--benchmark-validation)
-9. [Summary Comparison & Production Engineering Reference Matrix](#19-summary-comparison--production-engineering-reference-matrix)
-10. [References & Further Reading](#20-references--further-reading)
----
+   - [8.3 Operational Sizing Playbook & Benchmark Validation](#83-operational-sizing-playbook--benchmark-validation)
+9. [Summary Comparison & Production Engineering Reference Matrix](#9-summary-comparison--production-engineering-reference-matrix)
+   - [9.1 High-Performance Inference Serving Engines](#91-high-performance-inference-serving-engines)
+   - [9.2 Quantization & Memory Compression Reference](#92-quantization--memory-compression-reference)
+10. [References & Further Reading](#10-references--further-reading)
 
 # 1. Enterprise Cloud AI Platforms & Hosting Architectures
 
@@ -747,6 +748,19 @@ Where $PP$ is the pipeline depth and $M$ is the number of micro-batches. To make
 
 ### 5.3 Communication Topologies: Intra-Node NVLink vs. Inter-Node InfiniBand / RoCE
 
+High-throughput distributed model serving requires matching each parallelism dimension to the physical network fabric capable of satisfying its communication frequency and latency budget:
+
+#### 1. Intra-Node High-Speed Interconnects: NVIDIA NVLink & NVSwitch
+In Tensor Parallelism (TP), every single transformer layer executes an All-Reduce collective operation across the participating GPUs. In a 70B parameter model with 80 layers, this requires 160 All-Reduce synchronization rounds per generated token. 
+- Over standard PCIe Gen5 slots ($64\text{ GB/s}$ bidirectional bandwidth), the latency of these collective operations reaches tens of microseconds, causing GPU Tensor Cores to stall while waiting for cross-GPU synchronization.
+- NVIDIA NVLink 4 (on Hopper H100) provides **$900\text{ GB/s}$ bidirectional bandwidth per GPU** ($7.2\text{ TB/s}$ total bisection bandwidth across an 8-GPU chassis via NVSwitch). This delivers sub-microsecond latency, allowing All-Reduce operations to complete nearly instantaneously. Consequently, **Tensor Parallelism must strictly reside within a single physical node**.
+
+#### 2. Inter-Node Clustering: InfiniBand vs. RoCE v2 with GPUDirect RDMA
+When models exceed the memory capacity of a single 8-GPU chassis (e.g., DeepSeek-V3 671B or LLaMA-3.1 405B requiring Pipeline Parallelism or multi-node Tensor Parallelism), traffic must traverse the datacenter network fabric:
+- **GPUDirect RDMA (Remote Direct Memory Access):** Bypasses the host CPU, Linux kernel network stack, and system RAM copies entirely. Remote GPU High Bandwidth Memory (HBM) buffers read and write directly over PCIe into host NICs.
+- **NVIDIA Quantum-2 InfiniBand:** Operates as a native credit-based, lossless networking fabric providing deterministic $400\text{ Gbps}$ or $800\text{ Gbps}$ per port with ultra-low transit latencies ($<1.0\,\mu\text{s}$). It is the industry gold standard for frontier multi-node AI clusters.
+- **RoCE v2 (RDMA over Converged Ethernet):** Enables RDMA over standard Ethernet switches using Priority-Based Flow Control (PFC, IEEE 802.1Qbb) and Explicit Congestion Notification (ECN). While more cost-effective and compatible with enterprise network infrastructure, RoCE requires meticulous switch buffer tuning to prevent packet drops and PFC deadlock storms.
+
 | Parallelism Dimension | Interconnect Requirement | Bandwidth Required | Network Protocol | Typical Boundary |
 | :--- | :--- | :--- | :--- | :--- |
 | **Tensor Parallelism (TP)** | NVIDIA NVLink 4 / NVSwitch | $900\text{ GB/s}$ bidirectional | NCCL Shared Memory / P2P | Strictly **Intra-Node** (Within single 8x GPU chassis) |
@@ -828,8 +842,13 @@ flowchart LR
 
 ### 6.4 Quantization Quality, Latency & VRAM Trade-Off Matrix
 
+Evaluating quantization in production requires balancing three interconnected engineering variables: **memory footprint compression**, **computational throughput acceleration**, and **model perplexity / reasoning degradation**. 
+
+- **Weight-Only INT4 (AWQ vs. GPTQ):** Compresses static weights by $75\%$, enabling a 70B parameter model to fit onto a single $48\text{GB}$ GPU (or two $24\text{GB}$ GPUs). Because activation tensors remain in FP16, reasoning accuracy on complex STEM and coding benchmarks remains exceptionally close to baseline (typically $<1.0\%$ MMLU regression). However, because weights must be dynamically dequantized back to FP16 inside registers during each forward pass, compute-bound prefill latency is not accelerated.
+- **Native FP8 (E4M3 / E5M2):** Supported natively by NVIDIA Hopper (H100) and Blackwell (B200) Tensor Cores. By executing both weight matrix and activation tensor dot-products in native 8-bit floating-point math, FP8 delivers a theoretical $2\times$ increase in Tensor Core FLOPs while cutting VRAM usage by $50\%$. Accuracy degradation on MMLU is virtually undetectable ($<0.2\%$), making FP8 the undisputed gold standard for enterprise serving on modern datacenter GPUs.
+
 | Quantization Scheme | Bits (W / A) | LLaMA-3-70B VRAM | Accuracy Loss (MMLU) | Serving Engine Support | Ideal Production Use Case |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Unquantized (BF16)** | 16 / 16 | $142\text{ GB}$ | $0.0\%$ (Baseline) | All Engines | Maximum reasoning accuracy; zero tolerance for drift |
 | **Native FP8 (OCP)** | 8 / 8 | $72\text{ GB}$ | $<0.2\%$ | vLLM, TensorRT-LLM | **Gold Standard for NVIDIA H100 / B200 Enterprise Nodes** |
 | **AWQ (INT4)** | 4 / 16 | $38\text{ GB}$ | $<1.0\%$ | vLLM, SGLang, TGI | High-throughput serving on consumer or Ampere (A100) GPUs |
@@ -1017,7 +1036,7 @@ class ModelArchitectureProfile:
 
 # ==============================================================================
 
-# 9. Canonical Reference Hardware Specs
+    # Canonical Reference Hardware Specs
 
 # ==============================================================================
 
@@ -1050,7 +1069,7 @@ NVIDIA_B200_192GB = GPUHardwareProfile(
 
 # ==============================================================================
 
-# 10. Canonical Model Architecture Profiles
+    # Canonical Model Architecture Profiles
 
 # ==============================================================================
 
@@ -1086,7 +1105,7 @@ DEEPSEEK_V3_MOE_671B = ModelArchitectureProfile(
 
 # ==============================================================================
 
-# 11. Capacity Planning Engine
+    # Capacity Planning Engine
 
 # ==============================================================================
 
@@ -1115,7 +1134,7 @@ class EnterpriseCapacityPlanner:
         total_cluster_vram_gb = self.gpu_count * self.hw.vram_per_gpu_gb
         effective_usable_vram_gb = total_cluster_vram_gb * self.gpu_utilization
 
-# 12. Model Static Weights VRAM
+    # Model Static Weights VRAM
 
 raw_weights_gb = (self.model.parameter_count_billions * 1e9 * self.weight_precision) / (1024 ** 3)
         # Add 12% overhead for CUDA context, NCCL buffers, and peak activation tensors
@@ -1127,11 +1146,11 @@ raw_weights_gb = (self.model.parameter_count_billions * 1e9 * self.weight_precis
                 "error": f"Model static footprint ({static_overhead_gb:.1f} GB) exceeds total cluster capacity ({effective_usable_vram_gb:.1f} GB)"
             }
 
-# 13. Remaining VRAM allocated to PagedAttention KV Cache
+    # Remaining VRAM allocated to PagedAttention KV Cache
 
 available_kv_vram_gb = effective_usable_vram_gb - static_overhead_gb
 
-# 14. KV Cache Footprint per Token (PagedAttention Block Calculation)
+    # KV Cache Footprint per Token (PagedAttention Block Calculation)
 
 # Formula: 2 * num_layers * num_kv_heads * head_dim * bytes_per_elem
         bytes_per_token = (
@@ -1140,16 +1159,16 @@ available_kv_vram_gb = effective_usable_vram_gb - static_overhead_gb
         )
         kv_cache_gb_per_stream = (bytes_per_token * target_context_tokens) / (1024 ** 3)
 
-# 15. Maximum Concurrent Continuous Streams
+    # Maximum Concurrent Continuous Streams
 
 max_concurrent_streams = int(available_kv_vram_gb / kv_cache_gb_per_stream)
 
-# 16. PagedAttention Physical Block Allocation
+    # PagedAttention Physical Block Allocation
 
 bytes_per_block = bytes_per_token * self.block_size
         total_physical_blocks = int((available_kv_vram_gb * (1024 ** 3)) / bytes_per_block)
 
-# 17. Theoretical Peak Decode Throughput (Memory-Bandwidth Bound)
+    # Theoretical Peak Decode Throughput (Memory-Bandwidth Bound)
 
 # Peak Tokens/Sec ≈ Aggregate Memory Bandwidth / Model Weight Footprint per token
         aggregate_bandwidth_tb_s = self.gpu_count * self.hw.memory_bandwidth_tb_s
@@ -1186,7 +1205,7 @@ bytes_per_block = bytes_per_token * self.block_size
 
 # ==============================================================================
 
-# 18. Operational Sizing Benchmark Run
+    # Operational Sizing Benchmark Run
 
 # ==============================================================================
 
@@ -1236,7 +1255,7 @@ if __name__ == "__main__":
 
 ---
 
-### 18.3 Operational Sizing Playbook & Benchmark Validation
+### 8.3 Operational Sizing Playbook & Benchmark Validation
 
 When executing capacity planning in production:
 1. **Never Size for Average Context Length:** Sizing clusters based on average context ($1,500\text{ tokens}$) will cause catastrophic Out-of-Memory ($OOM$) evictions when users submit $16\text{k}$ documents. Size KV pools for the **$p90$ context length**.
@@ -1245,9 +1264,13 @@ When executing capacity planning in production:
 
 ---
 
-# 19. Summary Comparison & Production Engineering Reference Matrix
+# 9. Summary Comparison & Production Engineering Reference Matrix
 
 ### 9.1 High-Performance Inference Serving Engines
+
+Selecting an enterprise inference serving engine requires balancing runtime performance (time-to-first-token and inter-token latency) against deployment velocity and operational complexity. While naive HuggingFace Transformers pipelines process requests sequentially with static memory allocations, modern high-throughput serving runtimes leverage dynamic kernel fusions, non-contiguous virtual memory management (PagedAttention), and asynchronous iteration-level request scheduling.
+
+The modern LLM inference runtime landscape:
 
 | Feature / Metric | vLLM (v0.6+) | TensorRT-LLM | SGLang | Modular MAX / Mojo |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1273,7 +1296,7 @@ When executing capacity planning in production:
 
 ---
 
-# 20. References & Further Reading
+# 10. References & Further Reading
 
 1. **PagedAttention & vLLM: Efficient Memory Management for Large Language Model Serving:** Kwon, W., et al. (2023). *SOSP 2023.* [arXiv:2309.06180](https://arxiv.org/abs/2309.06180).
 2. **Orca: A Distributed Serving System for Transformer-Based Generative Models:** Yu, G. I., et al. (2022). *OSDI 2022.*

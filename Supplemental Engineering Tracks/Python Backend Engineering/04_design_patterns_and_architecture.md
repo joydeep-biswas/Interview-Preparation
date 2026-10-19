@@ -646,6 +646,17 @@ flowchart TD
 
 ### 7.1 Entities vs. Immutable Value Objects
 
+#### Tactical Domain-Driven Design Modeling
+In Domain-Driven Design (DDD), business logic is encapsulated within domain models that reflect real-world problem spaces. Domain elements are categorized into two fundamental building blocks based on whether their lifecycle is governed by an ongoing identity thread or defined purely by their structural attributes:
+
+1. **Entities (Thread of Continuity & Identity):**
+   - **Identity Rule:** An Entity possesses an intrinsic, persistent identity (e.g., a UUID or database primary key) that remains unchanged throughout its entire lifecycle. Two entities with identical attributes but different IDs represent completely distinct business objects (e.g., two customers who happen to share the same first and last name).
+   - **State Mutability:** Entities represent mutable state machines (e.g., an `Order` transitioning through `DRAFT`, `PAID`, `SHIPPED`). Equality (`__eq__`) is determined strictly by comparing unique identity identifiers, completely ignoring mutable state fields.
+
+2. **Value Objects (Descriptive & Immutable Attributes):**
+   - **Attribute Equivalence:** A Value Object has **zero conceptual identity**. It is defined entirely and exhaustively by the sum of its attributes. If two `Money` objects both represent `$10.00 USD`, they are interchangeable and equivalent.
+   - **Strict Immutability:** Value Objects must be **immutable** (`frozen=True`). Modifying an attribute is forbidden; state transitions produce a new Value Object instance. This prevents side-effect aliasing bugs where mutating a value object unexpectedly corrupts shared references across multiple entities.
+
 | Construct | Identity Definition | Mutability | Equality Comparison | Example |
 | :--- | :--- | :--- | :--- | :--- |
 | **Value Object** | No identity; defined entirely by its attributes | **Immutable** (`frozen=True`) | Equal if all attributes match | `Money(amount=10, currency="USD")` |

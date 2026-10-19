@@ -85,6 +85,21 @@ flowchart TD
     style T2PC fill:#1f2937,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 
+#### First-Principles Breakdown: Process vs. Thread Architecture
+
+Modern multitasking operating systems manage concurrent execution units using two foundational abstractions:
+
+1. **Process (The Heavyweight Unit of Resource Ownership):**
+   - **Address Space & Isolation:** A process is an executing program instance with its own private, isolated virtual memory address space (Page Tables, Code/Text segment, Initialized Data, Heap, and Stack) managed by the OS kernel and hardware Memory Management Unit (MMU). One process cannot directly read or mutate memory in another process without explicitly mapped Inter-Process Communication (IPC) primitives (shared memory, UNIX domain sockets, message queues).
+   - **Process Control Block (PCB):** The OS tracks each process via a PCB containing the process ID (PID), memory management information, open file descriptor tables, security credentials, and execution context.
+   - **Context Switching Overhead:** Switching execution between two different processes requires a full TLB (Translation Lookaside Buffer) flush, CPU register saving, and switching memory page tables, resulting in severe CPU pipeline stalls ($1 - 5\mu\text{s}$).
+
+2. **Thread (The Lightweight Unit of CPU Dispatch):**
+   - **Shared Memory Model:** A thread is the smallest schedulable unit of CPU execution. Multiple threads exist *within* the boundary of a single parent process. Peer threads share the process's text segment, global data, open file descriptors, and crucially, the **common JVM Heap**.
+   - **Thread Control Block (TCB) & Private State:** Each thread retains strictly private execution state: its own **Thread Stack** (local method stack frames, local variables, and primitive returns) and a **Program Counter (PC) Register** tracking the currently executing bytecode instruction.
+   - **Context Switching Cost:** Because threads share identical page tables, switching between peer threads does not require flushing the MMU's TLB cache. Only the CPU registers, PC, and stack pointer must be swapped, making thread context switches significantly faster ($100 - 500\text{ns}$).
+   - **Failure Boundary:** Because heap memory is shared, an unhandled error or data race that corrupts shared heap state in one thread can destabilize or crash all peer threads across the entire JVM.
+
 #### Comparison Matrix
 | Dimension | Process | Thread |
 | :--- | :--- | :--- |
@@ -684,6 +699,24 @@ public class PointCoordinate {
 ---
 
 ### Synchronizers
+
+#### Coordination Primitives in `java.util.concurrent`
+Multithreaded applications require deterministic coordination patterns to synchronize thread execution phases, govern shared resource capacities, and orchestrate initialization sequences without relying on fragile `wait()`/`notify()` loops. Java provides high-level synchronizers built primarily on the **AbstractQueuedSynchronizer (AQS)** framework:
+
+1. **`CountDownLatch` (One-Way Gateway):**
+   - **Internal Mechanics:** Initializes an internal AQS `state` to an integer $N$. Calling threads invoke `latch.await()` and suspend until the state reaches zero. Worker threads perform tasks and invoke `latch.countDown()`, atomically decrementing the state via CAS (`compareAndSetState`).
+   - **Non-Reusable:** Once the counter hits zero, the latch remains permanently open; subsequent calls to `await()` return immediately. It cannot be reset.
+
+2. **`CyclicBarrier` (Rendezvous Point):**
+   - **Internal Mechanics:** Coordinates a fixed set of $N$ threads. Threads perform parallel computations and call `barrier.await()`, blocking until all $N$ parties have arrived at the barrier. Once all parties arrive, an optional barrier action runs, and all threads are released simultaneously.
+   - **Reusable:** The barrier automatically resets its count back to $N$ after tripping, allowing threads to iterate through repeated phased algorithms (e.g., matrix calculations or physics simulations).
+
+3. **`Semaphore` (Permit-Based Concurrency Throttling):**
+   - **Internal Mechanics:** Controls access to a bounded resource pool using a set of available permits managed by AQS state. Calling `acquire()` decrements available permits (blocking if none are available); `release()` increments permits.
+   - **Use Case:** Preventing database connection exhaustion, rate-limiting outbound third-party API calls, or bounding parallel file downloads.
+
+4. **`Phaser` (Dynamic Multi-Phase Barrier):**
+   - **Internal Mechanics:** An advanced, highly flexible synchronization barrier that subsumes `CountDownLatch` and `CyclicBarrier`. Supports a dynamic number of registered parties (threads can register and deregister at any time) and advances through sequential numeric phases (`phase 0`, `phase 1`, ...).
 
 | Synchronizer | Mechanism | Reusable? | Typical Use Case |
 | :--- | :--- | :---: | :--- |

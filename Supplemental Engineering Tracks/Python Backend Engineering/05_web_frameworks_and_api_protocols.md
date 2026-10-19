@@ -801,6 +801,17 @@ async def lethal_route():
 
 ### 18.3 Decision Matrix: When to Use `def` vs. `async def`
 
+#### FastAPI Execution Engine Mechanics: The Event Loop vs. The AnyIO Thread Pool
+A subtle design element in FastAPI and Starlette is how the ASGI server schedules endpoint functions. Understanding this mechanism prevents catastrophic thread pool starvation or silent event loop freezes:
+
+1. **`async def` Endpoints (Direct Event Loop Execution):**
+   - **Scheduling:** The framework treats the route as a native coroutine and executes it directly on the main single-threaded `asyncio` event loop.
+   - **Contract & Peril:** Because it runs on the main event loop thread, **it must never execute blocking operations**. Any blocking call (`time.sleep()`, synchronous `requests.get()`, synchronous ORM calls via `psycopg2`) freezes the entire Python process, stalling all concurrent HTTP connections across the entire server.
+
+2. **Standard `def` Endpoints (Automated AnyIO Thread Pool Offloading):**
+   - **Scheduling:** When FastAPI detects a standard synchronous `def` endpoint, it does **not** execute it on the event loop. Instead, it automatically offloads execution to an external background worker thread pool (`anyio.to_thread.run_sync`, defaulting to 40 threads).
+   - **Safety:** The blocking call runs inside a worker thread; the main event loop remains completely unblocked and continues processing concurrent network traffic. However, concurrency is bounded by thread pool capacity, incurring OS thread context-switching overhead.
+
 | Endpoint Implementation | Declaration | Execution Mechanism | Performance Characteristic |
 | :--- | :--- | :--- | :--- |
 | **Pure Async I/O** (asyncpg, httpx, motor) | `async def` | Runs directly on event loop | **Maximum throughput** (10K+ req/sec). |

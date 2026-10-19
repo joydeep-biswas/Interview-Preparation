@@ -937,6 +937,21 @@ flowchart TD
 
 ### 14.1 Workload Classification & Bottleneck Diagnosis
 
+#### Identifying Hardware Bottlenecks in Python Microservices
+Modern backend performance tuning begins with precise workload classification. In Python, selecting the wrong concurrency model (e.g., throwing standard multithreading at CPU-bound tasks) exacerbates latency rather than mitigating it, due to OS thread preemption overhead and Global Interpreter Lock contention:
+
+1. **I/O-Bound Workloads (Network & Disk Latency Bound):**
+   - **Characteristics:** The CPU spends the vast majority of execution time idling in `epoll_wait` or blocking OS syscalls while waiting for remote database responses, third-party REST microservices, Redis cache lookups, or file storage transfers.
+   - **Concurrency Model:** Highly suited to cooperative asynchronous event loops (`asyncio`) or pre-warmed worker thread pools (`concurrent.futures.ThreadPoolExecutor`). When an I/O operation begins, the thread drops the GIL, allowing other threads or coroutines to execute in parallel.
+
+2. **CPU-Bound Workloads (Instruction Execution Bound):**
+   - **Characteristics:** Execution time is dominated by continuous CPU arithmetic and register operations (e.g., cryptographic password hashing with bcrypt/Argon2, image transcode/resizing, or complex serialization).
+   - **Concurrency Model:** Because standard CPython serializes bytecode execution on a single core via the GIL, threads yield zero concurrency gain. Scalability requires spawning independent OS processes (`concurrent.futures.ProcessPoolExecutor`) with dedicated address spaces, or delegating computation to compiled Rust/C++ extensions via PyO3.
+
+3. **Data/Memory-Bound Workloads (Cache Hierarchy & Bandwidth Bound):**
+   - **Characteristics:** Large-scale tabular manipulation or JSON payload parsing constrained by L1/L2/L3 cache misses and DRAM bus bandwidth.
+   - **Concurrency Model:** Bypasses standard Python object models in favor of vectorized, zero-copy columnar formats (Apache Arrow, Polars, DuckDB) that exploit modern CPU SIMD registers.
+
 | Workload Category | Typical Backend Operations | Primary Bottleneck | Optimal Python Strategy |
 | :--- | :--- | :--- | :--- |
 | **I/O-Bound** | HTTP calls, DB queries, Redis cache reads, file uploads | Network latency / socket wait | `asyncio` or `ThreadPoolExecutor` |

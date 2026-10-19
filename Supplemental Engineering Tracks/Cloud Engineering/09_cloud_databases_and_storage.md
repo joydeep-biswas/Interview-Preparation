@@ -99,46 +99,48 @@ flowchart TD
    - [7.3 Redundancy Topologies: LRS, ZRS, GRS, and Object Versioning](#73-redundancy-topologies-lrs-zrs-grs-and-object-versioning)
 8. [Production Code Implementation: Distributed Lock & Idempotent Consumer](#8-production-code-implementation-distributed-lock--idempotent-consumer)
    - [8.1 Production Python Redis Distributed Lease Lock with Safe Lua Releaser](#81-production-python-redis-distributed-lease-lock-with-safe-lua-releaser)
-9. [Senior Architect Troubleshooting Runbooks: Distributed Storage Outages](#13-senior-architect-troubleshooting-runbooks-distributed-storage-outages)
-   - [13.1 Scenario 1: Redis Cache Stampede Crashing Database Master](#131-scenario-1-redis-cache-stampede-crashing-database-master)
-   - [13.2 Scenario 2: Severe NoSQL Hot-Partition Throttling (HTTP 429)](#132-scenario-2-severe-nosql-hot-partition-throttling-http-429)
-   - [13.3 Scenario 3: Asynchronous Read-Replica Replication Lag (Stale Reads)](#133-scenario-3-asynchronous-read-replica-replication-lag-stale-reads)
-10. [Serverless Foundations: The Pop-Up Food Truck Analogy & Core Paradigms](#14-serverless-foundations-the-pop-up-food-truck-analogy--core-paradigms)
-   - [14.1 Real-World Analogy: Brick-and-Mortar Restaurants vs. On-Demand Pop-Up Trucks](#141-real-world-analogy-brick-and-mortar-restaurants-vs-on-demand-pop-up-trucks)
-   - [14.2 Serverless Definition: The 4 Tenets of True Serverless](#142-serverless-definition-the-4-tenets-of-true-serverless)
-11. [FaaS Compute Mechanics: Azure Functions vs. AWS Lambda Internals](#15-faas-compute-mechanics-azure-functions-vs-aws-lambda-internals)
-   - [15.1 Virtualization & Sandboxing: Firecracker MicroVMs vs. WebJobs Host](#151-virtualization--sandboxing-firecracker-microvms-vs-webjobs-host)
-   - [15.2 Cold Start Physics: Phases of Execution and Root Causes](#152-cold-start-physics-phases-of-execution-and-root-causes)
-   - [15.3 Advanced Cold-Start Elimination: SnapStart, CRaC, and Provisioned Concurrency](#153-advanced-cold-start-elimination-snapstart-crac-and-provisioned-concurrency)
-   - [15.4 Azure Functions Programming Model: In-Process vs. Isolated Worker](#154-azure-functions-programming-model-in-process-vs-isolated-worker)
-12. [Containerized Serverless Platforms: Azure Container Apps & AWS Fargate](#16-containerized-serverless-platforms-azure-container-apps--aws-fargate)
-   - [16.1 Architectural Underpinnings of ACA: KEDA, Envoy, and Dapr](#161-architectural-underpinnings-of-aca-keda-envoy-and-dapr)
-   - [16.2 Serverless Containers vs. FaaS vs. Dedicated Kubernetes (AKS/EKS)](#162-serverless-containers-vs-faas-vs-dedicated-kubernetes-akseks)
-13. [Event-Driven Architecture (EDA) & Reactive Cloud Routing](#17-event-driven-architecture-eda--reactive-cloud-routing)
-   - [17.1 The Three Event Archetypes: Notification, State Transfer, and Event Sourcing](#171-the-three-event-archetypes-notification-state-transfer-and-event-sourcing)
-   - [17.2 CNCF CloudEvents Standard and Content-Based Routing](#172-cncf-cloudevents-standard-and-content-based-routing)
-   - [17.3 Azure Event Grid vs. AWS EventBridge Deep Dive](#173-azure-event-grid-vs-aws-eventbridge-deep-dive)
-14. [Distributed Workflow Orchestration: Durable Functions & AWS Step Functions](#18-distributed-workflow-orchestration-durable-functions--aws-step-functions)
-   - [18.1 Durable Task Framework (DTFx): Event Sourcing and the Determinism Law](#181-durable-task-framework-dtfx-event-sourcing-and-the-determinism-law)
-   - [18.2 AWS Step Functions: Amazon States Language (ASL), Task Tokens, and Distributed Map](#182-aws-step-functions-amazon-states-language-asl-task-tokens-and-distributed-map)
-15. [The Distributed Saga Pattern: Managing Cross-Service Transactions](#19-the-distributed-saga-pattern-managing-cross-service-transactions)
-   - [19.1 Choreography vs. Orchestration: The Complexity Curve](#191-choreography-vs-orchestration-the-complexity-curve)
-   - [19.2 The Pivot Transaction and Semantic Compensations](#192-the-pivot-transaction-and-semantic-compensations)
-   - [19.3 Semantic Anomalies in Sagas: Lost Updates and Dirty Reads](#193-semantic-anomalies-in-sagas-lost-updates-and-dirty-reads)
-16. [Enterprise API Management & Edge Gateways](#20-enterprise-api-management--edge-gateways)
-   - [20.1 Azure APIM Policy Pipeline: Inbound, Backend, Outbound, and On-Error](#201-azure-apim-policy-pipeline-inbound-backend-outbound-and-on-error)
-   - [20.2 Token Bucket Rate Limiting and Circuit Breaking at the Edge](#202-token-bucket-rate-limiting-and-circuit-breaking-at-the-edge)
-17. [Total Cost of Ownership (TCO) & Inflection Point Mathematics](#21-total-cost-of-ownership-tco--inflection-point-mathematics)
-   - [21.1 The Serverless Economic Curve: Pay-Per-Execution vs. Baseline Compute](#211-the-serverless-economic-curve-pay-per-execution-vs-baseline-compute)
-   - [21.2 Mathematical TCO Inflection Model](#212-mathematical-tco-inflection-model)
-18. [Production Code Implementation: Distributed Saga Orchestration Engine](#22-production-code-implementation-distributed-saga-orchestration-engine)
-   - [22.1 Production Python Saga Orchestrator with Persistent State & Idempotent Compensation](#221-production-python-saga-orchestrator-with-persistent-state--idempotent-compensation)
-19. [Senior Cloud Architect Troubleshooting Runbooks: Serverless Incidents](#23-senior-cloud-architect-troubleshooting-runbooks-serverless-incidents)
-   - [23.1 Scenario 1: Uncontrolled Autoscaling Crashing Downstream Relational Databases](#231-scenario-1-uncontrolled-autoscaling-crashing-downstream-relational-databases)
-   - [23.2 Scenario 2: Non-Deterministic Replay Crash in Azure Durable Functions](#232-scenario-2-non-deterministic-replay-crash-in-azure-durable-functions)
-   - [23.3 Scenario 3: Cold-Start Latency Cascading into API Gateway 504 Timeouts](#233-scenario-3-cold-start-latency-cascading-into-api-gateway-504-timeouts)
-20. [Summary Comparison & Production Engineering Reference Matrix](#24-summary-comparison--production-engineering-reference-matrix)
-21. [References & Further Reading](#25-references--further-reading)
+9. [Senior Architect Troubleshooting Runbooks: Distributed Storage Outages](#9-senior-architect-troubleshooting-runbooks-distributed-storage-outages)
+   - [9.1 Scenario 1: Redis Cache Stampede Crashing Database Master](#91-scenario-1-redis-cache-stampede-crashing-database-master)
+   - [9.2 Scenario 2: Severe NoSQL Hot-Partition Throttling (HTTP 429)](#92-scenario-2-severe-nosql-hot-partition-throttling-http-429)
+   - [9.3 Scenario 3: Asynchronous Read-Replica Replication Lag (Stale Reads)](#93-scenario-3-asynchronous-read-replica-replication-lag-stale-reads)
+10. [Serverless Foundations: The Pop-Up Food Truck Analogy & Core Paradigms](#10-serverless-foundations-the-pop-up-food-truck-analogy--core-paradigms)
+    - [10.1 Real-World Analogy: Brick-and-Mortar Restaurants vs. On-Demand Pop-Up Trucks](#101-real-world-analogy-brick-and-mortar-restaurants-vs-on-demand-pop-up-trucks)
+    - [10.2 Serverless Definition: The 4 Tenets of True Serverless](#102-serverless-definition-the-4-tenets-of-true-serverless)
+11. [FaaS Compute Mechanics: Azure Functions vs. AWS Lambda Internals](#11-faas-compute-mechanics-azure-functions-vs-aws-lambda-internals)
+    - [11.1 Virtualization & Sandboxing: Firecracker MicroVMs vs. WebJobs Host](#111-virtualization--sandboxing-firecracker-microvms-vs-webjobs-host)
+    - [11.2 Cold Start Physics: Phases of Execution and Root Causes](#112-cold-start-physics-phases-of-execution-and-root-causes)
+    - [11.3 Advanced Cold-Start Elimination: SnapStart, CRaC, and Provisioned Concurrency](#113-advanced-cold-start-elimination-snapstart-crac-and-provisioned-concurrency)
+    - [11.4 Azure Functions Programming Model: In-Process vs. Isolated Worker](#114-azure-functions-programming-model-in-process-vs-isolated-worker)
+12. [Containerized Serverless Platforms: Azure Container Apps & AWS Fargate](#12-containerized-serverless-platforms-azure-container-apps--aws-fargate)
+    - [12.1 Architectural Underpinnings of ACA: KEDA, Envoy, and Dapr](#121-architectural-underpinnings-of-aca-keda-envoy-and-dapr)
+    - [12.2 Serverless Containers vs. FaaS vs. Dedicated Kubernetes (AKS/EKS)](#122-serverless-containers-vs-faas-vs-dedicated-kubernetes-akseks)
+13. [Event-Driven Architecture (EDA) & Reactive Cloud Routing](#13-event-driven-architecture-eda--reactive-cloud-routing)
+    - [13.1 The Three Event Archetypes: Notification, State Transfer, and Event Sourcing](#131-the-three-event-archetypes-notification-state-transfer-and-event-sourcing)
+    - [13.2 CNCF CloudEvents Standard and Content-Based Routing](#132-cncf-cloudevents-standard-and-content-based-routing)
+    - [13.3 Azure Event Grid vs. AWS EventBridge Deep Dive](#133-azure-event-grid-vs-aws-eventbridge-deep-dive)
+14. [Distributed Workflow Orchestration: Durable Functions & AWS Step Functions](#14-distributed-workflow-orchestration-durable-functions--aws-step-functions)
+    - [14.1 Durable Task Framework (DTFx): Event Sourcing and the Determinism Law](#141-durable-task-framework-dtfx-event-sourcing-and-the-determinism-law)
+    - [14.2 AWS Step Functions: Amazon States Language (ASL), Task Tokens, and Distributed Map](#142-aws-step-functions-amazon-states-language-asl-task-tokens-and-distributed-map)
+15. [The Distributed Saga Pattern: Managing Cross-Service Transactions](#15-the-distributed-saga-pattern-managing-cross-service-transactions)
+    - [15.1 Choreography vs. Orchestration: The Complexity Curve](#151-choreography-vs-orchestration-the-complexity-curve)
+    - [15.2 The Pivot Transaction and Semantic Compensations](#152-the-pivot-transaction-and-semantic-compensations)
+    - [15.3 Semantic Anomalies in Sagas: Lost Updates and Dirty Reads](#153-semantic-anomalies-in-sagas-lost-updates-and-dirty-reads)
+16. [Enterprise API Management & Edge Gateways](#16-enterprise-api-management--edge-gateways)
+    - [16.1 Azure APIM Policy Pipeline: Inbound, Backend, Outbound, and On-Error](#161-azure-apim-policy-pipeline-inbound-backend-outbound-and-on-error)
+    - [16.2 Token Bucket Rate Limiting and Circuit Breaking at the Edge](#162-token-bucket-rate-limiting-and-circuit-breaking-at-the-edge)
+17. [Total Cost of Ownership (TCO) & Inflection Point Mathematics](#17-total-cost-of-ownership-tco--inflection-point-mathematics)
+    - [17.1 The Serverless Economic Curve: Pay-Per-Execution vs. Baseline Compute](#171-the-serverless-economic-curve-pay-per-execution-vs-baseline-compute)
+    - [17.2 Mathematical TCO Inflection Model](#172-mathematical-tco-inflection-model)
+18. [Production Code Implementation: Distributed Saga Orchestration Engine](#18-production-code-implementation-distributed-saga-orchestration-engine)
+    - [18.1 Production Python Saga Orchestrator with Persistent State & Idempotent Compensation](#181-production-python-saga-orchestrator-with-persistent-state--idempotent-compensation)
+19. [Senior Cloud Architect Troubleshooting Runbooks: Serverless Incidents](#19-senior-cloud-architect-troubleshooting-runbooks-serverless-incidents)
+    - [19.1 Scenario 1: Uncontrolled Autoscaling Crashing Downstream Relational Databases](#191-scenario-1-uncontrolled-autoscaling-crashing-downstream-relational-databases)
+    - [19.2 Scenario 2: Non-Deterministic Replay Crash in Azure Durable Functions](#192-scenario-2-non-deterministic-replay-crash-in-azure-durable-functions)
+    - [19.3 Scenario 3: Cold-Start Latency Cascading into API Gateway 504 Timeouts](#193-scenario-3-cold-start-latency-cascading-into-api-gateway-504-timeouts)
+20. [Summary Comparison & Production Engineering Reference Matrix](#20-summary-comparison--production-engineering-reference-matrix)
+    - [20.1 Cloud Data Tier & Storage Technology Reference Matrix](#201-cloud-data-tier--storage-technology-reference-matrix)
+    - [20.2 Serverless & Cloud-Native Compute Execution Model Comparison](#202-serverless--cloud-native-compute-execution-model-comparison)
+21. [References & Further Reading](#21-references--further-reading)
 ---
 
 # 1. Distributed Systems Foundations: The Global Banking Analogy & Theoretical Limits
@@ -482,6 +484,10 @@ flowchart TD
 ---
 
 ### 4.2 The Three Great Cache Disasters: Penetration, Avalanche, and Stampede
+
+In-memory caching with Redis or Memcached provides sub-millisecond data retrieval and shields downstream relational databases from crushing read throughput. However, when caches degrade or expire unexpectedly, the sudden exposure of underlying relational storage can cause cascading failure and complete platform collapse. High-scale architectures must be explicitly engineered against the three canonical cache failure patterns: penetration, avalanche, and stampede.
+
+The triggers, failure mechanics, and engineering defenses for cache failure modes:
 
 | Cache Failure Disaster | Mechanics & Trigger | Architectural Disaster Caused | Engineering Defense |
 | :--- | :--- | :--- | :--- |
@@ -895,14 +901,14 @@ class IdempotentEventConsumer:
         """Processes event strictly once using distributed locking and deduplication cache."""
         dedup_key = f"dedup:event:{event_id}"
 
-# 9. Fast check for duplicate execution
+        # Fast check for duplicate execution
 
 cached = self.redis.get(dedup_key)
         if cached:
             logger.info("IDEMPOTENCY HIT: Event %s already executed. Returning cached outcome.", event_id)
             return json.loads(cached)
 
-# 10. Acquire lock to protect critical section
+        # Acquire lock to protect critical section
 
 lock = DistributedLeaseLock(self.redis, lock_name=f"event:{event_id}", lease_duration_ms=4000)
         if not lock.acquire(timeout_sec=1.5):
@@ -914,12 +920,12 @@ lock = DistributedLeaseLock(self.redis, lock_name=f"event:{event_id}", lease_dur
             if cached_again:
                 return json.loads(cached_again)
 
-# 11. Execute transactional business logic
+        # Execute transactional business logic
 
 logger.info("Executing transactional payment logic for event %s", event_id)
             result = business_handler(order_payload)
 
-# 12. Commit response into deduplication store with 24h expiration
+        # Commit response into deduplication store with 24h expiration
 
 self.redis.set(dedup_key, json.dumps(result), px=86400000)
             return result
@@ -955,9 +961,9 @@ if __name__ == "__main__":
 
 ---
 
-# 13. Senior Architect Troubleshooting Runbooks: Distributed Storage Outages
+# 9. Senior Architect Troubleshooting Runbooks: Distributed Storage Outages
 
-### 13.1 Scenario 1: Redis Cache Stampede Crashing Database Master
+### 9.1 Scenario 1: Redis Cache Stampede Crashing Database Master
 - **Symptom:** Redis CPU is at 20%, but the downstream PostgreSQL master database CPU spikes to 100%, connection pool exhausts, and HTTP 504 gateway timeouts spike across all microservices.
 - **Root Cause Isolation:**
   1. Inspect top slow queries on PostgreSQL. Notice 4,000 queries executing `SELECT * FROM featured_products WHERE status = 'active'` at 100 queries/sec.
@@ -973,7 +979,7 @@ if __name__ == "__main__":
 
 ---
 
-### 13.2 Scenario 2: Severe NoSQL Hot-Partition Throttling (HTTP 429)
+### 9.2 Scenario 2: Severe NoSQL Hot-Partition Throttling (HTTP 429)
 - **Symptom:** Azure Cosmos DB or AWS DynamoDB returns frequent `HTTP 429 RequestRateTooLarge` errors. Total provisioned throughput is 50,000 RU/s, but total consumed throughput across the container is only 8,000 RU/s.
 - **Root Cause Isolation:**
   1. Open Azure Portal Metric blade $\rightarrow$ `Consumed RU/s by PartitionKeyRangeID`.
@@ -990,7 +996,7 @@ if __name__ == "__main__":
 
 ---
 
-### 13.3 Scenario 3: Asynchronous Read-Replica Replication Lag (Stale Reads)
+### 9.3 Scenario 3: Asynchronous Read-Replica Replication Lag (Stale Reads)
 - **Symptom:** A user changes their shipping address, clicks "Save", navigates to the checkout page, and sees their old address. If they refresh the browser, the new address appears.
 - **Root Cause:** The address update write completed on the primary database. The subsequent page render read from an asynchronous **read-replica** that was suffering 4.2 seconds of replication lag due to a long-running batch report on the replica.
 - **Architectural Solution:**
@@ -999,9 +1005,9 @@ if __name__ == "__main__":
 
 ---
 
-# 14. Serverless Foundations: The Pop-Up Food Truck Analogy & Core Paradigms
+# 10. Serverless Foundations: The Pop-Up Food Truck Analogy & Core Paradigms
 
-### 14.1 Real-World Analogy: Brick-and-Mortar Restaurants vs. On-Demand Pop-Up Trucks
+### 10.1 Real-World Analogy: Brick-and-Mortar Restaurants vs. On-Demand Pop-Up Trucks
 
 To appreciate the paradigm shift represented by serverless cloud architecture, contrast the economics and operational overhead of a **traditional brick-and-mortar restaurant** with an **on-demand pop-up catering fleet**:
 
@@ -1018,7 +1024,7 @@ To appreciate the paradigm shift represented by serverless cloud architecture, c
 
 ---
 
-### 14.2 Serverless Definition: The 4 Tenets of True Serverless
+### 10.2 Serverless Definition: The 4 Tenets of True Serverless
 
 Not everything branded as "cloud-native" is serverless. Industry consensus defines a technology as genuinely serverless only if it satisfies all four criteria:
 1. **Zero Server Management:** Zero operating system installations, kernel security patching, AMI baking, or SSH key management.
@@ -1028,9 +1034,9 @@ Not everything branded as "cloud-native" is serverless. Industry consensus defin
 
 ---
 
-# 15. FaaS Compute Mechanics: Azure Functions vs. AWS Lambda Internals
+# 11. FaaS Compute Mechanics: Azure Functions vs. AWS Lambda Internals
 
-### 15.1 Virtualization & Sandboxing: Firecracker MicroVMs vs. WebJobs Host
+### 11.1 Virtualization & Sandboxing: Firecracker MicroVMs vs. WebJobs Host
 
 The internal execution architecture of AWS Lambda and Azure Functions differs fundamentally at the hypervisor and process sandboxing layers:
 
@@ -1070,7 +1076,7 @@ Azure Functions groups multiple functions into a **Function App**, hosted inside
 
 ---
 
-### 15.2 Cold Start Physics: Phases of Execution and Root Causes
+### 11.2 Cold Start Physics: Phases of Execution and Root Causes
 
 A **Cold Start** is the latency tax incurred when a request arrives and no pre-warmed, idle execution sandbox exists:
 
@@ -1104,7 +1110,7 @@ sequenceDiagram
 
 ---
 
-### 15.3 Advanced Cold-Start Elimination: SnapStart, CRaC, and Provisioned Concurrency
+### 11.3 Advanced Cold-Start Elimination: SnapStart, CRaC, and Provisioned Concurrency
 
 To eliminate JVM and container cold-start delays, cloud providers have engineered snapshot-based acceleration:
 
@@ -1132,7 +1138,7 @@ flowchart LR
 
 ---
 
-### 15.4 Azure Functions Programming Model: In-Process vs. Isolated Worker
+### 11.4 Azure Functions Programming Model: In-Process vs. Isolated Worker
 
 Azure Functions transitioned from the legacy **In-Process Model** to the modern **Isolated Worker Model**:
 
@@ -1158,11 +1164,11 @@ flowchart TD
 
 ---
 
-# 16. Containerized Serverless Platforms: Azure Container Apps & AWS Fargate
+# 12. Containerized Serverless Platforms: Azure Container Apps & AWS Fargate
 
 While Function-as-a-Service (FaaS) is ideal for short-lived, event-driven tasks, enterprise architectures require containerized serverless solutions to host complex microservices.
 
-### 16.1 Architectural Underpinnings of ACA: KEDA, Envoy, and Dapr
+### 12.1 Architectural Underpinnings of ACA: KEDA, Envoy, and Dapr
 
 **Azure Container Apps (ACA)** abstracts underlying Kubernetes (AKS) clusters, delivering a serverless container platform composed of three best-of-breed open-source projects:
 
@@ -1190,7 +1196,7 @@ flowchart TD
 
 ---
 
-### 16.2 Serverless Containers vs. FaaS vs. Dedicated Kubernetes (AKS/EKS)
+### 12.2 Serverless Containers vs. FaaS vs. Dedicated Kubernetes (AKS/EKS)
 
 | Architectural Dimension | Function-as-a-Service (Lambda / Azure Functions) | Serverless Containers (Azure Container Apps / Fargate) | Dedicated Kubernetes (AKS / EKS) |
 | :--- | :--- | :--- | :--- |
@@ -1202,11 +1208,11 @@ flowchart TD
 
 ---
 
-# 17. Event-Driven Architecture (EDA) & Reactive Cloud Routing
+# 13. Event-Driven Architecture (EDA) & Reactive Cloud Routing
 
 In an Event-Driven Architecture, state changes trigger asynchronous decoupled processing across independent services.
 
-### 17.1 The Three Event Archetypes: Notification, State Transfer, and Event Sourcing
+### 13.1 The Three Event Archetypes: Notification, State Transfer, and Event Sourcing
 
 ```mermaid
 flowchart LR
@@ -1235,7 +1241,7 @@ flowchart LR
 
 ---
 
-### 17.2 CNCF CloudEvents Standard and Content-Based Routing
+### 13.2 CNCF CloudEvents Standard and Content-Based Routing
 
 The Cloud Native Computing Foundation (CNCF) created the **CloudEvents** specification to standardize event metadata across cloud providers:
 
@@ -1260,7 +1266,7 @@ The Cloud Native Computing Foundation (CNCF) created the **CloudEvents** specifi
 
 ---
 
-### 17.3 Azure Event Grid vs. AWS EventBridge Deep Dive
+### 13.3 Azure Event Grid vs. AWS EventBridge Deep Dive
 
 Both platforms deliver high-throughput, serverless **event routers** capable of evaluating rules against JSON event bodies to direct traffic:
 
@@ -1273,11 +1279,11 @@ Both platforms deliver high-throughput, serverless **event routers** capable of 
 
 ---
 
-# 18. Distributed Workflow Orchestration: Durable Functions & AWS Step Functions
+# 14. Distributed Workflow Orchestration: Durable Functions & AWS Step Functions
 
 Long-running business processes (human-in-the-loop approvals, multi-step checkout pipelines) cannot run inside standard 15-minute stateless functions.
 
-### 18.1 Durable Task Framework (DTFx): Event Sourcing and the Determinism Law
+### 14.1 Durable Task Framework (DTFx): Event Sourcing and the Determinism Law
 
 **Azure Durable Functions** uses the **Durable Task Framework**. Orchestrator code is written in ordinary imperative sequential code, but under the hood, it is **event-sourced and executed via replays**:
 
@@ -1313,7 +1319,7 @@ sequenceDiagram
 
 ---
 
-### 18.2 AWS Step Functions: Amazon States Language (ASL), Task Tokens, and Distributed Map
+### 14.2 AWS Step Functions: Amazon States Language (ASL), Task Tokens, and Distributed Map
 
 AWS Step Functions defines visual state machines using JSON/YAML:
 - **Task Tokens (`.waitForTaskToken`):** The state machine pauses execution indefinitely (up to 1 year) and waits for an external callback signal (e.g. human manager clicking "Approve Expense" in an email), consuming **zero compute cost while paused**.
@@ -1321,9 +1327,9 @@ AWS Step Functions defines visual state machines using JSON/YAML:
 
 ---
 
-# 19. The Distributed Saga Pattern: Managing Cross-Service Transactions
+# 15. The Distributed Saga Pattern: Managing Cross-Service Transactions
 
-### 19.1 Choreography vs. Orchestration: The Complexity Curve
+### 15.1 Choreography vs. Orchestration: The Complexity Curve
 
 ```mermaid
 flowchart LR
@@ -1349,7 +1355,7 @@ flowchart LR
 
 ---
 
-### 19.2 The Pivot Transaction and Semantic Compensations
+### 15.2 The Pivot Transaction and Semantic Compensations
 
 In any distributed Saga, transactions fall into three categories:
 1. **Compensable Transactions:** Transactions that precede the pivot and can be semantically undone (e.g., reserving temporary stock).
@@ -1358,7 +1364,7 @@ In any distributed Saga, transactions fall into three categories:
 
 ---
 
-### 19.3 Semantic Anomalies in Sagas: Lost Updates and Dirty Reads
+### 15.3 Semantic Anomalies in Sagas: Lost Updates and Dirty Reads
 
 Because Sagas lack the strict ACID isolation ($I$) of relational databases, they are vulnerable to concurrency anomalies:
 - **Dirty Reads:** Service A updates account balance; Service B reads the balance; Service A fails and executes a compensating rollback. Service B operated on dirty, discarded data!
@@ -1366,9 +1372,9 @@ Because Sagas lack the strict ACID isolation ($I$) of relational databases, they
 
 ---
 
-# 20. Enterprise API Management & Edge Gateways
+# 16. Enterprise API Management & Edge Gateways
 
-### 20.1 Azure APIM Policy Pipeline: Inbound, Backend, Outbound, and On-Error
+### 16.1 Azure APIM Policy Pipeline: Inbound, Backend, Outbound, and On-Error
 
 Azure API Management (APIM) intercepts all client traffic, executing XML policy definitions along a structured four-stage pipeline:
 
@@ -1447,7 +1453,7 @@ flowchart TD
 
 ---
 
-### 20.2 Token Bucket Rate Limiting and Circuit Breaking at the Edge
+### 16.2 Token Bucket Rate Limiting and Circuit Breaking at the Edge
 
 To prevent cascading microservice collapse and runaway serverless billing from distributed denial-of-service (DDoS) spikes, API Gateways enforce token bucket rate limiting and circuit breaking directly at the perimeter network:
 
@@ -1483,9 +1489,9 @@ flowchart TD
 
 ---
 
-# 21. Total Cost of Ownership (TCO) & Inflection Point Mathematics
+# 17. Total Cost of Ownership (TCO) & Inflection Point Mathematics
 
-### 21.1 The Serverless Economic Curve: Pay-Per-Execution vs. Baseline Compute
+### 17.1 The Serverless Economic Curve: Pay-Per-Execution vs. Baseline Compute
 
 ```mermaid
 flowchart TD
@@ -1503,7 +1509,7 @@ flowchart TD
 
 ---
 
-### 21.2 Mathematical TCO Inflection Model
+### 17.2 Mathematical TCO Inflection Model
 
 $$\text{Cost}_{\text{Serverless}} = N_{\text{requests}} \times \left( C_{\text{invoc}} + (M_{\text{GB}} \times T_{\text{duration}} \times C_{\text{GB-sec}}) \right)$$
 
@@ -1514,9 +1520,9 @@ $$\text{Cost}_{\text{Provisioned}} = N_{\text{nodes}} \times \text{HourlyRate}_{
 
 ---
 
-# 22. Production Code Implementation: Distributed Saga Orchestration Engine
+# 18. Production Code Implementation: Distributed Saga Orchestration Engine
 
-### 22.1 Production Python Saga Orchestrator with Persistent State & Idempotent Compensation
+### 18.1 Production Python Saga Orchestrator with Persistent State & Idempotent Compensation
 
 Below is a production-grade Python implementation of an **Orchestrated Saga State Machine**, featuring step timeout tracking, persistent audit logging, and reverse-order compensating rollback logic:
 
@@ -1667,9 +1673,9 @@ if __name__ == "__main__":
 
 ---
 
-# 23. Senior Cloud Architect Troubleshooting Runbooks: Serverless Incidents
+# 19. Senior Cloud Architect Troubleshooting Runbooks: Serverless Incidents
 
-### 23.1 Scenario 1: Uncontrolled Autoscaling Crashing Downstream Relational Databases
+### 19.1 Scenario 1: Uncontrolled Autoscaling Crashing Downstream Relational Databases
 - **Symptom:** During a major promotional campaign, an event-driven AWS Lambda or Azure Function auto-scaled to **1,200 concurrent instances**. The downstream Azure SQL / RDS PostgreSQL database immediately crashed with `FATAL: remaining connection slots are reserved for non-replication superuser connections`.
 - **Root Cause:** Stateless serverless functions scale horizontally without constraint. If 1,200 functions open direct database connections, 1,200 connections overwhelm database memory and CPU.
 - **Immediate Mitigation Runbook:**
@@ -1685,7 +1691,7 @@ if __name__ == "__main__":
 
 ---
 
-### 23.2 Scenario 2: Non-Deterministic Replay Crash in Azure Durable Functions
+### 19.2 Scenario 2: Non-Deterministic Replay Crash in Azure Durable Functions
 - **Symptom:** Durable Functions orchestrator instances enter `Failed` status with `NonDeterministicOrchestrationException: Multithreaded execution was detected or code violated determinism invariants`.
 - **Root Cause Isolation:**
   1. Inspect git commit history for the orchestrator function.
@@ -1698,7 +1704,7 @@ if __name__ == "__main__":
 
 ---
 
-### 23.3 Scenario 3: Cold-Start Latency Cascading into API Gateway 504 Timeouts
+### 19.3 Scenario 3: Cold-Start Latency Cascading into API Gateway 504 Timeouts
 - **Symptom:** First-time morning traffic experiences 5% failure rates with `HTTP 504 Gateway Timeout`. Gateway integration timeout is configured at 3,000ms.
 - **Root Cause:** A heavy Java Spring Cloud function requires 4,200ms to boot the JVM, download dependency classes, and establish VPC ENI connections. Because the gateway timeout is 3,000ms, the gateway returns 504 before the function handler executes.
 - **Resolution:**
@@ -1708,7 +1714,13 @@ if __name__ == "__main__":
 
 ---
 
-# 24. Summary Comparison & Production Engineering Reference Matrix
+# 20. Summary Comparison & Production Engineering Reference Matrix
+
+### 20.1 Cloud Data Tier & Storage Technology Reference Matrix
+
+Architecting distributed data tiers requires navigating the PACELC theorem—evaluating whether a storage engine prioritizes consistency over availability during network partitions, and latency over consistency during normal operations. While cloud relational databases decouple SQL compute from multi-AZ storage logs to preserve ACID properties, globally distributed NoSQL engines trade strict serializability for horizontal scale and tunable multi-region consistency tiers.
+
+The consistency guarantees, scaling limits, and failure domain boundaries across cloud storage primitives:
 
 | Storage & Data Technology | Primary Consistency Model | Scaling Dimension | Failure Domain Tolerance | Best Fit Production Use Case |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1721,6 +1733,12 @@ if __name__ == "__main__":
 
 ---
 
+### 20.2 Serverless & Cloud-Native Compute Execution Model Comparison
+
+Selecting between Function-as-a-Service (FaaS), serverless container platforms, and dedicated Kubernetes clusters requires aligning execution concurrency, maximum job runtimes, cold-start tolerances, and orchestration complexity with workload traffic profiles. FaaS excels for event-driven asynchronous pipelines, while serverless containers combine microVM isolation with containerized dependency flexibility.
+
+Comparative execution mechanics across cloud compute platforms:
+
 | Feature / Dimension | AWS Lambda | Azure Functions | Azure Container Apps | Dedicated Kubernetes (AKS/EKS) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Runtime Isolation** | Firecracker MicroVM (1 req/VM) | WebJobs Host Process (Multi-threaded) | Container Pods (Envoy + KEDA) | Container Pods (Custom CNI) |
@@ -1732,18 +1750,16 @@ if __name__ == "__main__":
 
 ---
 
-# 25. References & Further Reading
+# 21. References & Further Reading
 
-- [CAP Twelve Years Later: How the "Rules" Have Changed (Eric Brewer)](https://www.infoq.com/articles/cap-twelve-years-later-how-the-rules-have-changed/) — Evolution of CAP theorem in modern cloud systems.
-- [Consistency Tradeoffs in Modern Distributed Database System Design: PACELC (Daniel Abadi)](https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf) — PACELC formal mathematical theorem.
-- [Amazon Aurora: Design Considerations for High Throughput Cloud-Native Relational Databases (Verbitski et al., ACM SIGMOD)](https://www.allthingsdistributed.com/files/p1041-verbitski.pdf) — Decoupled log-is-the-database architecture.
-- [Azure Cosmos DB Consistency Levels Documentation (Microsoft Learn)](https://learn.microsoft.com/en-us/azure/cosmos-db/consistency-levels) — Formal specification of the five consistency tiers.
-- [Optimal Probabilistic Cache Stampede Prevention (Vattani, Chierichetti, Lowenstein)](https://www.vldb.org/pvldb/vol8/p886-vattani.pdf) — Mathematical proof of the XFetch algorithm.
-- [Distributed Locks with Redis (Salvatore Sanfilippo)](https://redis.io/docs/manual/patterns/distributed-locks/) — Redlock algorithm and atomic Lua release mechanisms.
-- [Pattern: Saga (Chris Richardson)](https://microservices.io/patterns/data/saga.html) — Orchestration and choreography in distributed microservices.
-
-- [Firecracker: Lightweight MicroVMs for Serverless Computing (Agache et al., USENIX NSDI)](https://www.usenix.org/conference/nsdi20/presentation/agache) — Hypervisor sandboxing paper.
-- [Azure Functions Architecture & Host Internals (Microsoft Learn)](https://learn.microsoft.com/en-us/azure/azure-functions/functions-reference) — WebJobs SDK and Isolated Worker mechanics.
-- [CloudEvents Specification v1.0 (CNCF)](https://github.com/cloudevents/spec) — Standardized event metadata standard.
-- [Pattern: Saga Distributed Transactions (Chris Richardson)](https://microservices.io/patterns/data/saga.html) — Orchestration and compensation models.
-- [KEDA: Kubernetes Event-driven Autoscaling Documentation](https://keda.sh/docs/latest/concepts/) — Cloud-native autoscaling specification.
+1. **CAP Twelve Years Later: How the "Rules" Have Changed:** Brewer, E. (2012). IEEE Computer Society. [infoq.com/articles/cap-twelve-years-later](https://www.infoq.com/articles/cap-twelve-years-later-how-the-rules-have-changed/).
+2. **Consistency Tradeoffs in Modern Distributed Database System Design (PACELC):** Abadi, D. J. (2012). IEEE Computer. [cs.umd.edu/~abadi/papers/abadi-pacelc.pdf](https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf).
+3. **Amazon Aurora: Design Considerations for High Throughput Cloud-Native Relational Databases:** Verbitski, A., et al. (2017). ACM SIGMOD. [allthingsdistributed.com/files/p1041-verbitski.pdf](https://www.allthingsdistributed.com/files/p1041-verbitski.pdf).
+4. **Azure Cosmos DB Consistency Levels Documentation:** Microsoft Learn. [learn.microsoft.com/azure/cosmos-db/consistency-levels](https://learn.microsoft.com/en-us/azure/cosmos-db/consistency-levels).
+5. **Optimal Probabilistic Cache Stampede Prevention (XFetch):** Vattani, A., Chierichetti, F., & Lowenstein, K. (2015). Proceedings of the VLDB Endowment. [vldb.org/pvldb/vol8](https://www.vldb.org/pvldb/vol8/p886-vattani.pdf).
+6. **Distributed Locks with Redis & Redlock Algorithm:** Sanfilippo, S. [redis.io/docs/manual/patterns/distributed-locks](https://redis.io/docs/manual/patterns/distributed-locks/).
+7. **Microservices Patterns: With Examples in Java:** Richardson, C. (2018). Manning Publications. Saga and Transactional Outbox patterns.
+8. **Firecracker: Lightweight MicroVMs for Serverless Computing:** Agache, A., et al. (2020). USENIX NSDI. [usenix.org/conference/nsdi20](https://www.usenix.org/conference/nsdi20/presentation/agache).
+9. **Azure Functions Architecture & Host Internals:** Microsoft Learn. [learn.microsoft.com/azure/azure-functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-reference).
+10. **CloudEvents Specification (v1.0.2):** CNCF Serverless Working Group. [github.com/cloudevents/spec](https://github.com/cloudevents/spec).
+11. **KEDA: Kubernetes Event-driven Autoscaling:** Architecture, scaling triggers, and queue metrics. [keda.sh](https://keda.sh/docs/latest/concepts/).

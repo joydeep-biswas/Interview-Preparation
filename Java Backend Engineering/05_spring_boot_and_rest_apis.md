@@ -2228,6 +2228,24 @@ flowchart TD
 
 ### 10.3 Comprehensive HTTP Methods Taxonomy (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`)
 
+#### Uniform Interface & Resource Operations in HTTP/1.1 and HTTP/2
+The foundational constraint of RESTful architecture is the **Uniform Interface**, where HTTP request verbs establish standard, standardized operations on target resources identified by URIs (`RFC 9110`). Correctly applying these verbs enables intermediate proxies, CDNs, and API gateways to perform automated caching, error retries, and preflight security checks:
+
+1. **Read & Inspection Verbs (`GET`, `HEAD`):**
+   - **`GET`:** Requests a transfer of the current representation of the target resource. Must never carry a mutating request payload.
+   - **`HEAD`:** Identical to `GET`, except the server **must not return a message body** in the response. Used to inspect metadata headers (`Content-Length`, `Last-Modified`, `ETag`) before initiating large downloads or to check resource existence.
+
+2. **Creation & Processing Verbs (`POST`, `PUT`):**
+   - **`POST`:** Submits an enclosed entity to be processed by the server according to its own specific semantics. Typically used for creating subordinate resources under a parent collection (`POST /api/v1/orders`), triggering state machine transitions (`POST /api/v1/orders/42/cancel`), or submitting bulk batch commands. It is neither safe nor idempotent.
+   - **`PUT`:** Replaces all current representations of the target resource with the request payload, or creates the resource if the client dictates the exact URI (`PUT /api/v1/users/42`). If fields are omitted in a `PUT` payload, the server replaces them with `null` or defaults. It is strictly idempotent.
+
+3. **Delta Mutation & Removal Verbs (`PATCH`, `DELETE`):**
+   - **`PATCH`:** Applies a delta set of modifications to the target resource (RFC 5789 / JSON Patch RFC 6902). Unlike `PUT`, omitted fields remain unchanged. Idempotency depends on the patch document semantics.
+   - **`DELETE`:** Removes the target resource mapping permanently.
+
+4. **Protocol Negotiation & Preflight (`OPTIONS`):**
+   - **`OPTIONS`:** Queries the communication options and HTTP methods supported by the server for that URI. Used by web browsers to dispatch Cross-Origin Resource Sharing (CORS) preflight requests.
+
 | HTTP Method | Purpose / Intent | Request Body? | Response Body? | Safe? | Idempotent? | Typical Status Codes |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
 | **`GET`** | Retrieve resource representation | No | **Yes** | **Yes** | **Yes** | `200 OK`, `304 Not Modified`, `404 Not Found` |
@@ -2348,6 +2366,15 @@ sequenceDiagram
 ---
 
 ### 10.7 HTTP Status Codes Reference Matrix (2xx, 3xx, 4xx, 5xx)
+
+#### Standardized Protocol Response Taxonomy (RFC 9110)
+HTTP status codes provide an unambiguous, 3-digit numerical signaling mechanism communicating the outcome of a client's request. They are logically segmented into five functional families based on the leading digit:
+
+1. **`1xx` Informational:** Request received, continuing process (e.g., `101 Switching Protocols` for WebSockets).
+2. **`2xx` Success:** The action was successfully received, understood, and accepted by the server.
+3. **`3xx` Redirection:** Further action must be taken by the user agent to fulfill the request (e.g., locating resources at a new URI or validating client-side caches).
+4. **`4xx` Client Error:** The client committed an error (malformed syntax, missing authorization token, requesting nonexistent resources, violating rate limits).
+5. **`5xx` Server Error:** The server failed to fulfill an apparently valid request due to internal application runtime crashes, unhandled database errors, or upstream gateway timeouts.
 
 | Status Code | Reason Phrase | Semantic Meaning & Best Practice Usage |
 | :--- | :--- | :--- |
@@ -3190,6 +3217,19 @@ public class OrderGrpcClient {
 ---
 
 ### 16.5 Comprehensive Evaluation: REST vs gRPC Architecture Comparison Matrix
+
+In distributed enterprise topologies, selecting the inter-service communication protocol dictates latency percentiles, payload serialization overhead, bandwidth utilization, and client integration friction. Modern distributed systems divide responsibilities between **REST** (for public/external ingress) and **gRPC** (for high-throughput internal microservice-to-microservice mesh communication):
+
+#### First-Principles Architectural Analysis
+1. **REST over HTTP/1.1 / JSON (The Web-Native Standard):**
+   - **Serialization & Payload:** Transmits text-based JSON documents. Field names (e.g., `"transaction_timestamp"`) are repeated verbatim in every single message, resulting in significant network payload bloat. Parsing JSON requires CPU-intensive string scanning, tokenization, and dynamic object creation in the JVM.
+   - **Transport Mechanics:** Built historically on HTTP/1.1, requiring separate TCP connections or incurring Head-of-Line (HoL) blocking on single connections.
+   - **Universal Accessibility:** Native support in all modern web browsers, curl, Postman, and API gateways. Ideal for public-facing developer APIs.
+
+2. **gRPC over HTTP/2 & Protocol Buffers (The Cloud-Native Backbone):**
+   - **Binary Framing & Compact Encoding:** Developed by Google, gRPC uses **Protocol Buffers (protobuf)**. Messages are serialized into compact binary bitstreams where field names are replaced by compact 1–2 byte numeric tags (`1`, `2`), achieving $5\times - 10\times$ smaller payloads. Deserialization executes directly into compiled C++/Java memory structs with minimal CPU overhead.
+   - **HTTP/2 Transport:** Multiplexes hundreds of concurrent requests/responses over a single persistent TCP connection using binary framing, completely eliminating TCP handshake overhead and socket exhaustion.
+   - **Streaming Topologies:** Natively supports Unary (1 request $\to$ 1 response), Server Streaming, Client Streaming, and full Bidirectional Streaming.
 
 | Architectural Dimension | REST (Representational State Transfer) | gRPC (Google Remote Procedure Call) |
 | :--- | :--- | :--- |

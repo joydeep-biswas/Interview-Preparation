@@ -535,6 +535,10 @@ flowchart LR
 
 ## Summary & Data Engineering Leadership Reference Matrix
 
+Data engineering leadership demands a balance between technical depth and executive stewardship. High-stakes data incidents—such as corrupted revenue metrics hours before board meetings, cascading Spark executor out-of-memory crashes, or surging multi-tenant cloud compute bills—require data leaders to act decisively with blameless post-mortems, transparent cross-functional communication, and automated data contracts. Demonstrating leadership maturity involves articulating how technical trade-offs (e.g., streaming latency vs. batch cost, ACID consistency vs. availability) directly safeguard business operations and data integrity.
+
+The reference matrix below synthesizes the core production crisis domains, first-principles remediation strategies, and key leadership competencies evaluated in data engineering interviews:
+
 | Scenario Domain | Critical Failure Mode | First-Principles Engineering Solution | Key Leadership Competency |
 | :--- | :--- | :--- | :--- |
 | **Sev-1 Data Incident** | Data skew OOM, cascading executor collapse | Salted key distribution, AQE, Delta MERGE idempotency | Decisive Incident Command & blast radius containment |

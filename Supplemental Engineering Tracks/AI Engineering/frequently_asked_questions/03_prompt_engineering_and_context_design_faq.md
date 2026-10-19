@@ -515,7 +515,7 @@ Extract the supporting quote and answer in accordance with the strict schema."""
 **Question:** How can you enforce output structure (like JSON) from a generative model reliably?
 
 #### Definition & Core Concepts
-In production systems, LLM responses must interface directly with backend databases, microservices, and message brokers. Receiving malformed JSON, markdown backtick fences (` ```json `), or trailing commas breaks downstream parsers and triggers `HTTP 500` outages.
+In production systems, LLM responses must interface directly with backend databases, microservices, and message brokers. Receiving malformed JSON, markdown backtick fences (such as triple-backtick json blocks), or trailing commas breaks downstream parsers and triggers `HTTP 500` outages.
 
 #### The Evolution of Structured Output Enforcement
 1. **Prompt-Only Heuristics (Fragile - 75–85% Reliability):**
@@ -893,7 +893,7 @@ class SecurityError(Exception):
 1. **The ASCII / Base64 Evasion:** Attackers frequently encode malicious payloads in Base64, ROT13, or foreign languages (e.g. Zulu or Mongolian) to bypass keyword regex filters. Models easily decode Base64 internally. Always run semantic classifiers, not simple substring blacklists.
 
 #### Core Curriculum Cross-Reference
-- See [10. AI Security, Guardrails & Governance](../06_llm_evaluation_and_security.md#13-ai-threat-modeling-the-owasp-top-10-for-llms) for complete adversarial red-teaming harnesses.
+- See [09. AI Threat Modeling & The OWASP Top 10 for LLMs](../06_llm_evaluation_and_security.md#9-ai-threat-modeling--the-owasp-top-10-for-llms) for complete adversarial red-teaming harnesses.
 
 ---
 

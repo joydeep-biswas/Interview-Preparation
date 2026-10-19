@@ -78,30 +78,31 @@ flowchart TD
    - [3.1 System-Assigned vs. User-Assigned Managed Identities](#31-system-assigned-vs-user-assigned-managed-identities)
    - [3.2 The OIDC Cryptographic Handshake: Eliminating Static Cloud Secrets](#32-the-oidc-cryptographic-handshake-eliminating-static-cloud-secrets)
    - [3.3 Production Terraform Configuration for Workload Identity Federation](#33-production-terraform-configuration-for-workload-identity-federation)
-4. [Cryptographic Engineering: KMS & Envelope Encryption](#8-cryptographic-engineering-kms--envelope-encryption)
-   - [8.1 Why Direct KMS Encryption Fails at Scale: The 4KB Payload Limit](#81-why-direct-kms-encryption-fails-at-scale-the-4kb-payload-limit)
-   - [8.2 The Envelope Encryption Mathematical Model (DEK vs. KEK)](#82-the-envelope-encryption-mathematical-model-dek-vs-kek)
-   - [8.3 Hardware Security Modules (HSM): FIPS 140-2 vs. FIPS 140-3 Levels](#83-hardware-security-modules-hsm-fips-140-2-vs-fips-140-3-levels)
-   - [8.4 Customer-Managed Keys (CMEK) & Crypto-Shredding Mechanics](#84-customer-managed-keys-cmek--crypto-shredding-mechanics)
-5. [Edge Defense: Web Application Firewalls (WAF) & DDoS Mitigation](#9-edge-defense-web-application-firewalls-waf--ddos-mitigation)
-   - [9.1 WAF Inspection Mechanics: Mitigating OWASP Top 10 Threats](#91-waf-inspection-mechanics-mitigating-owasp-top-10-threats)
-   - [9.2 Layer 3/4 Volumetric DDoS Defense vs. Layer 7 Application Flood Defense](#92-layer-34-volumetric-ddos-defense-vs-layer-7-application-flood-defense)
-6. [Container & Kubernetes Runtime Security: Falco and eBPF](#10-container--kubernetes-runtime-security-falco-and-ebpf)
-   - [10.1 The Blind Spots of Static Container Image Scanning](#101-the-blind-spots-of-static-container-image-scanning)
-   - [10.2 Kernel Syscall Interception with Extended Berkeley Packet Filter (eBPF)](#102-kernel-syscall-interception-with-extended-berkeley-packet-filter-ebpf)
-   - [10.3 Authoring Production Falco Rules: Detecting CVE-2024-21626 & Shell Execution](#103-authoring-production-falco-rules-detecting-cve-2024-21626--shell-execution)
-7. [Threat Detection, CSPM, and SIEM Governance](#11-threat-detection-cspm-and-siem-governance)
-   - [11.1 Cloud Security Posture Management (CSPM): Defender for Cloud vs. GuardDuty](#111-cloud-security-posture-management-cspm-defender-for-cloud-vs-guardduty)
-   - [11.2 Immutable Audit Logging (WORM Storage) & SIEM Analytics](#112-immutable-audit-logging-worm-storage--siem-analytics)
-8. [Automated Cloud Security Audit & Misconfiguration Scanner](#12-automated-cloud-security-audit--misconfiguration-scanner)
-   - [12.1 Baseline Security Audit Inspection Framework](#121-baseline-security-audit-inspection-framework)
-   - [12.2 Production Python Security Auditor Script](#122-production-python-security-auditor-script)
-9. [Senior Security SRE Incident Response Runbooks](#13-senior-security-sre-incident-response-runbooks)
-   - [13.1 Runbook 1: Leaked Cloud API Key / IAM Credential Compromise](#131-runbook-1-leaked-cloud-api-key--iam-credential-compromise)
-   - [18.2 Runbook 2: Triage of a Reverse Shell in Production (Falco Alert)](#182-runbook-2-triage-of-a-reverse-shell-in-production-falco-alert)
-   - [23.3 Runbook 3: Azure Key Vault Access Policy vs. Azure RBAC Conflict Recovery](#233-runbook-3-azure-key-vault-access-policy-vs-azure-rbac-conflict-recovery)
-10. [Summary Comparison & Production Engineering Reference Matrix](#26-summary-comparison--production-engineering-reference-matrix)
-11. [References & Further Reading](#27-references--further-reading)
+4. [Cryptographic Engineering: KMS & Envelope Encryption](#4-cryptographic-engineering-kms--envelope-encryption)
+   - [4.1 Why Direct KMS Encryption Fails at Scale: The 4KB Payload Limit](#41-why-direct-kms-encryption-fails-at-scale-the-4kb-payload-limit)
+   - [4.2 The Envelope Encryption Mathematical Model (DEK vs. KEK)](#42-the-envelope-encryption-mathematical-model-dek-vs-kek)
+   - [4.3 Hardware Security Modules (HSM): FIPS 140-2 vs. FIPS 140-3 Levels](#43-hardware-security-modules-hsm-fips-140-2-vs-fips-140-3-levels)
+   - [4.4 Customer-Managed Keys (CMEK) & Crypto-Shredding Mechanics](#44-customer-managed-keys-cmek--crypto-shredding-mechanics)
+5. [Edge Defense: Web Application Firewalls (WAF) & DDoS Mitigation](#5-edge-defense-web-application-firewalls-waf--ddos-mitigation)
+   - [5.1 WAF Inspection Mechanics: Mitigating OWASP Top 10 Threats](#51-waf-inspection-mechanics-mitigating-owasp-top-10-threats)
+   - [5.2 Layer 3/4 Volumetric DDoS Defense vs. Layer 7 Application Flood Defense](#52-layer-34-volumetric-ddos-defense-vs-layer-7-application-flood-defense)
+6. [Container & Kubernetes Runtime Security: Falco and eBPF](#6-container--kubernetes-runtime-security-falco-and-ebpf)
+   - [6.1 The Blind Spots of Static Container Image Scanning](#61-the-blind-spots-of-static-container-image-scanning)
+   - [6.2 Kernel Syscall Interception with Extended Berkeley Packet Filter (eBPF)](#62-kernel-syscall-interception-with-extended-berkeley-packet-filter-ebpf)
+   - [6.3 Authoring Production Falco Rules: Detecting CVE-2024-21626 & Shell Execution](#63-authoring-production-falco-rules-detecting-cve-2024-21626--shell-execution)
+7. [Threat Detection, CSPM, and SIEM Governance](#7-threat-detection-cspm-and-siem-governance)
+   - [7.1 Cloud Security Posture Management (CSPM): Defender for Cloud vs. GuardDuty](#71-cloud-security-posture-management-cspm-defender-for-cloud-vs-guardduty)
+   - [7.2 Immutable Audit Logging (WORM Storage) & SIEM Analytics](#72-immutable-audit-logging-worm-storage--siem-analytics)
+8. [Automated Cloud Security Audit & Misconfiguration Scanner](#8-automated-cloud-security-audit--misconfiguration-scanner)
+   - [8.1 Baseline Security Audit Inspection Framework](#81-baseline-security-audit-inspection-framework)
+   - [8.2 Production Python Security Auditor Script](#82-production-python-security-auditor-script)
+9. [Senior Security SRE Incident Response Runbooks](#9-senior-security-sre-incident-response-runbooks)
+   - [9.1 Runbook 1: Leaked Cloud API Key / IAM Credential Compromise](#91-runbook-1-leaked-cloud-api-key--iam-credential-compromise)
+   - [9.2 Runbook 2: Triage of a Reverse Shell in Production (Falco Alert)](#92-runbook-2-triage-of-a-reverse-shell-in-production-falco-alert)
+   - [9.3 Runbook 3: Azure Key Vault Access Policy vs. Azure RBAC Conflict Recovery](#93-runbook-3-azure-key-vault-access-policy-vs-azure-rbac-conflict-recovery)
+10. [Summary Comparison & Production Engineering Reference Matrix](#10-summary-comparison--production-engineering-reference-matrix)
+    - [10.1 Multi-Cloud Security Domain & Architectural Invariant Matrix](#101-multi-cloud-security-domain--architectural-invariant-matrix)
+11. [References & Further Reading](#11-references--further-reading)
 ---
 
 # 1. The Zero Trust Security Paradigm & Core Tenets
@@ -348,13 +349,13 @@ Below is a complete, production-grade Terraform declaration binding a Kubernetes
 
 ```hcl
 
-# 4. Fetch AWS TLS Certificate for EKS OIDC Issuer
+# Fetch AWS TLS Certificate for EKS OIDC Issuer
 
 data "tls_certificate" "eks" {
   url = aws_eks_cluster.prod_cluster.identity[0].oidc[0].issuer
 }
 
-# 5. Register OIDC Identity Provider in AWS IAM
+# Register OIDC Identity Provider in AWS IAM
 
 resource "aws_iam_openid_connect_provider" "eks" {
   client_id_list  = ["sts.amazonaws.com"]
@@ -362,7 +363,7 @@ resource "aws_iam_openid_connect_provider" "eks" {
   url             = aws_eks_cluster.prod_cluster.identity[0].oidc[0].issuer
 }
 
-# 6. Create IAM Role with OIDC Federated Trust Relationship
+# Create IAM Role with OIDC Federated Trust Relationship
 
 resource "aws_iam_role" "payment_processor_role" {
   name = "payment-processor-workload-role"
@@ -387,7 +388,7 @@ resource "aws_iam_role" "payment_processor_role" {
   })
 }
 
-# 7. Attach Least-Privilege Policy to the Workload Role
+# Attach Least-Privilege Policy to the Workload Role
 
 resource "aws_iam_role_policy" "s3_payment_policy" {
   name = "payment-records-least-privilege"
@@ -411,9 +412,9 @@ resource "aws_iam_role_policy" "s3_payment_policy" {
 
 ---
 
-# 8. Cryptographic Engineering: KMS & Envelope Encryption
+# 4. Cryptographic Engineering: KMS & Envelope Encryption
 
-### 8.1 Why Direct KMS Encryption Fails at Scale: The 4KB Payload Limit
+### 4.1 Why Direct KMS Encryption Fails at Scale: The 4KB Payload Limit
 
 Engineers entering cloud security frequently assume they can upload large files (database dumps, audio streams, container images) directly to AWS KMS or Azure Key Vault for encryption.
 - **The 4KB Cryptographic Ceiling:** Cloud KMS APIs (such as `kms:Encrypt`) have a strict maximum payload size of **4,096 bytes (4 KB)**.
@@ -421,7 +422,7 @@ Engineers entering cloud security frequently assume they can upload large files 
 
 ---
 
-### 8.2 The Envelope Encryption Mathematical Model (DEK vs. KEK)
+### 4.2 The Envelope Encryption Mathematical Model (DEK vs. KEK)
 
 To encrypt gigabyte- and terabyte-scale data with microsecond performance while maintaining centralized hardware security, production architectures use **Envelope Encryption**:
 
@@ -469,7 +470,7 @@ flowchart TD
 
 ---
 
-### 8.3 Hardware Security Modules (HSM): FIPS 140-2 vs. FIPS 140-3 Levels
+### 4.3 Hardware Security Modules (HSM): FIPS 140-2 vs. FIPS 140-3 Levels
 
 Enterprise security compliance standards (PCI-DSS, FedRAMP, HIPAA) mandate Hardware Security Modules certified under NIST FIPS:
 
@@ -482,7 +483,7 @@ Enterprise security compliance standards (PCI-DSS, FedRAMP, HIPAA) mandate Hardw
 
 ---
 
-### 8.4 Customer-Managed Keys (CMEK) & Crypto-Shredding Mechanics
+### 4.4 Customer-Managed Keys (CMEK) & Crypto-Shredding Mechanics
 
 - **Platform-Managed Keys (Default):** Cloud provider owns and manages the root KEK. Zero operational friction, but the provider holds the cryptographic keys.
 - **Customer-Managed Keys (CMEK):** Keys generated inside customer-controlled KMS/HSM instances. Enables enterprise key rotation policies and access logging.
@@ -493,9 +494,9 @@ Enterprise security compliance standards (PCI-DSS, FedRAMP, HIPAA) mandate Hardw
 
 ---
 
-# 9. Edge Defense: Web Application Firewalls (WAF) & DDoS Mitigation
+# 5. Edge Defense: Web Application Firewalls (WAF) & DDoS Mitigation
 
-### 9.1 WAF Inspection Mechanics: Mitigating OWASP Top 10 Threats
+### 5.1 WAF Inspection Mechanics: Mitigating OWASP Top 10 Threats
 
 A Web Application Firewall (WAF) operates at Layer 7 of the OSI stack, inspecting HTTP/HTTPS request payloads, headers, cookies, and query strings before forwarding traffic to origin servers:
 
@@ -537,7 +538,11 @@ flowchart TD
 
 ---
 
-### 9.2 Layer 3/4 Volumetric DDoS Defense vs. Layer 7 Application Flood Defense
+### 5.2 Layer 3/4 Volumetric DDoS Defense vs. Layer 7 Application Flood Defense
+
+Distributed Denial of Service (DDoS) mitigation strategies depend fundamentally on the targeted layer of the network stack. While Layer 3 and Layer 4 volumetric attacks aim to saturate physical fiber links, router buffers, and firewall state tables through sheer terabit packet volume, Layer 7 application flood attacks mimic legitimate human web browsing to exhaust backend thread pools, database connection pools, or CPU-intensive API endpoints.
+
+The threat vectors, operational targets, and mitigation architectures across network and application layers:
 
 | Dimension | Layer 3/4 Volumetric DDoS Attacks | Layer 7 Application Flood Attacks |
 | :--- | :--- | :--- |
@@ -548,9 +553,9 @@ flowchart TD
 
 ---
 
-# 10. Container & Kubernetes Runtime Security: Falco and eBPF
+# 6. Container & Kubernetes Runtime Security: Falco and eBPF
 
-### 10.1 The Blind Spots of Static Container Image Scanning
+### 6.1 The Blind Spots of Static Container Image Scanning
 
 Static container vulnerability scanners (Trivy, Clair, Grype) parse package manifests and file hashes during CI/CD build cycles. While essential, static analysis has critical blind spots:
 1. **Zero-Day Vulnerabilities:** Cannot detect novel exploits that lack published CVE entries in NIST databases.
@@ -559,7 +564,7 @@ Static container vulnerability scanners (Trivy, Clair, Grype) parse package mani
 
 ---
 
-### 10.2 Kernel Syscall Interception with Extended Berkeley Packet Filter (eBPF)
+### 6.2 Kernel Syscall Interception with Extended Berkeley Packet Filter (eBPF)
 
 **Falco** is the CNCF standard for cloud-native runtime security. Rather than running intrusive agents inside individual containers, Falco attaches **eBPF programs** directly to the host Linux operating system kernel:
 
@@ -602,7 +607,7 @@ flowchart TD
 
 ---
 
-### 10.3 Authoring Production Falco Rules: Detecting CVE-2024-21626 & Shell Execution
+### 6.3 Authoring Production Falco Rules: Detecting CVE-2024-21626 & Shell Execution
 
 #### Rule 1: Detecting Interactive Shell Execution in Production
 Production containers should be immutable appliances containing only the compiled binary and minimal runtime. Spawning a shell (`sh`, `bash`, `zsh`) is a primary indicator of compromise (IoC):
@@ -641,9 +646,9 @@ CVE-2024-21626 allows an attacker to leak host file descriptors (`/proc/self/fd/
 
 ---
 
-# 11. Threat Detection, CSPM, and SIEM Governance
+# 7. Threat Detection, CSPM, and SIEM Governance
 
-### 11.1 Cloud Security Posture Management (CSPM): Defender for Cloud vs. GuardDuty
+### 7.1 Cloud Security Posture Management (CSPM): Defender for Cloud vs. GuardDuty
 
 - **Cloud Security Posture Management (CSPM):** Continuously scans cloud control plane configurations against CIS Benchmarks, NIST SP 800-53, and SOC 2 Type II:
   - Discovers open public S3/Blob storage accounts.
@@ -655,7 +660,7 @@ CVE-2024-21626 allows an attacker to leak host file descriptors (`/proc/self/fd/
 
 ---
 
-### 11.2 Immutable Audit Logging (WORM Storage) & SIEM Analytics
+### 7.2 Immutable Audit Logging (WORM Storage) & SIEM Analytics
 
 In an enterprise intrusion, attackers attempt to cover their footprints by deleting or truncating cloud audit logs (AWS CloudTrail, Azure Activity Logs).
 - **Write-Once-Read-Many (WORM) Storage:**
@@ -667,15 +672,15 @@ In an enterprise intrusion, attackers attempt to cover their footprints by delet
 
 ---
 
-# 12. Automated Cloud Security Audit & Misconfiguration Scanner
+# 8. Automated Cloud Security Audit & Misconfiguration Scanner
 
-### 12.1 Baseline Security Audit Inspection Framework
+### 8.1 Baseline Security Audit Inspection Framework
 
 Continuous security validation mandates automated scripts executing in CI/CD pipelines to ensure infrastructure definitions strictly adhere to corporate compliance baselines.
 
 ---
 
-### 12.2 Production Python Security Auditor Script
+### 8.2 Production Python Security Auditor Script
 
 The complete, runnable Python engine below audits simulated cloud storage resources and IAM policy definitions, detecting open public access, weak TLS versions, unencrypted disks, and dangerous administrative wildcard combinations:
 
@@ -850,9 +855,9 @@ if __name__ == "__main__":
 
 ---
 
-# 13. Senior Security SRE Incident Response Runbooks
+# 9. Senior Security SRE Incident Response Runbooks
 
-### 13.1 Runbook 1: Leaked Cloud API Key / IAM Credential Compromise
+### 9.1 Runbook 1: Leaked Cloud API Key / IAM Credential Compromise
 
 #### Incident Severity: P1 — CRITICAL
 - **Symptom:** Automated alert from GitHub Secret Scanning or AWS Health: *"AWS Access Key ID `AKIAIOSFODNN7EXAMPLE` has been identified publicly on GitHub."*
@@ -860,40 +865,40 @@ if __name__ == "__main__":
 #### Step-by-Step Remediation Protocol:
 ```bash
 
-# 14. Immediately deactivate the compromised access key to halt active exploitation
+# Immediately deactivate the compromised access key to halt active exploitation
 
 aws iam update-access-key \
   --access-key-id AKIAIOSFODNN7EXAMPLE \
   --status Inactive \
   --user-name payment-service-user
 
-# 15. Query CloudTrail to identify all API actions executed by the compromised credential in past 24h
+# Query CloudTrail to identify all API actions executed by the compromised credential in past 24h
 
 aws cloudtrail lookup-events \
   --lookup-attributes AttributeKey=AccessKeyId,AttributeValue=AKIAIOSFODNN7EXAMPLE \
   --max-results 50 \
   --output table
 
-# 16. Check for persistence mechanisms created by the attacker:
+# Check for persistence mechanisms created by the attacker:
 
 # - Newly created IAM users, access keys, or login profiles
 aws iam list-users --query 'Users[?CreateDate>=`2026-10-01`]'
 # - Modified trust relationships on IAM roles
 # - Rogue EC2 instances or unauthorized Lambda functions
 
-# 17. Permanently delete the compromised credential
+# Permanently delete the compromised credential
 
 aws iam delete-access-key \
   --access-key-id AKIAIOSFODNN7EXAMPLE \
   --user-name payment-service-user
 
-# 18. Long-term hardening: Migrate workload to OIDC Workload Identity Federation
+# Long-term hardening: Migrate workload to OIDC Workload Identity Federation
 
 ```
 
 ---
 
-### 18.2 Runbook 2: Triage of a Reverse Shell in Production (Falco Alert)
+### 9.2 Runbook 2: Triage of a Reverse Shell in Production (Falco Alert)
 
 #### Incident Severity: P1 — CRITICAL
 - **Symptom:** PagerDuty alert from Falco runtime engine: `CRITICAL: Unauthorized Shell Spawned in Production (pod=payment-api-7b89-z4r8q)`.
@@ -901,7 +906,7 @@ aws iam delete-access-key \
 #### Step-by-Step Remediation Protocol:
 ```bash
 
-# 19. DO NOT delete the pod immediately (preserves in-memory forensic evidence!)
+# DO NOT delete the pod immediately (preserves in-memory forensic evidence!)
 
 # Apply an emergency network quarantine NetworkPolicy blocking all ingress & egress:
 cat <<EOF | kubectl apply -f -
@@ -919,26 +924,26 @@ spec:
     - Egress
 EOF
 
-# 20. Inspect active process tree inside the quarantined container
+# Inspect active process tree inside the quarantined container
 
 kubectl exec -n production payment-api-7b89-z4r8q -- ps -ef --forest
 
-# 21. Capture open network socket connections and listening ports
+# Capture open network socket connections and listening ports
 
 kubectl exec -n production payment-api-7b89-z4r8q -- ss -tulpn
 
-# 22. Cordon and drain the host Kubernetes worker node to prevent cluster breakout
+# Cordon and drain the host Kubernetes worker node to prevent cluster breakout
 
 kubectl cordon aks-nodepool1-18274-vmss000003
 kubectl drain aks-nodepool1-18274-vmss000003 --ignore-daemonsets --delete-emptydir-data
 
-# 23. Capture node volatile memory dump for forensics, then terminate the VM instance.
+# Capture node volatile memory dump for forensics, then terminate the VM instance.
 
 ```
 
 ---
 
-### 23.3 Runbook 3: Azure Key Vault Access Policy vs. Azure RBAC Conflict Recovery
+### 9.3 Runbook 3: Azure Key Vault Access Policy vs. Azure RBAC Conflict Recovery
 
 #### Incident Severity: P2 — HIGH
 - **Symptom:** Application reports `Forbidden: Caller is not authorized to perform action on resource Key Vault`, even after adding Azure RBAC `Key Vault Secrets Officer` permissions.
@@ -946,7 +951,7 @@ kubectl drain aks-nodepool1-18274-vmss000003 --ignore-daemonsets --delete-emptyd
 #### Step-by-Step Remediation Protocol:
 ```bash
 
-# 24. Inspect the Key Vault Permission Authorization Model:
+# Inspect the Key Vault Permission Authorization Model:
 
 # Azure Key Vault operates in ONE of two mutually exclusive permission models:
 # a) Legacy Vault Access Policies
@@ -955,7 +960,7 @@ az keyvault show \
   --name "kv-payment-prod-01" \
   --query "properties.enableRbacAuthorization"
 
-# 25. If 'enableRbacAuthorization' is FALSE:
+# If 'enableRbacAuthorization' is FALSE:
 
 # Azure RBAC role assignments are COMPLETELY IGNORED by the Key Vault!
 # Remediation Option A: Switch vault to modern Azure RBAC model:
@@ -972,7 +977,13 @@ az keyvault set-policy \
 
 ---
 
-# 26. Summary Comparison & Production Engineering Reference Matrix
+# 10. Summary Comparison & Production Engineering Reference Matrix
+
+### 10.1 Multi-Cloud Security Domain & Architectural Invariant Matrix
+
+Implementing enterprise Zero Trust security requires establishing defensive layers across the identity plane, data storage encryption, perimeter edge routing, and runtime container kernel boundaries. Rather than treating security as an isolated perimeter appliance, modern cloud architectures enforce cryptographic identity verification, least-privilege scoping, envelope encryption, and immutable audit trails across every microservice transaction.
+
+The architectural mappings, provider services, and core engineering invariants across security domains:
 
 | Security Domain | Azure Architecture | AWS Architecture | Core Invariant |
 | :--- | :--- | :--- | :--- |
@@ -985,11 +996,11 @@ az keyvault set-policy \
 
 ---
 
-# 27. References & Further Reading
+# 11. References & Further Reading
 
-- [NIST SP 800-207: Zero Trust Architecture](https://csrc.nist.gov/publications/detail/sp/800-207/final) — Official US Government Zero Trust standard.
-- [AWS IAM Policy Evaluation Logic Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html) — Comprehensive guide to AWS authorization evaluation.
-- [CIS Cloud Benchmarks (Azure & AWS)](https://www.cisecurity.org/cis-benchmarks/) — Center for Internet Security cloud baseline controls.
-- [OWASP Top 10 Web Application Security Risks](https://owasp.org/www-project-top-ten/) — Canonical web vulnerability guide.
-- [Falco Runtime Security Documentation](https://falco.org/docs/) — eBPF kernel intrusion detection.
-- [AWS KMS Cryptographic Details](https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html) — Envelope encryption technical whitepaper.
+1. **NIST SP 800-207: Zero Trust Architecture:** Rose, S., et al. (2020). National Institute of Standards and Technology. [csrc.nist.gov/publications/detail/sp/800-207/final](https://csrc.nist.gov/publications/detail/sp/800-207/final).
+2. **AWS IAM Policy Evaluation Logic Documentation:** Detailed evaluation algorithm, SCP boundaries, and resource policies. [docs.aws.amazon.com/IAM/latest/UserGuide](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html).
+3. **Center for Internet Security (CIS) Foundations Benchmarks:** Security controls for Microsoft Azure and Amazon Web Services. [cisecurity.org/cis-benchmarks](https://www.cisecurity.org/cis-benchmarks/).
+4. **OWASP Top 10 Web Application Security Risks:** Canonical web application security guidance. [owasp.org/www-project-top-ten](https://owasp.org/www-project-top-ten/).
+5. **Falco Cloud-Native Runtime Security:** Syscall-driven kernel intrusion detection via eBPF. [falco.org/docs](https://falco.org/docs/).
+6. **AWS KMS Cryptographic Details Whitepaper:** Envelope encryption, hardware security modules, and key hierarchy architecture. [docs.aws.amazon.com/kms](https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html).

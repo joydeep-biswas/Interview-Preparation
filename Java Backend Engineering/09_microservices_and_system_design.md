@@ -493,6 +493,21 @@ public class JpaAccountAdapter implements AccountPersistencePort {
 
 ### 2.1 DRY, KISS & YAGNI
 
+#### Core Engineering Directives for Sustainable Microservice Architectures
+Software engineering principles serve as critical design heuristics that balance system maintainability, cognitive load, and evolutionary agility. In distributed microservice architectures, misapplying these principles frequently results in either tightly coupled monolithic dependencies or fragile, overly speculative abstractions:
+
+1. **DRY (Don't Repeat Yourself — Andy Hunt & Dave Thomas):**
+   - **Theoretical Meaning:** Every piece of domain knowledge or business invariant must have a single, unambiguous representation within a system.
+   - **Nuance in Microservices:** DRY does **not** mean eliminating all duplicate code across service boundaries. Forcing two independent microservices to share common DTO classes via a shared internal JAR library creates tight binary coupling—a change in Service A's schema forces a recompile and redeployment of Service B. In distributed architectures, **loose temporal and schema coupling takes precedence over internal DRY duplication**.
+
+2. **KISS (Keep It Simple, Stupid):**
+   - **Theoretical Meaning:** Systems perform best when their designs remain straightforward and transparent. Unnecessary algorithmic cleverness, complex metaprogramming, and dynamic reflection increase cognitive load and make debugging catastrophic production outages vastly more difficult.
+   - **Application:** Strive for linear, readable code flow. Favor explicit standard language constructs over bespoke framework abstractions.
+
+3. **YAGNI (You Aren't Gonna Need It — Extreme Programming):**
+   - **Theoretical Meaning:** Always implement features and architectural abstractions only when they are actually needed by current verified requirements, never in anticipation of speculative future needs.
+   - **Application:** Avoid designing generic multi-tenant distributed consensus engines or pluggable database adapters when building an internal enterprise reporting service with a single PostgreSQL database.
+
 | Principle | Full Name | Core Engineering Directive | Production Anti-Pattern |
 | :--- | :--- | :--- | :--- |
 | **DRY** | Don't Repeat Yourself | Every piece of domain knowledge or business logic must have a single, unambiguous representation within the system. | Copy-pasting tax calculation or currency rounding logic across 5 controllers. |
@@ -2134,6 +2149,22 @@ sequenceDiagram
 ---
 
 ### 11.1 Two-Phase Commit (2PC) vs Saga Pattern
+
+#### Distributed Transactions & Consistency Boundaries
+In a monolithic application, maintaining data consistency across multiple database tables is trivial: the relational database provides local ACID transactions managed by Write-Ahead Logs (WAL) and MVCC locks. In a microservices architecture where each service owns a private database (the **Database-per-Service pattern**), a single business process (e.g., e-commerce checkout) spans multiple independent network nodes.
+
+To coordinate state mutations across distinct data stores, architectures choose between two primary paradigms:
+
+1. **Two-Phase Commit (2PC — Distributed Consensus Protocol):**
+   - **Operational Protocol:** Coordinated by an external Transaction Coordinator (e.g., XA transaction manager):
+     - **Phase 1 (Prepare):** The coordinator asks all participating databases if they are ready to commit. Each node acquires physical locks on affected records, writes changes to its local redo log, and votes `YES` or `NO`.
+     - **Phase 2 (Commit/Abort):** If all nodes voted `YES`, the coordinator issues a global `COMMIT`. If any node voted `NO` or timed out, the coordinator issues a global `ROLLBACK`.
+   - **Severe Production Failure Modes:** 2PC is a **blocking protocol**. Participating nodes hold exclusive database locks across the entire network handshake duration. If the coordinator crashes or a network partition occurs between Phase 1 and Phase 2, nodes remain locked indefinitely, exhausting database connection pools and causing cascading outages.
+
+2. **The Saga Pattern (Asynchronous Event-Driven Compensations):**
+   - **Operational Philosophy:** Formulated by Garcia-Molina and Salem (1987). A Saga decomposes a distributed transaction into a linear sequence of **local ACID transactions** executed across microservices.
+   - **Compensating Transactions:** Each service updates its own database locally and emits an event. Crucially, **no distributed locks are held**. If step 3 fails (e.g., Payment Declined), the Saga executes explicit **Compensating Transactions** ($C_2, C_1$) in reverse order to semantically undo earlier committed steps (e.g., releasing reserved inventory).
+   - **Consistency Model:** Sacrifices immediate ACID isolation for **Eventual Consistency (BASE)**, delivering massive horizontal scalability and partition tolerance.
 
 | Architectural Dimension | Two-Phase Commit (2PC) | Saga Pattern |
 | :--- | :--- | :--- |

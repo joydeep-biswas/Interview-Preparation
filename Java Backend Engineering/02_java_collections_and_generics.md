@@ -139,8 +139,15 @@ classDiagram
   - For thread pool coordination: use `BlockingQueue` implementations.
 - **Legacy Synchronized Classes**: Avoid `Vector`, `Stack`, and `Hashtable` in modern codebases due to coarse-grained method-level synchronization bottlenecks.
 
-> [!TIP]
-> For in-depth concurrent memory semantics, volatile read visibility, lock-free CAS primitives, and how `BlockingQueue` feeds thread pool executors, see [04. Java Concurrency & Multithreading](04_java_concurrency_and_multithreading.md#6-concurrent-collections).
+#### Foundational Abstractions of the Collection Hierarchy
+The Java Collections Framework (`java.util`) unifies data structures under two distinct root hierarchies:
+1. **The `Collection<E>` Hierarchy:** The root interface for collections of discrete elements.
+   - **`List<E>`:** An ordered sequence (sequence/array abstraction). Elements are accessed by integer positional index (`get(i)`). Allows duplicate elements and preserves insertion order.
+   - **`Set<E>`:** A mathematical set abstraction. Guarantees element uniqueness based on `equals()` and `hashCode()`. Implementations vary in ordering: `HashSet` (unordered), `LinkedHashSet` (insertion order), and `TreeSet` (sorted order).
+   - **`Queue<E>`:** A collection designed for holding elements prior to processing. Typically orders elements in FIFO (First-In-First-Out) order, priority heap order, or LIFO order. Provides non-blocking inspection and bounded capacity operations.
+   - **`Deque<E>` (Double-Ended Queue):** Supports element insertion and removal at both terminal ends. Functions both as a FIFO queue and as a LIFO stack (officially deprecating the legacy `Stack` class).
+
+2. **The `Map<K, V>` Hierarchy:** A separate, parallel hierarchy modeling key-value associations. Maps cannot contain duplicate keys; each key maps to at most one value.
 
 #### Key Differences Between Root Interfaces
 | Interface | Ordering | Duplicates Allowed? | Key Characteristics |
@@ -758,6 +765,19 @@ flowchart LR
     style C2 fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
+#### Concurrency Mechanics & Locking Architecture of Blocking Queues
+`BlockingQueue` implementations synchronize concurrent producer-consumer pipelines by managing thread blocking states when queues are either completely full or empty:
+
+1. **`ArrayBlockingQueue`:**
+   - **Internal Mechanics:** Backed by a fixed-size, bounded circular array buffer.
+   - **Locking Strategy:** Employs a **single reentrant lock** (`ReentrantLock`) shared across both producers and consumers, accompanied by two conditions (`notEmpty` and `notFull`). Because `put()` and `take()` contend for the exact same physical lock, high concurrency scenarios suffer from thread lock contention.
+2. **`LinkedBlockingQueue`:**
+   - **Internal Mechanics:** Backed by dynamically linked FIFO node objects. Can be bounded (recommended) or unbounded (`Integer.MAX_VALUE`).
+   - **Two-Lock Concurrency:** Employs **two distinct reentrant locks**: a `takeLock` (protecting the head pointer for consumers) and a `putLock` (protecting the tail pointer for producers). Because producers and consumers acquire separate locks, producers can enqueue items concurrently while consumers dequeue, offering significantly higher throughput under heavy parallel workloads.
+3. **`PriorityBlockingQueue`:**
+   - **Internal Mechanics:** An unbounded concurrent blocking queue backed by an array-based binary min-heap. Elements are dequeued according to natural ordering (`Comparable`) or a custom `Comparator`.
+   - **Unbounded Behavior:** The `put()` method never blocks because the backing array grows dynamically, but `take()` blocks when the queue is empty. Uses a single lock with an allocation spinlock for resizing.
+
 #### Comparison of Blocking Implementations
 | Implementation | Backing Structure | Bound Type | Locking Strategy |
 | :--- | :--- | :--- | :--- |
@@ -1137,6 +1157,17 @@ A synchronized, hash table based implementation of the `Map` interface from JDK 
 - **Coarse-Grained Locking**: Every read (`get`) and write (`put`) acquires a global lock on the entire instance, causing severe thread contention.
 - **Null Hostile**: Does **not** allow `null` keys or `null` values (throws `NullPointerException`), unlike `HashMap`.
 - Replaced by `HashMap` for single-threaded usage and `ConcurrentHashMap` for concurrent multithreaded usage.
+
+#### Detailed Concurrency & Locking Mechanics
+1. **`Hashtable` (Obsolete Monolithic Locking):**
+   - **Internal Mechanics:** Synchronizes every method (`synchronized get()`, `synchronized put()`) on the `Hashtable` object's intrinsic monitor lock (`this`). 
+   - **Performance Bottleneck:** Only a single thread can interact with the table at any given time—even multiple concurrent read requests are forced to execute sequentially, causing severe thread stalls.
+2. **`HashMap` (Single-Threaded High-Performance):**
+   - **Internal Mechanics:** Zero synchronization overhead. Optimized purely for single-threaded speed using an array of linked list nodes that dynamically convert to red-black tree bins (`TreeNode`) when bucket collisions reach the threshold of 8 (`TREEIFY_THRESHOLD`).
+   - **Concurrency Hazard:** Concurrent writes can corrupt internal bucket pointers or trigger infinite loops (in legacy Java 7 rehashing) and race conditions.
+3. **`ConcurrentHashMap` (Modern Fine-Grained Concurrency):**
+   - **Internal Mechanics:** Eliminates monolithic table locking entirely. Reads execute completely lock-free via `volatile` table array reads and volatile node pointers. 
+   - **Fine-Grained Bucket Locking:** Concurrent writes (`put`, `computeIfAbsent`) synchronize strictly on the individual head node of the specific colliding bucket bin using Java's `synchronized` block, or use lock-free Compare-And-Swap (CAS) if the bucket is empty. Two threads writing to different hash bins proceed in full parallel execution with zero lock contention.
 
 #### Comparison: `Hashtable` vs `HashMap` vs `ConcurrentHashMap`
 | Feature | `Hashtable` | `HashMap` | `ConcurrentHashMap` |

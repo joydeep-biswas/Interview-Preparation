@@ -203,7 +203,21 @@ flowchart TD
 **Topic Covered:** Throttling Algorithms, Redis Lua Scripts, Distributed Concurrency, and Sliding Windows  
 **Question:** *How do you design an API Rate Limiter?*
 
+#### Architectural Context & Throttling Mechanisms
+An API Rate Limiter regulates the rate at which incoming network traffic is processed by upstream services. At enterprise scale, rate limiting serves three primary functions: protecting downstream microservices against Cascading Failures and Denial of Service (DoS) attacks, preventing noisy-neighbor starvation in multi-tenant SaaS environments, and enforcing contractual monetization tiers.
+
+Choosing the appropriate rate-limiting strategy requires evaluating memory consumption, computational overhead, and traffic burst tolerance:
+1. **Token Bucket:** A central bucket stores up to capacity $C$ tokens, refilling at a constant rate of $r$ tokens/second. Each request consumes one token. If tokens are available, the request proceeds immediately; otherwise, it is dropped or queued. This permits short, controlled bursts of traffic up to capacity $C$ while enforcing an average rate limit of $r$.
+2. **Leaky Bucket:** Modeled as a FIFO queue of capacity $C$. Inflowing requests enter the queue and drain at a strictly constant rate $r$ into the downstream service. While it guarantees a completely smooth egress traffic profile, sudden traffic bursts that exceed queue capacity are dropped immediately.
+3. **Fixed Window Counter:** Divides the timeline into fixed discrete intervals (e.g., 60 seconds). A counter tracks requests within each window. While simple to implement in Redis using `INCR` and `EXPIRE`, it suffers from the critical **Boundary Burst Vulnerability**: an attacker can send the full limit in the last second of window $W_1$ and another full limit in the first second of window $W_2$, effectively doubling the allowable threshold within a 2-second interval ($2 \times \text{limit}$).
+4. **Sliding Window Counter:** A hybrid approach combining the request count of the previous fixed window and the current window using a time-weighted interpolation formula:
+   $$\text{EstimatedCount} = \text{Count}(\text{PrevWindow}) \times \left(1 - \frac{\text{CurrentOffset}}{\text{WindowSize}}\right) + \text{Count}(\text{CurrWindow})$$
+   It smooths out boundary spikes while maintaining $O(1)$ memory overhead and constant-time evaluation.
+
 #### Rate Limiting Algorithms Comparison
+
+The comparison matrix below evaluates the core trade-offs, operational mechanics, advantages, and vulnerabilities of the primary distributed throttling algorithms:
+
 | Algorithm | Mechanism | Pros | Cons |
 | :--- | :--- | :--- | :--- |
 | **Token Bucket** | Tokens refill at constant rate $r$; bursts allowed up to capacity $C$. | Memory efficient, handles traffic bursts gracefully. | Parameter tuning ($r$ and $C$) can be complex. |
@@ -577,13 +591,45 @@ flowchart TD
 **Topic Covered:** Concurrency Control, Operational Transformation (OT), and CRDTs  
 **Question:** *How would you design Google Docs (collaborative editing)?*
 
+#### The Core Distributed Concurrency Challenge
+Real-time collaborative editing enables multiple users to edit the same shared document simultaneously across heterogeneous geographical regions. The fundamental engineering challenge arises from asynchronous network latency:
+- Suppose a document currently contains the text `"CAT"`.
+- User $A$ inserts `'S'` at index 0 to produce `"SCAT"`.
+- Concurrently, User $B$ deletes `'T'` at index 2 to produce `"CA"`.
+- When User $B$'s delete operation (`delete(2)`) arrives at User $A$'s client without transformation, User $A$ deletes index 2 of `"SCAT"` (the letter `'A'`), resulting in `"SCT"`. Meanwhile, User $B$ applies User $A$'s insert (`insert(0, 'S')`), resulting in `"SCA"`.
+- The document states have permanently diverged!
+
+To guarantee eventual consistency across all distributed clients, systems deploy either **Operational Transformation (OT)** or **Conflict-Free Replicated Data Types (CRDTs)**.
+
+#### Concurrency Control Architectures
+1. **Operational Transformation (OT):**
+   - **Centralized Sequencing:** Relies on a centralized server that establishes a strict, total chronological ordering of all operations.
+   - **Transformation Functions ($T$):** When an operation arrives out of order relative to concurrent edits that have already been applied by the server, the server transforms the incoming operation against the intervening operations:
+     $$op_1' = T(op_1, op_2), \quad op_2' = T(op_2, op_1)$$
+     This adjusts character indices dynamically so that applying $op_1$ followed by $op_2'$ yields the identical character sequence as applying $op_2$ followed by $op_1'$.
+   - **Client State Machine:** Clients buffer unacknowledged local operations, applying optimistic UI rendering, and transform incoming remote operations against their local pending buffer.
+2. **Conflict-Free Replicated Data Types (CRDTs):**
+   - **Decentralized Convergence:** Characters are modeled not by volatile array indices, but by globally unique, immutable identifiers embedded in a partially ordered set (e.g., Replicated Growable Array - RGA, or Logoot/LSEQ fractional indexing).
+   - **Monotonic Semi-Lattice Merging:** Merge operations are mathematically guaranteed to be commutative, associative, and idempotent:
+     $$A \vee B = B \vee A, \quad (A \vee B) \vee C = A \vee (B \vee C), \quad A \vee A = A$$
+   - **Offline-First Resilience:** Because CRDTs require no central server to resolve conflicts, clients can edit documents completely offline for days and merge changes seamlessly upon reconnecting.
+
 #### Operational Transformation (OT) vs. CRDTs
+
+The comparison matrix below contrasts the architectural topology, computational mechanics, memory profiles, and industry adoption between Operational Transformation and CRDTs:
+
 | Dimension | Operational Transformation (OT) | CRDTs (Conflict-Free Replicated Data Types) |
 | :--- | :--- | :--- |
 | **Architecture** | Centralized server required to order operations globally. | Fully decentralized; peer-to-peer or server-assisted. |
 | **Mechanics** | Operations (Insert, Delete) are mathematically transformed based on concurrent peer operations. | Data structures with mathematically provable monotonic merge functions (LWW-Element-Set, RGA). |
 | **Memory Overhead** | Extremely low memory overhead per character. | Higher memory footprint due to unique node IDs and tombstone metadata. |
 | **Industry Adoption** | Google Docs, Apache Wave. | Figma, Apple Notes, Linear, Notion. |
+
+#### Production Architecture Blueprint
+1. **WebSocket Gateway:** Terminates bi-directional persistent WebSocket connections, mapping active document sessions to designated stateful Document Workers.
+2. **Document Session Worker (JVM Actor / Stateful Node):** Holds the in-memory document state, manages client revision numbers, executes OT transformation matrices or CRDT causal merges, and broadcasts committed edits to all active session participants.
+3. **Presence & Cursor Service:** In-memory Redis pub/sub tracking real-time cursor positions, user selections, and active collaborator avatars with low-latency broadcasts.
+4. **Append-Only Edit Log (WAL) & Snapshot Store:** Every committed operation is appended to an immutable write-ahead log (Apache Kafka or Cassandra). Periodically (e.g., every 50 operations or 30 seconds), the document worker writes a compact document snapshot to Object Storage (S3 / GCS) to allow fast cold-start loading.
 
 ---
 
@@ -692,6 +738,8 @@ flowchart LR
 ---
 
 ## Summary & High-Level System Design Reference Matrix
+
+Designing enterprise distributed backend systems requires balancing strict consistency against high availability, memory efficiency against computational latency, and real-time streaming against durable batch persistence. The reference matrix below synthesizes the primary architectural trade-offs, service latency SLAs, bottleneck mitigations, and canonical storage choices across the distributed systems analyzed throughout this guide:
 
 | System Domain | Latency SLA | Primary Bottleneck | Canonical Architectural Solution | Persistence Choice |
 | :--- | :--- | :--- | :--- | :--- |

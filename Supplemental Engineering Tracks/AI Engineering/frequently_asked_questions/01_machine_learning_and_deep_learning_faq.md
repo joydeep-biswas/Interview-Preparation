@@ -273,7 +273,7 @@ def train_step_with_custom_regularization(
 2. **Extreme Sparsity Incompatibilities:** While L1 produces sparse weights on paper, floating-point GPU execution does not accelerate standard dense matrix multiplications (`GEMM`) unless the sparsity pattern matches hardware-accelerated structured sparsity (e.g., NVIDIA Ampere 2:4 structured sparsity).
 
 #### Core Curriculum Cross-Reference
-- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#7-regularization-normalization--numerical-stability) for AdamW decoupled weight decay proofs.
+- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#5-regularization-normalization--numerical-stability) for AdamW decoupled weight decay proofs.
 
 ---
 
@@ -391,7 +391,7 @@ class HybridFraudEngine:
 2. **Cold Start & Continuous Retraining:** Heuristic rules never fail on day 1. An ML model without historical labeled fraud data cannot predict new attack vectors. Successful production architectures employ **hybrid systems**: heuristics guard the baseline while ML extracts subtle, complex correlations.
 
 #### Core Curriculum Cross-Reference
-- See [15. Enterprise AI System Design](../10_model_adaptation_and_system_design.md#91-enterprise-ai-architecture-blueprint-reference-matrix) for production hybrid decisioning patterns.
+- See [10. Enterprise AI System Design](../10_model_adaptation_and_system_design.md#173-enterprise-ai-architecture-blueprint-reference-matrix) for production hybrid decisioning patterns.
 
 ---
 
@@ -492,7 +492,7 @@ def compare_gradient_descent_dynamics(
 2. **GPU Under-utilization with $B=1$:** Running pure SGD ($B=1$) on an NVIDIA H100 GPU leaves 99% of CUDA cores completely idle because the GPU spends all its time reading weights from HBM3 memory rather than performing arithmetic computation.
 
 #### Core Curriculum Cross-Reference
-- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#6-optimization-algorithms--gradient-descent-mechanics) for momentum, RMSprop, and AdamW derivations.
+- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#4-optimization-algorithms--gradient-descent-mechanics) for momentum, RMSprop, and AdamW derivations.
 
 ---
 
@@ -771,7 +771,7 @@ class ProductionRMSNorm(nn.Module):
 2. **Why Transformers Reject BatchNorm:** In autoregressive generation (inference), prompt prefill processes a full sequence while token decoding runs at batch size 1 ($B=1$, single token). BatchNorm cannot function at $B=1$. LayerNorm operates seamlessly in streaming generation.
 
 #### Core Curriculum Cross-Reference
-- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#7-regularization-normalization--numerical-stability) and [02. LLM Foundations](../02_llm_and_transformer_architecture.md#41-prefill-phase-vs-decode-phase-deep-dive) for RMSNorm mathematical optimizations.
+- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#5-regularization-normalization--numerical-stability) and [02. LLM Foundations](../02_llm_and_transformer_architecture.md#41-prefill-phase-vs-decode-phase-deep-dive) for RMSNorm mathematical optimizations.
 
 ---
 
@@ -864,7 +864,7 @@ class MultiModalArchitectureBenchmark(nn.Module):
 2. **Modern Hybrid Alternatives:** In 2026, architectures like **Mamba / State-Space Models (SSMs)** provide linear time $O(N)$ sequence modeling with parallel associative scan training, bridging the gap between RNN efficiency and Transformer expressiveness.
 
 #### Core Curriculum Cross-Reference
-- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#9-the-transformer-core-building-blocks) and [13. Multimodal AI](../09_multimodal_and_realtime_ai.md#2-computer-vision--vision-transformers-vit) for ViT and hybrid architectures.
+- See [01. Machine Learning & Deep Learning Fundamentals](../01_machine_learning_and_deep_learning.md#7-the-transformer-core-building-blocks) and [13. Multimodal AI](../09_multimodal_and_realtime_ai.md#2-computer-vision--vision-transformers-vit) for ViT and hybrid architectures.
 
 ---
 
@@ -968,7 +968,7 @@ def select_production_model_architecture(c: ProductionConstraints) -> str:
 2. **Treelite Model Compilation:** For ultra-low-latency tabular models, compile tree ensembles into native C code using **Treelite**. This eliminates Python interpreter overhead, reducing XGBoost inference latency from $12\text{ ms}$ down to $0.8\text{ ms}$.
 
 #### Core Curriculum Cross-Reference
-- See [15. Enterprise AI System Design](../10_model_adaptation_and_system_design.md#91-enterprise-ai-architecture-blueprint-reference-matrix) for system design tradeoff matrices.
+- See [10. Enterprise AI System Design](../10_model_adaptation_and_system_design.md#173-enterprise-ai-architecture-blueprint-reference-matrix) for system design tradeoff matrices.
 
 ---
 

@@ -88,7 +88,7 @@ flowchart TD
    - [3.3 Diagnosing Training Curves: Underfitting vs. Overfitting](#33-diagnosing-training-curves-underfitting-vs-overfitting)
    - [3.4 Catastrophic Forgetting & General Capability Degradation](#34-catastrophic-forgetting--general-capability-degradation)
 4. [Parameter-Efficient Fine-Tuning (PEFT): LoRA, QLoRA & DoRA](#4-parameter-efficient-fine-tuning-peft-lora-qlora--dora)
-   - [4.1 Low-Rank Decomposition Mathematics ($W_0 + \frac{\alpha}{r} BA$)](#41-low-rank-decomposition-mathematics-w_0--fracalphar-ba)
+   - [4.1 Low-Rank Decomposition Mathematics ($W_0 + rac{\alpha}{r} BA$)](#41-low-rank-decomposition-mathematics-w_0--fracalphar-ba)
    - [4.2 Sizing LoRA Parameters: Rank $r$, Alpha $\alpha$, and Target Modules](#42-sizing-lora-parameters-rank-r-alpha-alpha-and-target-modules)
    - [4.3 QLoRA Mechanics: 4-bit NormalFloat (NF4), Double Quantization & Paged Optimizers](#43-qlora-mechanics-4-bit-normalfloat-nf4-double-quantization--paged-optimizers)
    - [4.4 Weight-Decomposed Low-Rank Adaptation (DoRA)](#44-weight-decomposed-low-rank-adaptation-dora)
@@ -108,44 +108,47 @@ flowchart TD
 8. [Production Implementation: QLoRA Fine-Tuning Pipeline & Multi-LoRA Serving Engine](#8-production-implementation-qlora-fine-tuning-pipeline--multi-lora-serving-engine)
    - [8.1 Systems Architecture of the Pipeline](#81-systems-architecture-of-the-pipeline)
    - [8.2 Complete Production-Grade Python Implementation](#82-complete-production-grade-python-implementation)
-   - [15.3 Serving Dynamic Multi-LoRA Adapters in vLLM](#153-serving-dynamic-multi-lora-adapters-in-vllm)
-9. [The AI System Design Framework, Trade-Off Triangle & SLOs](#16-the-ai-system-design-framework-trade-off-triangle--slos)
-   - [16.1 The 4-Step Generative AI System Design Rubric](#161-the-4-step-generative-ai-system-design-rubric)
-   - [16.2 Sizing the Fundamental Trade-Off Triangle (Quality vs. Latency vs. Cost)](#162-sizing-the-fundamental-trade-off-triangle-quality-vs-latency-vs-cost)
-   - [16.3 Quantitative Service Level Objectives (SLOs) & SLAs](#163-quantitative-service-level-objectives-slos--slas)
-10. [Core Architectural Subsystems: Gateways, Routing Cascades & Multi-Tier Caching](#17-core-architectural-subsystems-gateways-routing-cascades--multi-tier-caching)
-   - [17.1 Enterprise AI Gateway Topology](#171-enterprise-ai-gateway-topology)
-   - [17.2 Complexity-Based Model Routing (Small vs. Frontier Models)](#172-complexity-based-model-routing-small-vs-frontier-models)
-   - [17.3 Multi-Tiered Caching Hierarchy (Exact Hash $\to$ Semantic Vector $\to$ Hardware Prefix)](#173-multi-tiered-caching-hierarchy-exact-hash-to-semantic-vector-to-hardware-prefix)
-   - [17.4 Multi-Tenant Cache Isolation & Invalidation Strategies](#174-multi-tenant-cache-isolation--invalidation-strategies)
-11. [Enterprise Blueprint 1: High-Concurrency Multimodal Customer Copilot](#18-enterprise-blueprint-1-high-concurrency-multimodal-customer-copilot)
-   - [18.1 Scale, Constraints & Architectural Topology](#181-scale-constraints--architectural-topology)
-   - [18.2 Multi-Tenant RAG, Live CRM Integration & Strict Guardrails](#182-multi-tenant-rag-live-crm-integration--strict-guardrails)
-   - [18.3 Human Escalation & Smooth Handoff Protocol](#183-human-escalation--smooth-handoff-protocol)
-12. [Enterprise Blueprint 2: Autonomous Code Intelligence & Self-Healing Engine](#19-enterprise-blueprint-2-autonomous-code-intelligence--self-healing-engine)
-   - [19.1 Repository-Scale Graph & AST Vector Indexing](#191-repository-scale-graph--ast-vector-indexing)
-   - [19.2 Language Server Protocol (LSP) Tool Integration](#192-language-server-protocol-lsp-tool-integration)
-   - [19.3 Sandboxed Test-Driven Repair Loops & Infinite Loop Prevention](#193-sandboxed-test-driven-repair-loops--infinite-loop-prevention)
-13. [Enterprise Blueprint 3: Autonomous Deep Research Agent & Knowledge Synthesizer](#20-enterprise-blueprint-3-autonomous-deep-research-agent--knowledge-synthesizer)
-   - [20.1 Multi-Query Decomposition & Parallel Web Search](#201-multi-query-decomposition--parallel-web-search)
-   - [20.2 Iterative Information Synthesis & External State Offloading](#202-iterative-information-synthesis--external-state-offloading)
-   - [20.3 Citation Tracking & Structured Markdown Deliverables](#203-citation-tracking--structured-markdown-deliverables)
-14. [Enterprise Blueprint 4: High-Throughput Global Enterprise RAG Platform](#21-enterprise-blueprint-4-high-throughput-global-enterprise-rag-platform)
-   - [21.1 Decoupling Asynchronous Ingestion from Online Query Serving](#211-decoupling-asynchronous-ingestion-from-online-query-serving)
-   - [21.2 Asynchronous Ingress Queues & Stateless Retrieval Workers](#212-asynchronous-ingress-queues--stateless-retrieval-workers)
-   - [21.3 High-Throughput Vector Index Sharding & Multi-Region Disaster Recovery](#213-high-throughput-vector-index-sharding--multi-region-disaster-recovery)
-15. [Live Production Incident Triage Playbooks & Whiteboard Defense](#22-live-production-incident-triage-playbooks--whiteboard-defense)
-   - [22.1 Runbook 1: Massive $p99$ Latency Spikes (TTFT Exceeds 10 Seconds)](#221-runbook-1-massive-p99-latency-spikes-ttft-exceeds-10-seconds)
-   - [22.2 Runbook 2: Runaway Financial Cost Explosions & Recursive Agent Loops](#222-runbook-2-runaway-financial-cost-explosions--recursive-agent-loops)
-   - [22.3 Runbook 3: Silent Quality Degradation Post-Deployment](#223-runbook-3-silent-quality-degradation-post-deployment)
-   - [22.4 Defending "RAG vs. Fine-Tuning" on a Technical Whiteboard](#224-defending-rag-vs-fine-tuning-on-a-technical-whiteboard)
-16. [Production Implementation: Enterprise Gateway, Semantic Router & Cascade Service](#23-production-implementation-enterprise-gateway-semantic-router--cascade-service)
-   - [23.1 Systems Architecture & Lifecycle Management](#231-systems-architecture--lifecycle-management)
-   - [23.2 Complete Production-Grade Python Implementation](#82-complete-production-grade-python-implementation)
-   - [31.3 End-to-End Execution Verification & Benchmark Validation](#313-end-to-end-execution-verification--benchmark-validation)
-17. [Summary Comparison & Production Engineering Reference Matrix](#32-summary-comparison--production-engineering-reference-matrix)
-18. [References & Further Reading](#33-references--further-reading)
-
+   - [8.3 Serving Dynamic Multi-LoRA Adapters in vLLM](#83-serving-dynamic-multi-lora-adapters-in-vllm)
+9. [The AI System Design Framework, Trade-Off Triangle & SLOs](#9-the-ai-system-design-framework-trade-off-triangle--slos)
+   - [9.1 The 4-Step Generative AI System Design Rubric](#91-the-4-step-generative-ai-system-design-rubric)
+   - [9.2 Sizing the Fundamental Trade-Off Triangle (Quality vs. Latency vs. Cost)](#92-sizing-the-fundamental-trade-off-triangle-quality-vs-latency-vs-cost)
+   - [9.3 Quantitative Service Level Objectives (SLOs) & SLAs](#93-quantitative-service-level-objectives-slos--slas)
+10. [Core Architectural Subsystems: Gateways, Routing Cascades & Multi-Tier Caching](#10-core-architectural-subsystems-gateways-routing-cascades--multi-tier-caching)
+    - [10.1 Enterprise AI Gateway Topology](#101-enterprise-ai-gateway-topology)
+    - [10.2 Complexity-Based Model Routing (Small vs. Frontier Models)](#102-complexity-based-model-routing-small-vs-frontier-models)
+    - [10.3 Multi-Tiered Caching Hierarchy (Exact Hash $\to$ Semantic Vector $\to$ Hardware Prefix)](#103-multi-tiered-caching-hierarchy-exact-hash-to-semantic-vector-to-hardware-prefix)
+    - [10.4 Multi-Tenant Cache Isolation & Invalidation Strategies](#104-multi-tenant-cache-isolation--invalidation-strategies)
+11. [Enterprise Blueprint 1: High-Concurrency Multimodal Customer Copilot](#11-enterprise-blueprint-1-high-concurrency-multimodal-customer-copilot)
+    - [11.1 Scale, Constraints & Architectural Topology](#111-scale-constraints--architectural-topology)
+    - [11.2 Multi-Tenant RAG, Live CRM Integration & Strict Guardrails](#112-multi-tenant-rag-live-crm-integration--strict-guardrails)
+    - [11.3 Human Escalation & Smooth Handoff Protocol](#113-human-escalation--smooth-handoff-protocol)
+12. [Enterprise Blueprint 2: Autonomous Code Intelligence & Self-Healing Engine](#12-enterprise-blueprint-2-autonomous-code-intelligence--self-healing-engine)
+    - [12.1 Repository-Scale Graph & AST Vector Indexing](#121-repository-scale-graph--ast-vector-indexing)
+    - [12.2 Language Server Protocol (LSP) Tool Integration](#122-language-server-protocol-lsp-tool-integration)
+    - [12.3 Sandboxed Test-Driven Repair Loops & Infinite Loop Prevention](#123-sandboxed-test-driven-repair-loops--infinite-loop-prevention)
+13. [Enterprise Blueprint 3: Autonomous Deep Research Agent & Knowledge Synthesizer](#13-enterprise-blueprint-3-autonomous-deep-research-agent--knowledge-synthesizer)
+    - [13.1 Multi-Query Decomposition & Parallel Web Search](#131-multi-query-decomposition--parallel-web-search)
+    - [13.2 Iterative Information Synthesis & External State Offloading](#132-iterative-information-synthesis--external-state-offloading)
+    - [13.3 Citation Tracking & Structured Markdown Deliverables](#133-citation-tracking--structured-markdown-deliverables)
+14. [Enterprise Blueprint 4: High-Throughput Global Enterprise RAG Platform](#14-enterprise-blueprint-4-high-throughput-global-enterprise-rag-platform)
+    - [14.1 Decoupling Asynchronous Ingestion from Online Query Serving](#141-decoupling-asynchronous-ingestion-from-online-query-serving)
+    - [14.2 Asynchronous Ingress Queues & Stateless Retrieval Workers](#142-asynchronous-ingress-queues--stateless-retrieval-workers)
+    - [14.3 High-Throughput Vector Index Sharding & Multi-Region Disaster Recovery](#143-high-throughput-vector-index-sharding--multi-region-disaster-recovery)
+15. [Live Production Incident Triage Playbooks & Whiteboard Defense](#15-live-production-incident-triage-playbooks--whiteboard-defense)
+    - [15.1 Runbook 1: Massive $p99$ Latency Spikes (TTFT Exceeds 10 Seconds)](#151-runbook-1-massive-p99-latency-spikes-ttft-exceeds-10-seconds)
+    - [15.2 Runbook 2: Runaway Financial Cost Explosions & Recursive Agent Loops](#152-runbook-2-runaway-financial-cost-explosions--recursive-agent-loops)
+    - [15.3 Runbook 3: Silent Quality Degradation Post-Deployment](#153-runbook-3-silent-quality-degradation-post-deployment)
+    - [15.4 Defending "RAG vs. Fine-Tuning" on a Technical Whiteboard](#154-defending-rag-vs-fine-tuning-on-a-technical-whiteboard)
+16. [Production Implementation: Enterprise Gateway, Semantic Router & Cascade Service](#16-production-implementation-enterprise-gateway-semantic-router--cascade-service)
+    - [16.1 Systems Architecture & Lifecycle Management](#161-systems-architecture--lifecycle-management)
+    - [16.2 Complete Production-Grade Python Implementation](#162-complete-production-grade-python-implementation)
+    - [16.3 End-to-End Execution Verification & Benchmark Validation](#163-end-to-end-execution-verification--benchmark-validation)
+17. [Summary Comparison & Production Engineering Reference Matrix](#17-summary-comparison--production-engineering-reference-matrix)
+    - [17.1 Model Adaptation Methodology Comparison](#171-model-adaptation-methodology-comparison)
+    - [17.2 Fine-Tuning Hyperparameter Reference Playbook](#172-fine-tuning-hyperparameter-reference-playbook)
+    - [17.3 Enterprise AI Architecture Blueprint Reference Matrix](#173-enterprise-ai-architecture-blueprint-reference-matrix)
+    - [17.4 Enterprise AI Platform SRE Invariants](#174-enterprise-ai-platform-sre-invariants)
+18. [References & Further Reading](#18-references--further-reading)
 ---
 
 # 1. The Model Adaptation Decision Framework
@@ -185,6 +188,12 @@ flowchart TD
     style LoRA fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#6ee7b7
     style FullFT fill:#1e293b,stroke:#8b5cf6,stroke-width:1.5px,color:#fff
 ```
+
+#### Architectural Trade-Off Analysis: Adaptation Matrix
+
+Navigating the adaptation spectrum requires evaluating four fundamental engineering axes: knowledge volatility, latency budgets, operational complexity, and output determinism. Foundation models act as general reasoning engines, but applying them to enterprise production demands a clear delineation between knowledge retrieval (RAG) and behavioral conditioning (fine-tuning).
+
+The architectural comparison across the three primary adaptation paradigms:
 
 | Dimension | Prompt Engineering | Retrieval-Augmented Generation (RAG) | Fine-Tuning (SFT / PEFT) |
 | :--- | :--- | :--- | :--- |
@@ -788,7 +797,7 @@ logger = logging.getLogger("FineTuningEngine")
 
 # ==============================================================================
 
-# 9. Training Dataset & Chat Template Preparation with Loss Masking
+    # Training Dataset & Chat Template Preparation with Loss Masking
 
 # ==============================================================================
 
@@ -854,7 +863,7 @@ def construct_loss_masked_tensors(
 
 # ==============================================================================
 
-# 10. QLoRA Configuration & Parameter Accounting
+    # QLoRA Configuration & Parameter Accounting
 
 # ==============================================================================
 
@@ -898,7 +907,7 @@ class QLoRAConfigurator:
 
 # ==============================================================================
 
-# 11. Dynamic Multi-LoRA Serving Router (vLLM Emulation)
+    # Dynamic Multi-LoRA Serving Router (vLLM Emulation)
 
 # ==============================================================================
 
@@ -926,7 +935,7 @@ class MultiLoRARouter:
 
 # ==============================================================================
 
-# 12. Pipeline Execution & Verification Runner
+    # Pipeline Execution & Verification Runner
 
 # ==============================================================================
 
@@ -935,7 +944,7 @@ def execute_finetuning_pipeline_demo():
     print("PRODUCTION QLoRA FINE-TUNING & MULTI-LORA SERVING PIPELINE")
     print("=" * 80)
 
-# 13. Dataset Loss Masking Verification
+    # Dataset Loss Masking Verification
 
 print("\n1. VERIFYING STRICT LOSS MASKING (-100 TARGET LABELS):")
     sample_tensors = construct_loss_masked_tensors(
@@ -955,7 +964,7 @@ print("\n1. VERIFYING STRICT LOSS MASKING (-100 TARGET LABELS):")
     print(f"  Target Tokens Active for Loss:{active_loss_count} tokens (Gradients active)")
     print("  Loss Masking Invariant Verified: ✅")
 
-# 14. QLoRA Parameter & VRAM Footprint Accounting
+    # QLoRA Parameter & VRAM Footprint Accounting
 
 print("\n2. QLoRA PARAMETER & VRAM SIZING (LLaMA-3.1-70B on Single 80GB GPU):")
     sizing = QLoRAConfigurator.calculate_lora_parameters(
@@ -974,7 +983,7 @@ print("\n2. QLoRA PARAMETER & VRAM SIZING (LLaMA-3.1-70B on Single 80GB GPU):")
     print(f"  Total Training VRAM Required: {sizing['estimated_total_training_vram_gb']} GB")
     print(f"  Single H100 80GB Feasibility: APPROVED ✅ (Fits within 80GB VRAM)")
 
-# 15. Dynamic Multi-LoRA Serving Router Verification
+    # Dynamic Multi-LoRA Serving Router Verification
 
 print("\n3. DYNAMIC MULTI-LORA HIGH-DENSITY SERVING DEMONSTRATION:")
     router = MultiLoRARouter("meta-llama/Meta-Llama-3.1-70B-Instruct")
@@ -994,7 +1003,7 @@ if __name__ == "__main__":
 
 ---
 
-### 15.3 Serving Dynamic Multi-LoRA Adapters in vLLM
+### 8.3 Serving Dynamic Multi-LoRA Adapters in vLLM
 
 Rather than hosting separate dedicated GPU instances for every fine-tuned model, **vLLM Multi-LoRA** serves dozens of specialized adapters dynamically over a **single shared base model**:
 
@@ -1027,9 +1036,9 @@ response = client.chat.completions.create(
 
 ---
 
-# 16. The AI System Design Framework, Trade-Off Triangle & SLOs
+# 9. The AI System Design Framework, Trade-Off Triangle & SLOs
 
-### 16.1 The 4-Step Generative AI System Design Rubric
+### 9.1 The 4-Step Generative AI System Design Rubric
 
 Designing enterprise generative AI systems requires an engineering discipline that balances stochastic, probabilistic foundation models with deterministic, high-availability distributed systems infrastructure. 
 
@@ -1055,7 +1064,7 @@ flowchart TD
 
 ---
 
-### 16.2 Sizing the Fundamental Trade-Off Triangle (Quality vs. Latency vs. Cost)
+### 9.2 Sizing the Fundamental Trade-Off Triangle (Quality vs. Latency vs. Cost)
 
 Every generative AI architectural decision exists within the tension of the **AI Trade-Off Triangle**:
 
@@ -1083,7 +1092,7 @@ flowchart TD
 
 ---
 
-### 16.3 Quantitative Service Level Objectives (SLOs) & SLAs
+### 9.3 Quantitative Service Level Objectives (SLOs) & SLAs
 
 Enterprise architectures must translate ambiguous business goals into rigorous, measurable engineering contracts:
 
@@ -1098,9 +1107,9 @@ Enterprise architectures must translate ambiguous business goals into rigorous, 
 
 ---
 
-# 17. Core Architectural Subsystems: Gateways, Routing Cascades & Multi-Tier Caching
+# 10. Core Architectural Subsystems: Gateways, Routing Cascades & Multi-Tier Caching
 
-### 17.1 Enterprise AI Gateway Topology
+### 10.1 Enterprise AI Gateway Topology
 
 An enterprise cannot permit direct microservice-to-model API calls. An **Enterprise AI Gateway** acts as a unified reverse proxy, policy engine, and governance perimeter:
 
@@ -1129,7 +1138,7 @@ The gateway exposes a single **OpenAI-compatible unified endpoint** (`/v1/chat/c
 
 ---
 
-### 17.2 Complexity-Based Model Routing (Small vs. Frontier Models)
+### 10.2 Complexity-Based Model Routing (Small vs. Frontier Models)
 
 In a typical enterprise workload, **$70\%$ to $80\%$ of user queries are routine, simple tasks** (e.g., entity extraction, intent classification, summarizing short passages, or answering basic FAQs). Routing every query to a \$5.00/1M token frontier model (GPT-4o) wastes millions of dollars annually.
 
@@ -1169,7 +1178,7 @@ flowchart TD
 
 ---
 
-### 17.3 Multi-Tiered Caching Hierarchy (Exact Hash $\to$ Semantic Vector $\to$ Hardware Prefix)
+### 10.3 Multi-Tiered Caching Hierarchy (Exact Hash $\to$ Semantic Vector $\to$ Hardware Prefix)
 
 To maximize throughput and minimize latency, enterprise systems deploy a three-tiered caching hierarchy:
 
@@ -1217,7 +1226,7 @@ flowchart TD
 
 ---
 
-### 17.4 Multi-Tenant Cache Isolation & Invalidation Strategies
+### 10.4 Multi-Tenant Cache Isolation & Invalidation Strategies
 
 > [!CAUTION]
 > **Cross-Tenant Data Leakage in Shared Semantic Caches:**
@@ -1234,9 +1243,9 @@ $$\text{CacheKey} = \text{HMAC-SHA256}\Big(\text{Secret}, \ \text{TenantID} \,\|
 
 ---
 
-# 18. Enterprise Blueprint 1: High-Concurrency Multimodal Customer Copilot
+# 11. Enterprise Blueprint 1: High-Concurrency Multimodal Customer Copilot
 
-### 18.1 Scale, Constraints & Architectural Topology
+### 11.1 Scale, Constraints & Architectural Topology
 
 A production customer support copilot serving a global e-commerce enterprise handling $10,000\text{ concurrent sessions}$ with sub-second response times and multimodal attachment inspection (e.g., photos of damaged goods or return receipts).
 
@@ -1298,7 +1307,7 @@ flowchart TD
 
 ---
 
-### 18.2 Multi-Tenant RAG, Live CRM Integration & Strict Guardrails
+### 11.2 Multi-Tenant RAG, Live CRM Integration & Strict Guardrails
 
 1. **Multimodal Defect Verification:** When a user uploads a photo of a broken device, the image is passed to a Vision-Language Model (VLM) which identifies the damage, compares it with company warranty policies retrieved from Qdrant, and verifies whether the defect is covered.
 2. **Deterministic CRM Tool Execution:** The copilot cannot execute direct database writes. All actions (e.g., issuing refunds) are routed through authenticated REST endpoints with strict idempotency keys (`idempotency_key = hash(user_id, order_id, action)`).
@@ -1306,7 +1315,7 @@ flowchart TD
 
 ---
 
-### 18.3 Human Escalation & Smooth Handoff Protocol
+### 11.3 Human Escalation & Smooth Handoff Protocol
 
 An AI customer copilot must never leave a frustrated customer stranded in an automated loop:
 
@@ -1334,9 +1343,9 @@ sequenceDiagram
 
 ---
 
-# 19. Enterprise Blueprint 2: Autonomous Code Intelligence & Self-Healing Engine
+# 12. Enterprise Blueprint 2: Autonomous Code Intelligence & Self-Healing Engine
 
-### 19.1 Repository-Scale Graph & AST Vector Indexing
+### 12.1 Repository-Scale Graph & AST Vector Indexing
 
 Traditional text chunking fails on codebases because functions depend on cross-file class definitions, imports, and global interfaces. A production code intelligence engine uses a **Graph-RAG + Abstract Syntax Tree (AST)** indexing pipeline:
 
@@ -1382,7 +1391,7 @@ flowchart TD
 
 ---
 
-### 19.2 Language Server Protocol (LSP) Tool Integration
+### 12.2 Language Server Protocol (LSP) Tool Integration
 
 Rather than asking an LLM to guess variable types or find references via text search, the agent connects directly to headless **Language Server Protocol (LSP)** daemons (such as `pyright` for Python or `gopls` for Go).
 
@@ -1393,7 +1402,7 @@ Rather than asking an LLM to guess variable types or find references via text se
 
 ---
 
-### 19.3 Sandboxed Test-Driven Repair Loops & Infinite Loop Prevention
+### 12.3 Sandboxed Test-Driven Repair Loops & Infinite Loop Prevention
 
 When generating or fixing code, the agent operates in an isolated micro-virtual machine (**E2B / Docker Sandbox**) in an automated **Test-Driven Repair Loop**:
 
@@ -1431,9 +1440,9 @@ flowchart TD
 
 ---
 
-# 20. Enterprise Blueprint 3: Autonomous Deep Research Agent & Knowledge Synthesizer
+# 13. Enterprise Blueprint 3: Autonomous Deep Research Agent & Knowledge Synthesizer
 
-### 20.1 Multi-Query Decomposition & Parallel Web Search
+### 13.1 Multi-Query Decomposition & Parallel Web Search
 
 A Deep Research Agent conducts open-ended, complex scientific, financial, or strategic investigations. A naive single prompt produces shallow summaries. 
 
@@ -1477,7 +1486,7 @@ flowchart TD
 
 ---
 
-### 20.2 Iterative Information Synthesis & External State Offloading
+### 13.2 Iterative Information Synthesis & External State Offloading
 
 If an agent attempts to hold 50 full academic papers in its context window simultaneously, it triggers severe **Context Rot** and the **Lost-in-the-Middle** phenomenon.
 
@@ -1490,7 +1499,7 @@ The agent maintains an external workspace file system:
 
 ---
 
-### 20.3 Citation Tracking & Structured Markdown Deliverables
+### 13.3 Citation Tracking & Structured Markdown Deliverables
 
 Every empirical statement, market projection, and metric in the final report must carry an explicit, verifiable bracketed citation pointing back to the raw source:
 
@@ -1498,9 +1507,9 @@ $$\text{"Current lab prototypes reach } 450\text{ Wh/kg [Source 4], compared to 
 
 ---
 
-# 21. Enterprise Blueprint 4: High-Throughput Global Enterprise RAG Platform
+# 14. Enterprise Blueprint 4: High-Throughput Global Enterprise RAG Platform
 
-### 21.1 Decoupling Asynchronous Ingestion from Online Query Serving
+### 14.1 Decoupling Asynchronous Ingestion from Online Query Serving
 
 In high-concurrency systems, **document ingestion and user querying must never share the same execution thread, memory pool, or database cluster**.
 
@@ -1540,14 +1549,14 @@ flowchart TD
 
 ---
 
-### 21.2 Asynchronous Ingress Queues & Stateless Retrieval Workers
+### 14.2 Asynchronous Ingress Queues & Stateless Retrieval Workers
 
 - **Kafka Buffering:** If an enterprise uploads 50,000 corporate policy PDFs simultaneously, the ingestion queue absorbs the spike without degrading the latency of live users querying the system.
 - **Stateless Query Tier:** The online query pods maintain zero in-memory user session state, allowing the cluster to scale elastically from 5 to 500 pods in response to traffic surges.
 
 ---
 
-### 21.3 High-Throughput Vector Index Sharding & Multi-Region Disaster Recovery
+### 14.3 High-Throughput Vector Index Sharding & Multi-Region Disaster Recovery
 
 #### Sharding Topology
 To support hundreds of millions of document chunks, collections are partitioned using **Two-Tier Sharding**:
@@ -1556,9 +1565,9 @@ To support hundreds of millions of document chunks, collections are partitioned 
 
 ---
 
-# 22. Live Production Incident Triage Playbooks & Whiteboard Defense
+# 15. Live Production Incident Triage Playbooks & Whiteboard Defense
 
-### 22.1 Runbook 1: Massive $p99$ Latency Spikes (TTFT Exceeds 10 Seconds)
+### 15.1 Runbook 1: Massive $p99$ Latency Spikes (TTFT Exceeds 10 Seconds)
 
 ```mermaid
 flowchart TD
@@ -1591,7 +1600,7 @@ flowchart TD
 
 ---
 
-### 22.2 Runbook 2: Runaway Financial Cost Explosions & Recursive Agent Loops
+### 15.2 Runbook 2: Runaway Financial Cost Explosions & Recursive Agent Loops
 
 - **Symptom:** Hourly API expenditure surges $500\%$ above normal baseline.
 - **Immediate Triage Steps:**
@@ -1605,7 +1614,7 @@ flowchart TD
 
 ---
 
-### 22.3 Runbook 3: Silent Quality Degradation Post-Deployment
+### 15.3 Runbook 3: Silent Quality Degradation Post-Deployment
 
 - **Symptom:** User complaints surge; answer accuracy drops sharply after two weeks in production.
 - **Triage Checklist:**
@@ -1615,7 +1624,7 @@ flowchart TD
 
 ---
 
-### 22.4 Defending "RAG vs. Fine-Tuning" on a Technical Whiteboard
+### 15.4 Defending "RAG vs. Fine-Tuning" on a Technical Whiteboard
 
 When interviewers or executive stakeholders ask: *"Should we fine-tune a model or build RAG for our enterprise knowledge base?"* defend your architectural decision using this canonical matrix:
 
@@ -1629,9 +1638,9 @@ When interviewers or executive stakeholders ask: *"Should we fine-tune a model o
 
 ---
 
-# 23. Production Implementation: Enterprise Gateway, Semantic Router & Cascade Service
+# 16. Production Implementation: Enterprise Gateway, Semantic Router & Cascade Service
 
-### 23.1 Systems Architecture & Lifecycle Management
+### 16.1 Systems Architecture & Lifecycle Management
 
 The complete production-grade Python implementation below delivers an enterprise-ready AI Gateway microservice featuring:
 - Multi-tier caching (Exact SHA-256 hash match + Semantic vector cache mock).
@@ -1642,7 +1651,7 @@ The complete production-grade Python implementation below delivers an enterprise
 
 ---
 
-### 23.2 Complete Production-Grade Python Implementation
+### 16.2 Complete Production-Grade Python Implementation
 
 ```python
 """
@@ -1667,7 +1676,7 @@ logger = logging.getLogger("EnterpriseAIGateway")
 
 # ==============================================================================
 
-# 24. Domain Data Classes & Telemetry Schemas
+    # Domain Data Classes & Telemetry Schemas
 
 # ==============================================================================
 
@@ -1692,7 +1701,7 @@ class GatewayResponse:
 
 # ==============================================================================
 
-# 25. Multi-Tier Caching Infrastructure Simulation
+    # Multi-Tier Caching Infrastructure Simulation
 
 # ==============================================================================
 
@@ -1733,7 +1742,7 @@ class SemanticVectorCache:
 
 # ==============================================================================
 
-# 26. Dynamic Model Cascade & Serving Engines
+    # Dynamic Model Cascade & Serving Engines
 
 # ==============================================================================
 
@@ -1768,7 +1777,7 @@ class FoundationModelEngines:
 
 # ==============================================================================
 
-# 27. Enterprise AI Gateway Orchestrator
+    # Enterprise AI Gateway Orchestrator
 
 # ==============================================================================
 
@@ -1791,7 +1800,7 @@ class EnterpriseAIGateway:
 
         # ----------------------------------------------------------------------
 
-# 28. Tier 1 Cache Lookup (Exact Match)
+        # Tier 1 Cache Lookup (Exact Match)
 
 # ----------------------------------------------------------------------
         exact_hit = self.exact_cache.get(req.tenant_id, req.query)
@@ -1811,7 +1820,7 @@ class EnterpriseAIGateway:
 
         # ----------------------------------------------------------------------
 
-# 29. Tier 2 Cache Lookup (Semantic Vector Cache)
+        # Tier 2 Cache Lookup (Semantic Vector Cache)
 
 # ----------------------------------------------------------------------
         semantic_hit = self.semantic_cache.lookup(req.tenant_id, req.query)
@@ -1831,7 +1840,7 @@ class EnterpriseAIGateway:
 
         # ----------------------------------------------------------------------
 
-# 30. Dynamic Model Routing & Cascade Execution
+        # Dynamic Model Routing & Cascade Execution
 
 # ----------------------------------------------------------------------
         tier = self._classify_complexity(req.query)
@@ -1884,7 +1893,7 @@ class EnterpriseAIGateway:
 
 # ==============================================================================
 
-# 31. End-to-End Verification Runner
+    # End-to-End Verification Runner
 
 # ==============================================================================
 
@@ -1962,7 +1971,7 @@ if __name__ == "__main__":
 
 ---
 
-### 31.3 End-to-End Execution Verification & Benchmark Validation
+### 16.3 End-to-End Execution Verification & Benchmark Validation
 
 When executing the benchmark suite:
 - **Exact Cache Hit:** Returns in **$2.1\text{ms}$** with $\$0.00$ cost.
@@ -1973,9 +1982,13 @@ When executing the benchmark suite:
 
 ---
 
-# 32. Summary Comparison & Production Engineering Reference Matrix
+# 17. Summary Comparison & Production Engineering Reference Matrix
 
-### 9.1 Model Adaptation Methodology Comparison
+### 17.1 Model Adaptation Methodology Comparison
+
+Selecting the appropriate adaptation technique requires balancing parameter updates, compute budgets, memory footprints, and serving architectures. While full parameter fine-tuning modifies every weight matrix, parameter-efficient adaptations like LoRA, QLoRA, and DoRA freeze the foundation model and introduce low-rank projection adapters. For human preference alignment and verifiable tasks, direct preference optimization (DPO) and rejection sampling provide specialized post-training alignment without external reward models.
+
+The technical trade-offs across model adaptation methodologies:
 
 | Adaptation Technique | Weights Modified | VRAM Sizing (70B Model) | Training Compute | Servability | Primary Failure Mode |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -1988,7 +2001,11 @@ When executing the benchmark suite:
 
 ---
 
-### 9.2 Fine-Tuning Hyperparameter Reference Playbook
+### 17.2 Fine-Tuning Hyperparameter Reference Playbook
+
+Fine-tuning stability depends on precise hyperparameter calibration. Because parameter-efficient fine-tuning operates on pre-trained representations, improper learning rates, mismatched scaling factors, or omission of prompt loss masking immediately destabilize attention projections or cause catastrophic degradation.
+
+Production hyperparameter guidelines and diagnostic indicators:
 
 | Parameter | Recommended Setting | Failure Symptom if Incorrect |
 | :--- | :--- | :--- |
@@ -2000,7 +2017,11 @@ When executing the benchmark suite:
 
 ---
 
-### 9.1 Enterprise AI Architecture Blueprint Reference Matrix
+### 17.3 Enterprise AI Architecture Blueprint Reference Matrix
+
+Enterprise AI systems operate across diverse operational regimes—from sub-second voice customer copilots to long-running autonomous research agents. Each pattern requires a distinct component topology, caching strategy, and latency budget to ensure service reliability under load.
+
+Comparative architectural dimensions across the four core enterprise blueprints:
 
 | Architecture Blueprint | Core Component Topology | Latency SLA ($p95$) | Cost Profile | Dominant Failure Mode & Mitigation |
 | :--- | :--- | :--- | :--- | :--- |
@@ -2011,7 +2032,11 @@ When executing the benchmark suite:
 
 ---
 
-### 9.2 Enterprise AI Platform SRE Invariants
+### 17.4 Enterprise AI Platform SRE Invariants
+
+Reliable generative AI platforms require non-negotiable operational boundaries. These site reliability invariants enforce tenant security, predictable unit economics, and deterministic upstream failover across all model invocations.
+
+Production reliability mandates and automated verification mechanisms:
 
 | Architectural Invariant | Production Mandate | SRE Verification Mechanism |
 | :--- | :--- | :--- |
@@ -2023,7 +2048,7 @@ When executing the benchmark suite:
 
 ---
 
-# 33. References & Further Reading
+# 18. References & Further Reading
 
 1. **LoRA: Low-Rank Adaptation of Large Language Models:** Hu, E. J., et al. (2021). *ICLR 2022.* [arXiv:2106.09685](https://arxiv.org/abs/2106.09685).
 2. **QLoRA: Efficient Finetuning of Quantized LLMs:** Dettmers, T., et al. (2023). *NeurIPS 2023.* [arXiv:2305.14314](https://arxiv.org/abs/2305.14314).
@@ -2032,11 +2057,10 @@ When executing the benchmark suite:
 5. **DoRA: Weight-Decomposed Low-Rank Adaptation:** Liu, S. Y., et al. (2024). *ICML 2024.* [arXiv:2402.09353](https://arxiv.org/abs/2402.09353).
 6. **Distilling the Knowledge in a Neural Network:** Hinton, G., Vinyals, O., & Dean, J. (2015). *NIPS Deep Learning Workshop.* [arXiv:1503.02531](https://arxiv.org/abs/1503.02531).
 7. **vLLM Multi-LoRA High-Density Serving Architecture:** [docs.vllm.ai/en/latest/models/lora.html](https://docs.vllm.ai/en/latest/models/lora.html).
-
-1. **System Design Interview – An Insider's Guide:** Xu, A. (2020). ByteDance & Twitter Engineering.
-2. **Designing Data-Intensive Applications:** Kleppmann, M. (2017). O'Reilly Media.
-3. **Architecting Multi-Tenant Generative AI Applications on AWS:** Amazon Web Services (2024). [aws.amazon.com/solutions](https://aws.amazon.com/solutions/).
-4. **Azure AI Architecture Center: Generative AI Blueprints:** Microsoft (2024). [learn.microsoft.com/azure/architecture](https://learn.microsoft.com/azure/architecture/).
-5. **LangGraph Production Case Studies:** LangChain Engineering (2024). [blog.langchain.dev](https://blog.langchain.dev/).
-6. **OpenInference Semantic Conventions for Generative AI:** OpenTelemetry & Arize AI (2024). [github.com/Arize-ai/openinference](https://github.com/Arize-ai/openinference).
-7. **Qdrant Vector Database Distributed Deployment Architecture:** Qdrant Team (2024). [qdrant.tech/documentation](https://qdrant.tech/documentation/).
+8. **System Design Interview – An Insider's Guide:** Xu, A. (2020). ByteDance & Twitter Engineering.
+9. **Designing Data-Intensive Applications:** Kleppmann, M. (2017). O'Reilly Media.
+10. **Architecting Multi-Tenant Generative AI Applications on AWS:** Amazon Web Services (2024). [aws.amazon.com/solutions](https://aws.amazon.com/solutions/).
+11. **Azure AI Architecture Center: Generative AI Blueprints:** Microsoft (2024). [learn.microsoft.com/azure/architecture](https://learn.microsoft.com/azure/architecture/).
+12. **LangGraph Production Case Studies:** LangChain Engineering (2024). [blog.langchain.dev](https://blog.langchain.dev/).
+13. **OpenInference Semantic Conventions for Generative AI:** OpenTelemetry & Arize AI (2024). [github.com/Arize-ai/openinference](https://github.com/Arize-ai/openinference).
+14. **Qdrant Vector Database Distributed Deployment Architecture:** Qdrant Team (2024). [qdrant.tech/documentation](https://qdrant.tech/documentation/).
