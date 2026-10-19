@@ -1,6 +1,6 @@
 # Interview Preparation & Engineering Knowledge Base
 
-A structured collection of production-grade study guides, architectural deep dives, and real-world interview solutions focused on **Data Engineering** and **Java Backend Engineering**, with dedicated resources for **Supplemental Resources** (Universal Interview Prep & Additional Engineering Tracks).
+A structured collection of production-grade study guides, architectural deep dives, and real-world interview solutions focused on **Data Engineering** and **Java Backend Engineering**, with dedicated resources for **Supplemental Engineering Tracks** (AI, Cloud, and Python Backend) and **Supplemental Resources** (Universal Interview Preparation).
 
 Each track provides a strict 10-module linear curriculum, accompanied by scenario-based interview question deep dives in 1:1 mapped companion guides.
 
@@ -34,18 +34,21 @@ Deep architectural exploration of JVM mechanics, core Java, modern functional fe
 
 ---
 
-## Supplemental Resources & Additional Tracks
+## Supplemental Engineering Tracks
+Comprehensive, production-grade curricula covering specialized domains, each following the repository's strict 10-module standard:
 
-For universal interview preparation and additional engineering disciplines, see the **[Supplemental Resources](Supplemental%20Resources/README.md)** directory:
+- **[Supplemental Engineering Tracks Overview](Supplemental%20Engineering%20Tracks/README.md)** — Master catalog, architecture overview, and syllabi for specialized engineering disciplines.
+- **[AI Engineering](Supplemental%20Engineering%20Tracks/AI%20Engineering/00_ai_study_guide_and_index.md)** — Applied machine learning, transformer architectures, prompt engineering, RAG, multi-agent systems, and inference serving. Includes [Interview FAQs & Question Bank](Supplemental%20Engineering%20Tracks/AI%20Engineering/frequently_asked_questions/00_ai_faq_study_guide_and_index.md).
+- **[Cloud Engineering](Supplemental%20Engineering%20Tracks/Cloud%20Engineering/00_cloud_study_guide_and_index.md)** — Linux internals, cloud networking, Azure & AWS architecture, Terraform, Kubernetes, SRE, and FinOps.
+- **[Python Backend Engineering](Supplemental%20Engineering%20Tracks/Python%20Backend%20Engineering/00_python_study_guide_and_index.md)** — CPython runtime, async concurrency, FastAPI, SQLAlchemy 2.0, microservices, and enterprise architecture.
 
-### Pillar 1: Universal Interview Foundations
-- **[Data Structures & Algorithms (DSA)](Supplemental%20Resources/README.md#pillar-1-universal-interview-foundations-roadmap--specifications)** — Core algorithmic patterns, asymptotic complexity, graph algorithms, and dynamic programming.
-- **[System Design (HLD & LLD)](Supplemental%20Resources/README.md#pillar-1-universal-interview-foundations-roadmap--specifications)** — Distributed systems architecture, scalability patterns, consensus, low-level object-oriented design, and design patterns.
-- **[Behavioral & Leadership](Supplemental%20Resources/README.md#pillar-1-universal-interview-foundations-roadmap--specifications)** — STAR-framework response strategies, technical leadership principles, incident post-mortems, and stakeholder triage.
+---
 
-### Pillar 2: Additional Engineering Tracks
-- **[AI Engineering](Supplemental%20Resources/README.md#1-ai-engineering)** — Applied machine learning, transformer architectures, prompt engineering, RAG, multi-agent systems, and inference serving.
-- **[Cloud Engineering](Supplemental%20Resources/README.md#2-cloud-engineering)** — Linux internals, cloud networking, Azure & AWS architecture, Terraform, Kubernetes, SRE, and FinOps.
-- **[Python Backend Engineering](Supplemental%20Resources/README.md#3-python-backend-engineering)** — CPython runtime, async concurrency, FastAPI, SQLAlchemy 2.0, microservices, and enterprise architecture.
+## Supplemental Resources (Universal Interview Preparation)
 
-👉 **Explore the full roadmaps, syllabi, 10-module curricula, and question banks in the [Supplemental Resources Guide](Supplemental%20Resources/README.md).**
+Universal software engineering interview preparation across cross-cutting evaluation pillars, organized under **[Supplemental Resources](Supplemental%20Resources/README.md)**:
+
+- **[Interview Foundations Master Study Guide](Supplemental%20Resources/00_interview_foundations_study_guide_and_index.md)** — Master syllabus and 50-problem canonical production-solution cross-reference matrix.
+- **[Data Structures & Algorithms (DSA)](Supplemental%20Resources/Data%20Structures%20&%20Algorithms/00_dsa_study_guide_and_index.md)** — 8 progressive modules covering pointer patterns, monotonic structures, trees, binary search on answer, heaps, graphs, DP, and bit manipulation.
+- **[System Design (HLD & LLD)](Supplemental%20Resources/00_interview_foundations_study_guide_and_index.md#2-system-design-track-hld--lld)** — High-Level Design (20 architectures) & Low-Level Design (17 machine coding systems) divided across Java/Backend and Data Engineering.
+- **[Behavioral & Engineering Leadership](Supplemental%20Resources/00_interview_foundations_study_guide_and_index.md#1-behavioral--engineering-leadership)** — Production incident command, technical pushback, and cross-functional leadership divided across Java/Backend and Data Engineering.

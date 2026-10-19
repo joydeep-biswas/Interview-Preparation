@@ -226,8 +226,8 @@ flowchart TD
 > This module details the application engineering lifecycle for Java developers: containerizing Spring Boot apps, tuning JVM memory within cgroups, configuring Kubernetes Deployment/Service manifests, and implementing CI/CD pipelines.
 >
 > For deep cloud infrastructure engineering, etcd control plane mechanics, CNI network virtualization, multi-region hub-and-spoke landing zones, and enterprise GitOps (ArgoCD/Flux), see:
-> - [Cloud Engineering: 08. Containers, Kubernetes & GitOps](../Supplemental%20Resources/Cloud%20Engineering/06_containers_kubernetes_and_gitops.md)
-> - [Cloud Engineering: 07. CI/CD & Release Engineering](../Supplemental%20Resources/Cloud%20Engineering/05_cicd_and_release_engineering.md)
+> - [Cloud Engineering: 08. Containers, Kubernetes & GitOps](../Supplemental%20Engineering%20Tracks/Cloud%20Engineering/06_containers_kubernetes_and_gitops.md)
+> - [Cloud Engineering: 07. CI/CD & Release Engineering](../Supplemental%20Engineering%20Tracks/Cloud%20Engineering/05_cicd_and_release_engineering.md)
 
 ---
 
